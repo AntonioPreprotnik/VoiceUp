@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PAUSE_ABOVE_CHARS } from '../../core/terminalFlow'
+import { TERMINAL_RESET } from '../../shared/ipcChannels'
 import fakeLog from '../../../test/fakes/electronLog'
 import { FakePty, lastPty, resetFakePty, spawned } from '../../../test/fakes/nodePty'
 import { PtyHost } from './host'
@@ -268,6 +269,16 @@ describe('restarting', () => {
     await host.restart()
     expect(spawned).toHaveLength(2)
     expect(lastPty().options).toMatchObject({ cols: 88, rows: 22 })
+  })
+
+  it('sends the screen reset as its own message, which the banner relies on', async () => {
+    const { host, sent } = createHost()
+    const first = await started(host)
+    first.emitData('old output')
+    const restarted = host.restart()
+    first.emitExit(0)
+    await restarted
+    expect(sent).toContain(TERMINAL_RESET)
   })
 
   it('does nothing beyond clearing when no size has arrived yet', async () => {

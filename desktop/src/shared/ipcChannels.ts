@@ -9,6 +9,9 @@ export const Channels = {
   sessionRestart: 'session:restart'
 } as const
 
+/** RIS, the terminal's full reset, sent on its own as a session is replaced. */
+export const TERMINAL_RESET = '\x1bc'
+
 /** Why the session ended, in words the terminal window can show as they are. */
 export interface SessionExit {
   readonly title: string

@@ -4,7 +4,7 @@ import { WebglAddon } from '@xterm/addon-webgl'
 import { Terminal } from '@xterm/xterm'
 import '@xterm/xterm/css/xterm.css'
 import { chunkInput } from '../../shared/chunkInput'
-import type { TerminalApi } from '../../shared/ipcChannels'
+import { TERMINAL_RESET, type TerminalApi } from '../../shared/ipcChannels'
 
 declare global {
   interface Window {
@@ -49,22 +49,39 @@ terminal.onData((data) => {
   for (const chunk of chunkInput(data, MAX_INPUT_CHARS)) api.input(chunk)
 })
 
+const exitBanner = document.getElementById('session-exited')
+const exitText = document.getElementById('session-exited-text')
+const restartButton = document.getElementById('restart-session')
+if (exitBanner === null || exitText === null || !(restartButton instanceof HTMLButtonElement)) {
+  throw new Error('The terminal page is missing its session banner')
+}
+
+let restarting = false
+
+// An arrow function, because a hoisted declaration would lose the null checks above.
+const setRestarting = (active: boolean): void => {
+  restarting = active
+  restartButton.disabled = active
+  restartButton.textContent = active ? 'Restarting...' : 'Restart session'
+}
+
 // Acknowledged only once xterm has drawn it, which is what makes the flow control work.
 api.onData((data) => {
+  // The banner stays until the new session prints something. The reset that clears the screen
+  // comes first and doesn't count, or the banner would vanish before Claude has started.
+  if (restarting && data !== TERMINAL_RESET) {
+    setRestarting(false)
+    exitBanner.hidden = true
+    terminal.focus()
+  }
   terminal.write(data, () => {
     api.ack(data.length)
   })
 })
 
 // The text comes from main and is shown with textContent, never as markup.
-const exitBanner = document.getElementById('session-exited')
-const exitText = document.getElementById('session-exited-text')
-const restartButton = document.getElementById('restart-session')
-if (exitBanner === null || exitText === null || restartButton === null) {
-  throw new Error('The terminal page is missing its session banner')
-}
-
 api.onSessionExit(({ title, detail, exitCode }) => {
+  setRestarting(false)
   const code = exitCode === null ? '' : ` (exit code ${String(exitCode)})`
   exitText.textContent = `${title}${code}. ${detail}`
   exitBanner.hidden = false
@@ -73,9 +90,9 @@ api.onSessionExit(({ title, detail, exitCode }) => {
 })
 
 restartButton.addEventListener('click', () => {
-  exitBanner.hidden = true
+  setRestarting(true)
+  exitText.textContent = 'Starting Claude Code...'
   api.restartSession()
-  terminal.focus()
 })
 
 function fitAndReport(): void {

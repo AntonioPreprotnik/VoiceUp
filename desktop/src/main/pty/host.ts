@@ -3,13 +3,12 @@ import { childEnv, type ClaudeCommand } from '../../core/claudeCommand'
 import { MESSAGES } from '../../core/messages'
 import { clampTermSize, FlowControl, OutputBatcher } from '../../core/terminalFlow'
 import type { TermResize } from '../../shared/ipc'
+import { TERMINAL_RESET } from '../../shared/ipcChannels'
 import { log } from '../log'
 
 const BATCH_MS = 16
 const RESIZE_DEBOUNCE_MS = 50
 const STOP_TIMEOUT_MS = 2000
-/** RIS, the terminal's full reset. */
-const CLEAR_SCREEN = '\x1bc'
 
 export interface PtyHostOptions {
   /** Sends output to the terminal window. */
@@ -102,7 +101,7 @@ export class PtyHost {
     this.batcher.flush()
     this.flow = new FlowControl()
     this.stopping = false
-    this.options.send(CLEAR_SCREEN)
+    this.options.send(TERMINAL_RESET)
     if (this.latestSize !== undefined) {
       this.startup = this.start(this.latestSize)
       await this.startup

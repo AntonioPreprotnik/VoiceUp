@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import { Channels, type TerminalApi } from '../shared/ipcChannels'
+import { Channels, type SessionExit, type TerminalApi } from '../shared/ipcChannels'
 
 // Security rule 7: named functions through contextBridge, never ipcRenderer itself, and the IPC
 // event never reaches the page. Security rule 2: this preload serves the terminal window only.
@@ -22,6 +22,18 @@ const api: TerminalApi = {
     return () => {
       ipcRenderer.off(Channels.termData, forward)
     }
+  },
+  onSessionExit: (listener) => {
+    const forward = (_event: unknown, exit: SessionExit): void => {
+      listener(exit)
+    }
+    ipcRenderer.on(Channels.sessionExited, forward)
+    return () => {
+      ipcRenderer.off(Channels.sessionExited, forward)
+    }
+  },
+  restartSession: () => {
+    ipcRenderer.send(Channels.sessionRestart, {})
   }
 }
 

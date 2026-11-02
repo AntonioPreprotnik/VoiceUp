@@ -8,3 +8,4 @@ export const TermAck = z.number().int().nonnegative()
 // The size is clamped by the receiver, not rejected, so only its shape is checked here.
 export const TermResize = z.object({ cols: z.number().int(), rows: z.number().int() })
 export type TermResize = z.infer<typeof TermResize>
+export const SessionRestart = z.object({}).strict()

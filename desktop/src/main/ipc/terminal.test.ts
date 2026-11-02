@@ -12,7 +12,12 @@ vi.mock('electron-log/main', () => import('../../../test/fakes/electronLog'))
 
 const APP_PAGE = 'app://voiceup/terminal/index.html'
 
-const host = { write: vi.fn(), resize: vi.fn(), acknowledge: vi.fn() }
+const host = {
+  write: vi.fn(),
+  resize: vi.fn(),
+  acknowledge: vi.fn(),
+  restart: vi.fn(() => Promise.resolve())
+}
 
 function terminalEvent(frameUrl = APP_PAGE): unknown {
   createWindow('terminal')
@@ -41,6 +46,30 @@ describe('terminal IPC', () => {
   it('passes a valid ack', () => {
     ipcMain.emit(Channels.termAck, terminalEvent(), 500)
     expect(host.acknowledge).toHaveBeenCalledWith(500)
+  })
+
+  it('restarts the session on request', () => {
+    ipcMain.emit(Channels.sessionRestart, terminalEvent(), {})
+    expect(host.restart).toHaveBeenCalledOnce()
+  })
+
+  it('drops a restart from a frame on another origin', () => {
+    ipcMain.emit(Channels.sessionRestart, terminalEvent('https://example.com/'), {})
+    expect(host.restart).not.toHaveBeenCalled()
+  })
+
+  it('drops a restart with an unexpected payload', () => {
+    ipcMain.emit(Channels.sessionRestart, terminalEvent(), { folder: 'C:\\Windows' })
+    expect(host.restart).not.toHaveBeenCalled()
+    expect(fakeLog.messages('warn')).toHaveLength(1)
+  })
+
+  it('logs a restart that fails', async () => {
+    host.restart.mockImplementationOnce(() => Promise.reject(new Error('boom')))
+    ipcMain.emit(Channels.sessionRestart, terminalEvent(), {})
+    await vi.waitFor(() => {
+      expect(fakeLog.messages('error')).toHaveLength(1)
+    })
   })
 
   it.each([Channels.termInput, Channels.termResize, Channels.termAck])(

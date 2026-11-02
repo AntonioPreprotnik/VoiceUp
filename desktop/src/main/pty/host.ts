@@ -15,6 +15,8 @@ export interface PtyHostOptions {
   /** Sends output to the terminal window. */
   readonly send: (data: string) => void
   readonly resolveCommand: () => Promise<ClaudeCommand | null>
+  /** Claude ended or failed to start, and not because we stopped it. Null: no exit code. */
+  readonly onExit: (exitCode: number | null) => void
   /** The folder to run in, which may ask the user. Null means they declined. */
   readonly resolveCwd: () => Promise<string | null>
 }
@@ -28,6 +30,7 @@ export class PtyHost {
   private resizeTimer: ReturnType<typeof setTimeout> | undefined
   private exited: Promise<void> | undefined
   private startup: Promise<void> | undefined
+  private restarting: Promise<void> | undefined
   private flow = new FlowControl()
   private readonly batcher: OutputBatcher
 
@@ -82,8 +85,18 @@ export class PtyHost {
     this.pty = undefined
   }
 
-  /** Replaces the session with a new one, at the current size, on a cleared screen. */
-  async restart(): Promise<void> {
+  /**
+   * Replaces the session with a new one, at the current size, on a cleared screen. A second call
+   * while one is in progress joins it, so a double click can't start two sessions.
+   */
+  restart(): Promise<void> {
+    this.restarting ??= this.replaceSession().finally(() => {
+      this.restarting = undefined
+    })
+    return this.restarting
+  }
+
+  private async replaceSession(): Promise<void> {
     await this.stop()
     await this.startup // a start in progress gives up when it sees stopping
     this.batcher.flush()
@@ -135,7 +148,7 @@ export class PtyHost {
       this.launch(spawn, command, size, cwd)
     } catch (error: unknown) {
       log.error('Could not start Claude Code', error)
-      this.showMessage('CLAUDE_EXITED')
+      this.options.onExit(null)
     } finally {
       this.starting = false
     }
@@ -174,7 +187,7 @@ export class PtyHost {
         if (this.pty === pty) {
           this.batcher.flush()
           this.pty = undefined
-          if (!this.stopping) this.showMessage('CLAUDE_EXITED', ` (exit code ${String(exitCode)})`)
+          if (!this.stopping) this.options.onExit(exitCode)
         }
         resolve()
       })

@@ -1,6 +1,6 @@
 import { ipcMain, type IpcMainEvent } from 'electron'
 import type { ZodType } from 'zod'
-import { TermAck, TermInput, TermResize } from '../../shared/ipc'
+import { SessionRestart, TermAck, TermInput, TermResize } from '../../shared/ipc'
 import { Channels } from '../../shared/ipcChannels'
 import { log } from '../log'
 import type { PtyHost } from '../pty/host'
@@ -32,5 +32,10 @@ export function registerTerminalIpc(host: PtyHost): void {
   })
   on(Channels.termAck, TermAck, (chars) => {
     host.acknowledge(chars)
+  })
+  on(Channels.sessionRestart, SessionRestart, () => {
+    host.restart().catch((error: unknown) => {
+      log.error('Could not restart the session', error)
+    })
   })
 }

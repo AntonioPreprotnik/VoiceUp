@@ -10,14 +10,20 @@ vi.mock('node-pty', () => import('../../../test/fakes/nodePty'))
 
 const claude = { file: 'claude.exe', args: ['--flag'] }
 
-function createHost(command: typeof claude | null = claude): { host: PtyHost; sent: string[] } {
+function createHost(command: typeof claude | null = claude): {
+  host: PtyHost
+  sent: string[]
+  exits: (number | null)[]
+} {
   const sent: string[] = []
+  const exits: (number | null)[] = []
   const host = new PtyHost({
     send: (data) => sent.push(data),
+    onExit: (exitCode) => exits.push(exitCode),
     resolveCommand: () => Promise.resolve(command),
     resolveCwd: () => Promise.resolve('C:\\work')
   })
-  return { host, sent }
+  return { host, sent, exits }
 }
 
 async function started(host: PtyHost, cols = 100, rows = 30): Promise<FakePty> {
@@ -91,16 +97,17 @@ describe('starting', () => {
     expect(fakeLog.messages('error')).toEqual([['CLAUDE_NOT_FOUND']])
   })
 
-  it('shows a message when the spawn fails', async () => {
-    const sent: string[] = []
+  it('reports an exit with no code when the spawn fails', async () => {
+    const exits: (number | null)[] = []
     const host = new PtyHost({
-      send: (data) => sent.push(data),
+      send: () => undefined,
+      onExit: (exitCode) => exits.push(exitCode),
       resolveCommand: () => Promise.reject(new Error('boom')),
       resolveCwd: () => Promise.resolve('C:\\work')
     })
     host.resize({ cols: 80, rows: 24 })
     await vi.waitFor(() => {
-      expect(sent.join('')).toContain('Claude Code stopped')
+      expect(exits).toEqual([null])
     })
     expect(fakeLog.messages('error')).toHaveLength(1)
   })
@@ -182,7 +189,7 @@ describe('resizing', () => {
 
 describe('restarting', () => {
   it('kills the old session and starts a new one at the current size', async () => {
-    const { host, sent } = createHost()
+    const { host, exits } = createHost()
     const first = await started(host, 90, 30)
     const restarted = host.restart()
     expect(first.killCount).toBe(1)
@@ -190,7 +197,7 @@ describe('restarting', () => {
     await restarted
     expect(spawned).toHaveLength(2)
     expect(lastPty().options).toMatchObject({ cols: 90, rows: 30 })
-    expect(sent.join('')).not.toContain('Claude Code stopped')
+    expect(exits).toEqual([])
   })
 
   it('starts a new session even if the old one will not exit', async () => {
@@ -203,7 +210,7 @@ describe('restarting', () => {
   })
 
   it('ignores a late exit and late output from the replaced session', async () => {
-    const { host, sent } = createHost()
+    const { host, sent, exits } = createHost()
     const first = await started(host)
     const restarted = host.restart()
     await vi.advanceTimersByTimeAsync(2000)
@@ -214,7 +221,7 @@ describe('restarting', () => {
     first.emitExit(1)
     await vi.advanceTimersByTimeAsync(16)
     expect(sent.join('')).not.toContain('old output')
-    expect(sent.join('')).not.toContain('Claude Code stopped')
+    expect(exits).toEqual([])
 
     host.write('still connected')
     expect(second.written).toEqual(['still connected'])
@@ -231,6 +238,38 @@ describe('restarting', () => {
     expect(lastPty().options).toMatchObject({ cols: 70, rows: 20 })
   })
 
+  it('joins a restart already in progress, so two requests make one session', async () => {
+    const { host } = createHost()
+    const first = await started(host)
+    const restarts = [host.restart(), host.restart()]
+    first.emitExit(0)
+    await Promise.all(restarts)
+    expect(first.killCount).toBe(1)
+    expect(spawned).toHaveLength(2)
+  })
+
+  it('can restart again after a restart has finished', async () => {
+    const { host } = createHost()
+    const first = await started(host)
+    const once = host.restart()
+    first.emitExit(0)
+    await once
+    const second = lastPty()
+    const twice = host.restart()
+    second.emitExit(0)
+    await twice
+    expect(spawned).toHaveLength(3)
+  })
+
+  it('starts a new session after Claude has already exited', async () => {
+    const { host } = createHost()
+    const first = await started(host, 88, 22)
+    first.emitExit(1)
+    await host.restart()
+    expect(spawned).toHaveLength(2)
+    expect(lastPty().options).toMatchObject({ cols: 88, rows: 22 })
+  })
+
   it('does nothing beyond clearing when no size has arrived yet', async () => {
     const { host } = createHost()
     await host.restart()
@@ -239,24 +278,23 @@ describe('restarting', () => {
 })
 
 describe('exit and stop', () => {
-  it('flushes output and shows the exit code when Claude exits', async () => {
-    const { host, sent } = createHost()
+  it('flushes output and reports the exit code when Claude exits', async () => {
+    const { host, sent, exits } = createHost()
     const pty = await started(host)
     pty.emitData('last words')
     pty.emitExit(3)
     expect(sent[0]).toBe('last words')
-    expect(sent.join('')).toContain('Claude Code stopped')
-    expect(sent.join('')).toContain('exit code 3')
+    expect(exits).toEqual([3])
   })
 
-  it('kills and waits for exit on stop, with no exit message', async () => {
-    const { host, sent } = createHost()
+  it('kills and waits for exit on stop, with no exit report', async () => {
+    const { host, exits } = createHost()
     const pty = await started(host)
     const stopped = host.stop()
     expect(pty.killCount).toBe(1)
     pty.emitExit(0)
     await stopped
-    expect(sent.join('')).not.toContain('Claude Code stopped')
+    expect(exits).toEqual([])
   })
 
   it('gives up waiting after 2 s if Claude does not exit', async () => {

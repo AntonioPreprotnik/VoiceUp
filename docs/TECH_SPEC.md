@@ -342,6 +342,8 @@ Every boundary has one zod schema in `shared/`, imported by both sides; nothing 
 | `devices:list` | invoke | → `[{ deviceId, label }]` (the recorder enumerates) | settings |
 | `app:openLogs` | invoke | none | settings |
 | `state:rearm` | renderer → main | `{}`; ignored unless the state is `unknown` | terminal |
+| `session:exited` | main → renderer | `{ title, detail, exitCode \| null }`; `null` means Claude never started | terminal |
+| `session:restart` | renderer → main | `{}`; restarts Claude in the saved folder; a second request during a restart joins it | terminal |
 
 Rules for every handler: `validateSender(event)` checks that the sending frame's origin is `app://` and that the window id is in the channel's allowlist; then `schema.parse`. A failed check logs at `warn` and drops the message. Each preload exposes only its own window's channels as named functions, never `ipcRenderer` itself. Payloads are objects, except the high-frequency `term:*` stream channels, which may carry a bare string or number. Main clamps `term:resize` values rather than rejecting them.
 

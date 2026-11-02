@@ -56,6 +56,28 @@ api.onData((data) => {
   })
 })
 
+// The text comes from main and is shown with textContent, never as markup.
+const exitBanner = document.getElementById('session-exited')
+const exitText = document.getElementById('session-exited-text')
+const restartButton = document.getElementById('restart-session')
+if (exitBanner === null || exitText === null || restartButton === null) {
+  throw new Error('The terminal page is missing its session banner')
+}
+
+api.onSessionExit(({ title, detail, exitCode }) => {
+  const code = exitCode === null ? '' : ` (exit code ${String(exitCode)})`
+  exitText.textContent = `${title}${code}. ${detail}`
+  exitBanner.hidden = false
+  // Focused, so Enter restarts right away.
+  restartButton.focus()
+})
+
+restartButton.addEventListener('click', () => {
+  exitBanner.hidden = true
+  api.restartSession()
+  terminal.focus()
+})
+
 function fitAndReport(): void {
   fit.fit()
   api.resize(terminal.cols, terminal.rows)

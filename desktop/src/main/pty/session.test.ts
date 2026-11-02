@@ -140,6 +140,56 @@ describe('a later launch', () => {
   })
 })
 
+describe('when Claude exits', () => {
+  function exits(): unknown[] {
+    return window.webContents.sent
+      .filter(([channel]) => channel === 'session:exited')
+      .map(([, payload]) => payload)
+  }
+
+  it('tells the window, with the exit code and a next step', async () => {
+    createSession(folderA).host.resize({ cols: 80, rows: 24 })
+    await spawnedCount(1)
+    lastPty().emitExit(3)
+    expect(exits()).toEqual([
+      {
+        title: 'Claude Code stopped',
+        detail: 'Restart the session to continue.',
+        exitCode: 3
+      }
+    ])
+  })
+
+  it('says nothing when the app itself stopped Claude', async () => {
+    const session = createSession(folderA)
+    session.host.resize({ cols: 80, rows: 24 })
+    await spawnedCount(1)
+    const stopped = session.host.stop()
+    lastPty().emitExit(0)
+    await stopped
+    expect(exits()).toEqual([])
+  })
+
+  it('does not send to a window that has closed', async () => {
+    createSession(folderA).host.resize({ cols: 80, rows: 24 })
+    await spawnedCount(1)
+    window.destroyed = true
+    lastPty().emitExit(1)
+    expect(exits()).toEqual([])
+  })
+
+  it('restarts in the same folder without asking', async () => {
+    const session = createSession(folderA)
+    session.host.resize({ cols: 80, rows: 24 })
+    await spawnedCount(1)
+    lastPty().emitExit(1)
+    await session.host.restart()
+    expect(spawned).toHaveLength(2)
+    expect(lastPty().options['cwd']).toBe(folderA)
+    expect(dialog.requests).toEqual([])
+  })
+})
+
 describe('changing folder', () => {
   it('restarts Claude in the new folder and remembers it', async () => {
     const session = createSession(folderA)

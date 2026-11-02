@@ -342,7 +342,7 @@ Every boundary has one zod schema in `shared/`, imported by both sides; nothing 
 | `devices:list` | invoke | → `[{ deviceId, label }]` (the recorder enumerates) | settings |
 | `app:openLogs` | invoke | none | settings |
 | `state:rearm` | renderer → main | `{}`; ignored unless the state is `unknown` | terminal |
-| `session:exited` | main → renderer | `{ title, detail, exitCode \| null }`; `null` means Claude never started | terminal |
+| `session:exited` | main → renderer | `{ title, detail, action, command \| null, exitCode \| null }`; `null` exit code means Claude never started | terminal |
 | `clipboard:write` | renderer → main | string, ≤ 10 MB | terminal |
 | `clipboard:read` | invoke | → string | terminal |
 | `link:open` | renderer → main | `{ url }`, ≤ 2048 chars; only `https:` opens | terminal |
@@ -422,7 +422,7 @@ export const Settings = z.object({
 | `WORKER_CRASHED` | worker exit ≠ 0 three times in 60 s | "Speech engine stopped" | restart button, logs link |
 | `APP_START_FAILED` | a package fails to load, or an uncaught exception in main | "VoiceUp could not start" and the error | reinstall; the app exits 1 and never lingers without a window |
 | `NO_PROJECT_FOLDER` | the folder picker is cancelled with no saved folder | "No project folder chosen" | File > Change folder |
-| `CLAUDE_NOT_FOUND` | no binary | install screen (S1.5 / S6.3) | install |
+| `CLAUDE_NOT_FOUND` | no binary | "Claude Code isn't installed" and the official install command (S1.5; S6.3 replaces it with the guided step) | copy the command, install, Check again |
 | `CLAUDE_EXITED` | PTY exit | exit code + "Restart session" | restart |
 | `HOOKS_BLOCKED` | `allowedHttpHookUrls` excludes us, `disableAllHooks` or `allowManagedHooksOnly` applies | "Your Claude settings block VoiceUp's status hooks" | docs link; voice disabled |
 | `STARTING_SLOW` | 30 s in `starting` | "Waiting for Claude to start" | finish any prompt in the terminal, otherwise check the hooks |

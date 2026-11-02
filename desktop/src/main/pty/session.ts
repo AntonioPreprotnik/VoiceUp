@@ -39,13 +39,19 @@ export class ClaudeSession {
         if (!window.isDestroyed()) window.webContents.send(Channels.termData, data)
       },
       onExit: (exitCode) => {
-        if (window.isDestroyed()) return
-        const exit: SessionExit = { ...MESSAGES.CLAUDE_EXITED, exitCode }
-        window.webContents.send(Channels.sessionExited, exit)
+        this.report({ ...MESSAGES.CLAUDE_EXITED, command: null, exitCode })
+      },
+      onNotFound: () => {
+        this.report({ ...MESSAGES.CLAUDE_NOT_FOUND, exitCode: null })
       },
       resolveCommand: options.resolveCommand,
       resolveCwd: () => this.resolveFolder()
     })
+  }
+
+  private report(exit: SessionExit): void {
+    const { window } = this.options
+    if (!window.isDestroyed()) window.webContents.send(Channels.sessionExited, exit)
   }
 
   get fontSize(): number {

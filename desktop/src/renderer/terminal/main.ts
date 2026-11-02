@@ -66,17 +66,28 @@ terminal.onData((data) => {
 const exitBanner = document.getElementById('session-exited')
 const exitText = document.getElementById('session-exited-text')
 const restartButton = document.getElementById('restart-session')
-if (exitBanner === null || exitText === null || !(restartButton instanceof HTMLButtonElement)) {
+const commandRow = document.getElementById('session-command')
+const commandText = document.getElementById('session-command-text')
+const copyCommand = document.getElementById('copy-command')
+if (
+  exitBanner === null ||
+  exitText === null ||
+  !(restartButton instanceof HTMLButtonElement) ||
+  commandRow === null ||
+  commandText === null ||
+  copyCommand === null
+) {
   throw new Error('The terminal page is missing its session banner')
 }
 
 let restarting = false
+let actionLabel = 'Restart session'
 
 // An arrow function, because a hoisted declaration would lose the null checks above.
 const setRestarting = (active: boolean): void => {
   restarting = active
   restartButton.disabled = active
-  restartButton.textContent = active ? 'Waiting ...' : 'Restart session'
+  restartButton.textContent = active ? 'Waiting ...' : actionLabel
 }
 
 // Acknowledged only once xterm has drawn it, which is what makes the flow control work.
@@ -94,13 +105,22 @@ api.onData((data) => {
 })
 
 // The text comes from main and is shown with textContent, never as markup.
-api.onSessionExit(({ title, detail, exitCode }) => {
+api.onSessionExit(({ title, detail, action, command, exitCode }) => {
+  actionLabel = action
   setRestarting(false)
+  commandText.textContent = command
+  commandRow.hidden = command === null
+  copyCommand.textContent = 'Copy command'
   const code = exitCode === null ? '' : ` (exit code ${String(exitCode)})`
   exitText.textContent = `${title}${code}. ${detail}`
   exitBanner.hidden = false
   // Focused, so Enter restarts right away.
   restartButton.focus()
+})
+
+copyCommand.addEventListener('click', () => {
+  api.copy(commandText.textContent)
+  copyCommand.textContent = 'Copied'
 })
 
 restartButton.addEventListener('click', () => {

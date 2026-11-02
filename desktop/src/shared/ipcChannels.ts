@@ -21,10 +21,14 @@ export const TERMINAL_RESET = '\x1bc'
 
 export type TerminalMenuAction = 'copy' | 'paste'
 
-/** Why the session ended, in words the terminal window can show as they are. */
+/** Why no session is running, in words the terminal window can show as they are. */
 export interface SessionExit {
   readonly title: string
   readonly detail: string
+  /** The label of the button that tries again. */
+  readonly action: string
+  /** A command the user can copy, if there is one. */
+  readonly command: string | null
   /** Null when Claude never started, so there is no code to show. */
   readonly exitCode: number | null
 }

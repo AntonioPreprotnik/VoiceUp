@@ -17,6 +17,8 @@ export interface PtyHostOptions {
   readonly resolveCommand: () => Promise<ClaudeCommand | null>
   /** Claude ended or failed to start, and not because we stopped it. Null: no exit code. */
   readonly onExit: (exitCode: number | null) => void
+  /** Claude Code isn't installed. */
+  readonly onNotFound: () => void
   /** The folder to run in, which may ask the user. Null means they declined. */
   readonly resolveCwd: () => Promise<string | null>
 }
@@ -142,7 +144,7 @@ export class PtyHost {
       if (this.isStopping()) return
       if (command === null) {
         log.error('CLAUDE_NOT_FOUND')
-        this.showMessage('CLAUDE_NOT_FOUND')
+        this.options.onNotFound()
         return
       }
       // Loaded here so a native module failure is reported, not fatal at startup.

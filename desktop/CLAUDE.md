@@ -29,6 +29,8 @@ Exact versions only. Confirmed with `npm view` on 2026-11-02: Electron 45.2.1, e
 - Dev and packaged builds share `%APPDATA%\VoiceUp` (the folder name is case-insensitive), so they share settings and logs.
 - `CLAUDECODE` and `CLAUDE_CODE_ENTRYPOINT` are removed from Claude's environment, because they are set when the app itself runs under Claude Code (TECH_SPEC §4.1). Other `CLAUDE_CODE_*` variables from such a session still pass through, so test a real session from a normal terminal.
 - A sandboxed preload can't load packages. Channel names live in `src/shared/ipcChannels.ts`, which imports nothing; `src/shared/ipc.ts` pulls in zod and is for main only.
+- Anything drawn over the terminal needs a `z-index` above xterm's layers, which go up to 11, or xterm takes its clicks. A script's `click()` won't show this: test with a real mouse, or `elementFromPoint` as the smoke test does.
+- Only the renderer's first size starts Claude. After that a session starts only on request, so resizing can't restart it.
 - Main-process tests use the fake in `test/fakes/electron.ts`, which records the order of effects. It proves ordering and policy, not that Electron behaves: the packaged smoke test covers that.
 - Same-origin Vite HMR works under `connect-src 'self'`; the CSP needs no `ws:` entry in dev.
 - electron-builder does not bundle: run `npm run build` first, or it packages a stale `out/`.

@@ -1,5 +1,6 @@
 import { FitAddon } from '@xterm/addon-fit'
 import { Unicode11Addon } from '@xterm/addon-unicode11'
+import { WebLinksAddon } from '@xterm/addon-web-links'
 import { WebglAddon } from '@xterm/addon-webgl'
 import { Terminal } from '@xterm/xterm'
 import '@xterm/xterm/css/xterm.css'
@@ -24,7 +25,14 @@ const terminal = new Terminal({
   allowProposedApi: true, // the unicode11 addon needs it
   cursorBlink: true,
   fontFamily: "'Cascadia Mono', Consolas, monospace",
-  fontSize: 14,
+  fontSize: 14, // replaced by the saved size below, before the first size is reported
+  scrollback: 10000, // Claude's long replies still don't reach it: see TECH_SPEC §11
+  // Links written with OSC 8. Plain text links use the addon below. Main checks both.
+  linkHandler: {
+    activate: (_event, url) => {
+      api.openLink(url)
+    }
+  },
   // Tells xterm how ConPTY wraps lines, which keeps resizing from garbling the text.
   windowsPty: { backend: 'conpty', buildNumber: api.windowsBuild }
 })
@@ -32,6 +40,11 @@ const terminal = new Terminal({
 const fit = new FitAddon()
 terminal.loadAddon(fit)
 terminal.loadAddon(new Unicode11Addon())
+terminal.loadAddon(
+  new WebLinksAddon((_event, url) => {
+    api.openLink(url)
+  })
+)
 terminal.unicode.activeVersion = '11'
 terminal.open(container)
 
@@ -101,6 +114,70 @@ function fitAndReport(): void {
   api.resize(terminal.cols, terminal.rows)
 }
 
-new ResizeObserver(fitAndReport).observe(container)
-fitAndReport()
-terminal.focus()
+function copySelection(): void {
+  const selection = terminal.getSelection()
+  if (selection !== '') api.copy(selection)
+}
+
+function pasteClipboard(): void {
+  api
+    .readClipboard()
+    .then((text) => {
+      // paste() wraps it for programs in bracketed paste mode, such as Claude's prompt.
+      if (text !== '') terminal.paste(text)
+    })
+    .catch((error: unknown) => {
+      console.warn('Could not read the clipboard', error)
+    })
+}
+
+// Ctrl+C stays with the terminal, where it means interrupt.
+const SHORTCUTS: Readonly<Record<string, () => void>> = {
+  KeyC: copySelection,
+  KeyV: pasteClipboard
+}
+
+terminal.attachCustomKeyEventHandler((event) => {
+  const action =
+    event.ctrlKey && event.shiftKey && !event.altKey ? SHORTCUTS[event.code] : undefined
+  if (action === undefined) return true
+  // False on every event type, so xterm never sees the key. Acting on keydown only runs it once.
+  if (event.type === 'keydown') {
+    event.preventDefault()
+    action()
+  }
+  return false
+})
+
+container.addEventListener('contextmenu', (event) => {
+  event.preventDefault()
+  api.showContextMenu(terminal.hasSelection())
+})
+
+api.onMenuAction((action) => {
+  if (action === 'copy') copySelection()
+  else pasteClipboard()
+  terminal.focus()
+})
+
+api.onFontSize((size) => {
+  terminal.options.fontSize = size
+  fitAndReport()
+})
+
+// The saved size comes first: the first report starts Claude, which should draw at the real size.
+function startReporting(): void {
+  new ResizeObserver(fitAndReport).observe(container as HTMLElement)
+  fitAndReport()
+  terminal.focus()
+}
+
+api
+  .fontSize()
+  .then((size) => {
+    terminal.options.fontSize = size
+  })
+  .catch((error: unknown) => {
+    console.warn('Using the default font size', error)
+  })
+  .finally(startReporting)

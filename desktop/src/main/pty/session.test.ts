@@ -190,6 +190,52 @@ describe('when Claude exits', () => {
   })
 })
 
+describe('the font size', () => {
+  function sizes(): unknown[] {
+    return window.webContents.sent
+      .filter(([channel]) => channel === 'term:fontSize')
+      .map(([, payload]) => payload)
+  }
+
+  function savedSize(): unknown {
+    const saved = JSON.parse(readFileSync(join(settingsDir, 'settings.json'), 'utf8')) as {
+      ui: { fontSize: unknown }
+    }
+    return saved.ui.fontSize
+  }
+
+  it('starts from the settings', () => {
+    expect(createSession().fontSize).toBe(defaultSettings().ui.fontSize)
+  })
+
+  it('changes it, saves it and tells the window', () => {
+    const session = createSession()
+    session.changeFontSize('larger')
+    expect(session.fontSize).toBe(15)
+    expect(savedSize()).toBe(15)
+    expect(sizes()).toEqual([15])
+  })
+
+  it('does nothing when already at the default and asked to reset', () => {
+    const session = createSession()
+    session.changeFontSize('reset')
+    expect(sizes()).toEqual([])
+  })
+
+  it('keeps the project folder when it saves', () => {
+    const session = createSession(folderA)
+    session.changeFontSize('smaller')
+    expect(savedFolder()).toBe(folderA)
+  })
+
+  it('does not send to a window that has closed', () => {
+    const session = createSession()
+    window.destroyed = true
+    session.changeFontSize('larger')
+    expect(sizes()).toEqual([])
+  })
+})
+
 describe('changing folder', () => {
   it('restarts Claude in the new folder and remembers it', async () => {
     const session = createSession(folderA)

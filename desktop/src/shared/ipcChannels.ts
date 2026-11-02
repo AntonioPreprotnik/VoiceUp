@@ -6,11 +6,20 @@ export const Channels = {
   termResize: 'term:resize',
   termAck: 'term:ack',
   sessionExited: 'session:exited',
-  sessionRestart: 'session:restart'
+  sessionRestart: 'session:restart',
+  clipboardWrite: 'clipboard:write',
+  clipboardRead: 'clipboard:read',
+  linkOpen: 'link:open',
+  termContextMenu: 'term:contextMenu',
+  termMenuAction: 'term:menuAction',
+  termFontSize: 'term:fontSize',
+  settingsFontSize: 'settings:fontSize'
 } as const
 
 /** RIS, the terminal's full reset, sent on its own as a session is replaced. */
 export const TERMINAL_RESET = '\x1bc'
+
+export type TerminalMenuAction = 'copy' | 'paste'
 
 /** Why the session ended, in words the terminal window can show as they are. */
 export interface SessionExit {
@@ -32,4 +41,14 @@ export interface TerminalApi {
   /** Returns the function that unsubscribes. */
   onSessionExit(listener: (exit: SessionExit) => void): () => void
   restartSession(): void
+  copy(text: string): void
+  readClipboard(): Promise<string>
+  openLink(url: string): void
+  showContextMenu(hasSelection: boolean): void
+  /** Returns the function that unsubscribes. */
+  onMenuAction(listener: (action: TerminalMenuAction) => void): () => void
+  /** The saved size. Rejects when no session is running, as in a smoke test. */
+  fontSize(): Promise<number>
+  /** Returns the function that unsubscribes. */
+  onFontSize(listener: (size: number) => void): () => void
 }

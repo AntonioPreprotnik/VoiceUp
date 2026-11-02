@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { app, Menu, resetFakes, shell } from '../../test/fakes/electron'
 import fakeLog from '../../test/fakes/electronLog'
 import { installAppMenu } from './menu'
@@ -9,8 +9,13 @@ vi.mock('electron-log/main', () => import('../../test/fakes/electronLog'))
 interface TemplateItem {
   label?: string
   role?: string
+  accelerator?: string
   click?: () => void
   submenu?: TemplateItem[]
+}
+
+function actions(): { changeFolder: () => Promise<void>; changeFontSize: Mock } {
+  return { changeFolder: () => Promise.resolve(), changeFontSize: vi.fn() }
 }
 
 function template(): TemplateItem[] {
@@ -32,14 +37,28 @@ describe('the app menu', () => {
     expect(template().map((item) => item.label)).toEqual(['Help'])
   })
 
-  it('adds File only when there is a session to change', () => {
-    installAppMenu(() => Promise.resolve())
-    expect(template().map((item) => item.label)).toEqual(['File', 'Help'])
+  it('adds File and View only when there is a session to change', () => {
+    installAppMenu(actions())
+    expect(template().map((item) => item.label)).toEqual(['File', 'View', 'Help'])
+  })
+
+  it.each([
+    ['Larger text', 'larger', 'Ctrl+Shift+='],
+    ['Smaller text', 'smaller', 'Ctrl+Shift+-'],
+    ['Default text size', 'reset', 'Ctrl+Shift+0']
+  ])('%s changes the font size', (label, change, accelerator) => {
+    const session = actions()
+    installAppMenu(session)
+    const view = template().find((item) => item.label === 'View')
+    const entry = view?.submenu?.find((item) => item.label === label)
+    expect(entry?.accelerator).toBe(accelerator)
+    entry?.click?.()
+    expect(session.changeFontSize).toHaveBeenCalledWith(change)
   })
 
   it('runs Change folder and logs a failure', async () => {
     const change = vi.fn(() => Promise.reject(new Error('boom')))
-    installAppMenu(change)
+    installAppMenu({ ...actions(), changeFolder: change })
     const file = template().find((item) => item.label === 'File')
     file?.submenu?.find((entry) => entry.label === 'Change folder...')?.click?.()
     expect(change).toHaveBeenCalledOnce()

@@ -1,6 +1,7 @@
 import { statSync } from 'node:fs'
 import { app, dialog, type BrowserWindow } from 'electron'
 import type { ClaudeCommand } from '../../core/claudeCommand'
+import { adjustFontSize, type FontSizeChange } from '../../core/fontSize'
 import { MESSAGES } from '../../core/messages'
 import { Channels, type SessionExit } from '../../shared/ipcChannels'
 import type { Settings } from '../../shared/settings'
@@ -47,6 +48,18 @@ export class ClaudeSession {
     })
   }
 
+  get fontSize(): number {
+    return this.settings.ui.fontSize
+  }
+
+  changeFontSize(change: FontSizeChange): void {
+    const fontSize = adjustFontSize(this.settings.ui.fontSize, change)
+    if (fontSize === this.settings.ui.fontSize) return
+    this.save({ ...this.settings, ui: { ...this.settings.ui, fontSize } })
+    const { window } = this.options
+    if (!window.isDestroyed()) window.webContents.send(Channels.termFontSize, fontSize)
+  }
+
   /** Asks for a folder and restarts Claude there. Cancelling leaves the session running. */
   async changeFolder(): Promise<void> {
     const folder = await this.pickFolder()
@@ -90,11 +103,15 @@ export class ClaudeSession {
   }
 
   private remember(folder: string): void {
-    this.settings = { ...this.settings, claude: { ...this.settings.claude, projectDir: folder } }
+    this.save({ ...this.settings, claude: { ...this.settings.claude, projectDir: folder } })
+  }
+
+  private save(settings: Settings): void {
+    this.settings = settings
     try {
-      saveSettings(this.options.settingsDir, this.settings)
+      saveSettings(this.options.settingsDir, settings)
     } catch (error: unknown) {
-      log.error('Could not save the project folder; it applies to this run only', error)
+      log.error('Could not save settings; the change applies to this run only', error)
     }
   }
 }

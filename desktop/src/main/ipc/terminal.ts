@@ -10,7 +10,11 @@ import { validateSender } from './validateSender'
 type RendererChannel = keyof typeof SENDERS
 
 /** Security rule 8: every message passes the sender check, then its schema, or it is dropped. */
-function on<T>(channel: RendererChannel, schema: ZodType<T>, handle: (payload: T) => void): void {
+export function on<T>(
+  channel: RendererChannel,
+  schema: ZodType<T>,
+  handle: (payload: T) => void
+): void {
   ipcMain.on(channel, (event: IpcMainEvent, raw: unknown) => {
     if (!validateSender(event, ...SENDERS[channel])) return
     const parsed = schema.safeParse(raw)

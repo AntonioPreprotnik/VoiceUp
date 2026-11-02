@@ -9,3 +9,7 @@ export const TermAck = z.number().int().nonnegative()
 export const TermResize = z.object({ cols: z.number().int(), rows: z.number().int() })
 export type TermResize = z.infer<typeof TermResize>
 export const SessionRestart = z.object({}).strict()
+// Far above any real selection, while keeping a runaway page from filling the clipboard.
+export const ClipboardWrite = z.string().max(10 * 1024 * 1024)
+export const LinkOpen = z.object({ url: z.string().max(2048) })
+export const ContextMenuRequest = z.object({ hasSelection: z.boolean() })

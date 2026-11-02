@@ -130,8 +130,13 @@ export const protocol = {
 
 export const Menu = {
   installed: undefined as unknown,
-  buildFromTemplate(template: unknown): unknown {
-    return template
+  popups: [] as { template: unknown; options: unknown }[],
+  /** The template itself, so tests can read it, with popup added for the right-click menu. */
+  buildFromTemplate(template: unknown[]): unknown[] & { popup(options: unknown): void } {
+    const record = (options: unknown): void => {
+      Menu.popups.push({ template, options })
+    }
+    return Object.assign(template, { popup: record })
   },
   setApplicationMenu(menu: unknown): void {
     calls.push('menu')
@@ -142,13 +147,41 @@ export const Menu = {
 export const shell = {
   opened: [] as string[],
   failure: '',
+  external: [] as string[],
+  openFails: false,
   openPath(path: string): Promise<string> {
     this.opened.push(path)
     return Promise.resolve(this.failure)
+  },
+  openExternal(url: string): Promise<void> {
+    if (this.openFails) return Promise.reject(new Error('no handler'))
+    this.external.push(url)
+    return Promise.resolve()
   }
 }
 
-export const ipcMain = new EventEmitter()
+type InvokeHandler = (event: unknown) => unknown
+
+class FakeIpcMain extends EventEmitter {
+  readonly handlers = new Map<string, InvokeHandler>()
+
+  handle(channel: string, handler: InvokeHandler): void {
+    this.handlers.set(channel, handler)
+  }
+}
+
+export const ipcMain = new FakeIpcMain()
+
+export const clipboard = {
+  text: '',
+  writeText(text: string): Promise<void> {
+    this.text = text
+    return Promise.resolve()
+  },
+  readText(): Promise<string> {
+    return Promise.resolve(this.text)
+  }
+}
 
 export const dialog = {
   /** Queued replies: a folder, or null for cancel. Anything unexpected counts as cancel. */
@@ -199,6 +232,11 @@ export const session = {
 export function resetFakes(): void {
   fakeLog.reset()
   ipcMain.removeAllListeners()
+  ipcMain.handlers.clear()
+  clipboard.text = ''
+  Menu.popups = []
+  shell.external = []
+  shell.openFails = false
   dialog.answers = []
   dialog.requests = []
   rmSync(join(pathRoot, 'settings.json'), { force: true })

@@ -343,6 +343,13 @@ Every boundary has one zod schema in `shared/`, imported by both sides; nothing 
 | `app:openLogs` | invoke | none | settings |
 | `state:rearm` | renderer → main | `{}`; ignored unless the state is `unknown` | terminal |
 | `session:exited` | main → renderer | `{ title, detail, exitCode \| null }`; `null` means Claude never started | terminal |
+| `clipboard:write` | renderer → main | string, ≤ 10 MB | terminal |
+| `clipboard:read` | invoke | → string | terminal |
+| `link:open` | renderer → main | `{ url }`, ≤ 2048 chars; only `https:` opens | terminal |
+| `term:contextMenu` | renderer → main | `{ hasSelection }`; main shows the native menu | terminal |
+| `term:menuAction` | main → renderer | `copy` or `paste`, chosen in that menu | terminal |
+| `term:fontSize` | main → renderer | number, after a change | terminal |
+| `settings:fontSize` | invoke | → number; the saved size | terminal |
 | `session:restart` | renderer → main | `{}`; restarts Claude in the saved folder; a second request during a restart joins it | terminal |
 
 Rules for every handler: `validateSender(event)` checks that the sending frame's origin is `app://` and that the window id is in the channel's allowlist; then `schema.parse`. A failed check logs at `warn` and drops the message. Each preload exposes only its own window's channels as named functions, never `ipcRenderer` itself. Payloads are objects, except the high-frequency `term:*` stream channels, which may carry a bare string or number. Main clamps `term:resize` values rather than rejecting them.
@@ -601,6 +608,7 @@ Each question has an owner story; code that depends on the answer waits for it. 
 | Parakeet RAM and decode time on an 8 GB, 4-core laptop; is 15 GiB of reported RAM the right threshold for the auto-pick? | S4.1 |
 | Does `globalShortcut` fire while a fullscreen exclusive game has focus? | S3.1, manual test |
 | ~~electron-builder `electronFuses`~~ Answered: supported natively (§7.2). | done |
+| Why don't Claude's long replies reach scrollback? Measured in S1.4 on Windows 10 19045 with Claude Code 2.1.316: of 300 printed numbers, about 36 arrive even reading `node-pty` directly, so the loss is below VoiceUp. 2,000 plain lines scroll fine. `WT_SESSION` and `TERM` make no difference. The same prompt scrolls in Windows Terminal, which ships a newer console layer, so the old system ConPTY is the likely cause, not proven. `useConptyDll` can't test this: its interactive output stalls on `node-pty` 1.2.0-beta.18. | no owner; not implemented |
 | Which library extracts `.tar.bz2` model archives cleanly on Windows? | S4.3 |
 | Ed25519 or P-256 for device keys, given the minimum Android version | S9.1 |
 

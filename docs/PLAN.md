@@ -283,7 +283,8 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 
 **[x] S1.4 Terminal ergonomics.** As a user, I want copy, paste and readable text.
 
-- AC: Ctrl+Shift+C/V copy/paste, right-click menu, 10,000-line scrollback, font size setting, clickable links opened only via a URL allowlist (`https:` only).
+- AC: Ctrl+Shift+C/V copy/paste, right-click menu, font size setting, clickable links opened only via a URL allowlist (`https:` only).
+- **Not implemented: scrolling back through Claude's output.** xterm has a 10,000-line scrollback and the wheel works on plain output, but Claude's long replies don't scroll in VoiceUp, though they do in Windows Terminal. Antonio accepted this on 2026-11-02 to move on. Findings are in TECH_SPEC §11.
 
 **[ ] S1.5 Missing Claude Code.** As a user, I want a clear message if Claude Code isn't installed.
 

@@ -26,7 +26,7 @@ const terminal = new Terminal({
   cursorBlink: true,
   fontFamily: "'Cascadia Mono', Consolas, monospace",
   fontSize: 14, // replaced by the saved size below, before the first size is reported
-  scrollback: 10000,
+  scrollback: 10000, // Claude's long replies still don't reach it: see TECH_SPEC §11
   // Links written with OSC 8. Plain text links use the addon below. Main checks both.
   linkHandler: {
     activate: (_event, url) => {

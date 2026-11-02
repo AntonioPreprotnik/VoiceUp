@@ -608,6 +608,7 @@ Each question has an owner story; code that depends on the answer waits for it. 
 | Parakeet RAM and decode time on an 8 GB, 4-core laptop; is 15 GiB of reported RAM the right threshold for the auto-pick? | S4.1 |
 | Does `globalShortcut` fire while a fullscreen exclusive game has focus? | S3.1, manual test |
 | ~~electron-builder `electronFuses`~~ Answered: supported natively (§7.2). | done |
+| Why don't Claude's long replies reach scrollback? Measured in S1.4 on Windows 10 19045 with Claude Code 2.1.316: of 300 printed numbers, about 36 arrive even reading `node-pty` directly, so the loss is below VoiceUp. 2,000 plain lines scroll fine. `WT_SESSION` and `TERM` make no difference. The same prompt scrolls in Windows Terminal, which ships a newer console layer, so the old system ConPTY is the likely cause, not proven. `useConptyDll` can't test this: its interactive output stalls on `node-pty` 1.2.0-beta.18. | no owner; not implemented |
 | Which library extracts `.tar.bz2` model archives cleanly on Windows? | S4.3 |
 | Ed25519 or P-256 for device keys, given the minimum Android version | S9.1 |
 

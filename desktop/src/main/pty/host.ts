@@ -24,7 +24,7 @@ export interface PtyHostOptions {
 /** Owns the Claude PTY (TECH_SPEC §4.1). Only the main process writes to it. */
 export class PtyHost {
   private pty: IPty | undefined
-  private starting = false
+  private hasStarted = false
   private stopping = false
   private latestSize: TermResize | undefined
   private resizeTimer: ReturnType<typeof setTimeout> | undefined
@@ -46,12 +46,15 @@ export class PtyHost {
     )
   }
 
-  /** The renderer's first size starts Claude, so it never draws at the wrong size. */
+  /**
+   * The renderer's first size starts Claude, so it never draws at the wrong size. Only the first:
+   * after that, a session starts only on request, or resizing the window would restart Claude.
+   */
   resize(raw: TermResize): void {
     const size = clampTermSize(raw)
     this.latestSize = size
     if (this.pty === undefined) {
-      if (!this.starting && !this.stopping) this.startup = this.start(size)
+      if (!this.hasStarted && !this.stopping) this.startup = this.start(size)
       return
     }
     clearTimeout(this.resizeTimer)
@@ -126,7 +129,7 @@ export class PtyHost {
   }
 
   private async start(size: TermResize): Promise<void> {
-    this.starting = true
+    this.hasStarted = true
     try {
       const cwd = await this.options.resolveCwd()
       if (this.isStopping()) return
@@ -149,8 +152,6 @@ export class PtyHost {
     } catch (error: unknown) {
       log.error('Could not start Claude Code', error)
       this.options.onExit(null)
-    } finally {
-      this.starting = false
     }
   }
 

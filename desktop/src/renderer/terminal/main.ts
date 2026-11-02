@@ -63,7 +63,7 @@ let restarting = false
 const setRestarting = (active: boolean): void => {
   restarting = active
   restartButton.disabled = active
-  restartButton.textContent = active ? 'Restarting...' : 'Restart session'
+  restartButton.textContent = active ? 'Waiting ...' : 'Restart session'
 }
 
 // Acknowledged only once xterm has drawn it, which is what makes the flow control work.

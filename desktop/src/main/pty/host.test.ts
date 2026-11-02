@@ -301,6 +301,63 @@ describe('restarting', () => {
   })
 })
 
+describe('only the first size starts Claude', () => {
+  it('does not start a new session when the window resizes after Claude exits', async () => {
+    const { host } = createHost()
+    const pty = await started(host)
+    pty.emitExit(0)
+    host.resize({ cols: 200, rows: 60 })
+    await vi.advanceTimersByTimeAsync(100)
+    expect(spawned).toHaveLength(1)
+  })
+
+  it('still restarts on request afterwards, at the size from that resize', async () => {
+    const { host } = createHost()
+    const pty = await started(host)
+    pty.emitExit(0)
+    host.resize({ cols: 200, rows: 60 })
+    await host.restart()
+    expect(spawned).toHaveLength(2)
+    expect(lastPty().options).toMatchObject({ cols: 200, rows: 60 })
+  })
+
+  it('does not ask for a folder again on resize after the picker was cancelled', async () => {
+    const resolveCwd = vi.fn(() => Promise.resolve(null))
+    const host = new PtyHost({
+      send: () => undefined,
+      onExit: () => undefined,
+      resolveCommand: () => Promise.resolve(claude),
+      resolveCwd
+    })
+    host.resize({ cols: 80, rows: 24 })
+    await vi.waitFor(() => {
+      expect(resolveCwd).toHaveBeenCalledOnce()
+    })
+    await vi.advanceTimersByTimeAsync(10)
+    host.resize({ cols: 90, rows: 24 })
+    await vi.advanceTimersByTimeAsync(10)
+    expect(resolveCwd).toHaveBeenCalledOnce()
+  })
+
+  it('does not look for Claude again on resize when it is not installed', async () => {
+    const resolveCommand = vi.fn(() => Promise.resolve(null))
+    const host = new PtyHost({
+      send: () => undefined,
+      onExit: () => undefined,
+      resolveCommand,
+      resolveCwd: () => Promise.resolve('C:\\work')
+    })
+    host.resize({ cols: 80, rows: 24 })
+    await vi.waitFor(() => {
+      expect(resolveCommand).toHaveBeenCalledOnce()
+    })
+    await vi.advanceTimersByTimeAsync(10)
+    host.resize({ cols: 90, rows: 24 })
+    await vi.advanceTimersByTimeAsync(10)
+    expect(resolveCommand).toHaveBeenCalledOnce()
+  })
+})
+
 describe('exit and stop', () => {
   it('flushes output and reports the exit code when Claude exits', async () => {
     const { host, sent, exits } = createHost()

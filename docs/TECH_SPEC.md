@@ -75,7 +75,7 @@ Seven processes at runtime; only the main process holds authority, and it is the
 
 **Startup order.**
 
-1. Single-instance lock (`app.requestSingleInstanceLock()`); a second launch focuses the first. `--smoke-test` skips the lock so it can run beside an open copy.
+1. Single-instance lock (`app.requestSingleInstanceLock()`); a second launch focuses the first. `--smoke-test` skips the lock and step 2's settings so it can run beside an open copy.
 2. Load and migrate settings; open logs.
 3. Register `app://` as a privileged scheme before `ready`, serve it with `protocol.handle`, then create the terminal and hidden windows.
 4. Delete hook and token files left by a crashed run. Start the hook server on `127.0.0.1:0`; generate the per-launch token and hook settings file.
@@ -400,7 +400,7 @@ export const Settings = z.object({
 });
 ```
 
-`migrate(raw)` upgrades by `version`, strips unknown keys and fills defaults. `.prefault({})` makes zod 4 parse a missing section as `{}`, so its field defaults apply. An unreadable file is renamed to `settings.bad-<timestamp>.json` and replaced with defaults; the app never fails to start over settings. Writes go to a temp file and are renamed atomically.
+`migrate(raw)` upgrades by `version`, strips unknown keys and fills defaults. `.prefault({})` makes zod 4 parse a missing section as `{}`, so its field defaults apply. An unreadable file is renamed to `settings.bad-<timestamp>.json` and replaced with defaults; a file counts as unreadable if it is not valid JSON, has no upgrade path for its `version`, or holds any invalid value. If it cannot be renamed, it is kept and defaults apply for that run only. The app never fails to start over settings. Writes go to a temp file and are renamed atomically.
 
 ### 6.5 Error codes
 

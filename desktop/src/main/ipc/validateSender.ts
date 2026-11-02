@@ -1,5 +1,6 @@
 import type { IpcMainEvent, IpcMainInvokeEvent } from 'electron'
 import { isTrustedRendererUrl } from '../../core/appUrl'
+import { log } from '../log'
 import { rendererMode } from '../rendererMode'
 import { windowKindOf, type WindowKind } from '../windows/factory'
 
@@ -21,7 +22,7 @@ export function validateSender(
     isTrustedRendererUrl(frameUrl, rendererMode())
 
   if (!trusted) {
-    console.warn(
+    log.warn(
       `Dropped IPC from an untrusted sender: webContents ${String(event.sender.id)}, ` +
         `kind ${String(kind)}, frame ${String(frameUrl)}`
     )

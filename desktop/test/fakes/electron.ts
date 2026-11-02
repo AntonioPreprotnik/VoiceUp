@@ -1,6 +1,15 @@
 // A fake of the parts of the electron module the main process uses, for Vitest. Use it with
 // vi.mock('electron', () => import('<path to this file>')). `calls` records the order of effects.
 import { EventEmitter } from 'node:events'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import fakeLog from './electronLog'
+
+const pathRoot = mkdtempSync(join(tmpdir(), 'voiceup-fake-electron-'))
+process.on('exit', () => {
+  rmSync(pathRoot, { recursive: true, force: true })
+})
 
 export const calls: string[] = []
 
@@ -59,6 +68,15 @@ class FakeApp extends EventEmitter {
   quitCount = 0
   exitCodes: number[] = []
 
+  getVersion(): string {
+    return '0.0.0-test'
+  }
+
+  getPath(name: string): string {
+    calls.push(`getPath:${name}`)
+    return name === 'logs' ? join(pathRoot, 'logs') : pathRoot
+  }
+
   requestSingleInstanceLock(): boolean {
     calls.push('lock')
     return this.hasLock
@@ -95,6 +113,26 @@ export const protocol = {
   }
 }
 
+export const Menu = {
+  installed: undefined as unknown,
+  buildFromTemplate(template: unknown): unknown {
+    return template
+  },
+  setApplicationMenu(menu: unknown): void {
+    calls.push('menu')
+    this.installed = menu
+  }
+}
+
+export const shell = {
+  opened: [] as string[],
+  failure: '',
+  openPath(path: string): Promise<string> {
+    this.opened.push(path)
+    return Promise.resolve(this.failure)
+  }
+}
+
 export const net = {
   fetched: [] as string[],
   fetch(url: string): Promise<Response> {
@@ -126,6 +164,11 @@ export const session = {
 }
 
 export function resetFakes(): void {
+  fakeLog.reset()
+  rmSync(join(pathRoot, 'settings.json'), { force: true })
+  Menu.installed = undefined
+  shell.opened = []
+  shell.failure = ''
   calls.length = 0
   BrowserWindow.instances.length = 0
   app.removeAllListeners()

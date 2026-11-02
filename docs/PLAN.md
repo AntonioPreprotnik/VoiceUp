@@ -246,7 +246,7 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 - AC: single-instance lock and the startup and shutdown order from TECH_SPEC §3 are in place.
 - AC: dev-mode exceptions follow TECH_SPEC §7.1, apply only when `!app.isPackaged`, and a test proves packaged mode accepts `app://` only.
 
-**[ ] S0.5 Settings and logging.** As a user, I want my choices remembered; as the developer, I want useful logs.
+**[x] S0.5 Settings and logging.** As a user, I want my choices remembered; as the developer, I want useful logs.
 
 - AC: settings JSON in `app.getPath('userData')`, validated by a zod schema, with defaults and safe migration of unknown/old fields.
 - AC: rotating log file (e.g. electron-log), levels `error`/`warn`/`info`/`debug`; transcripts only at `debug`.

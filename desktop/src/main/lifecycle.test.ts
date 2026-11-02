@@ -1,3 +1,5 @@
+import { readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   app,
@@ -8,9 +10,11 @@ import {
   resetFakes,
   session
 } from '../../test/fakes/electron'
+import fakeLog from '../../test/fakes/electronLog'
 import { startApp } from './lifecycle'
 
 vi.mock('electron', () => import('../../test/fakes/electron'))
+vi.mock('electron-log/main', () => import('../../test/fakes/electronLog'))
 
 function onlyWindow(): BrowserWindow {
   const window = BrowserWindow.instances.at(0)
@@ -24,7 +28,15 @@ async function settle(): Promise<void> {
   })
 }
 
-beforeEach(resetFakes)
+beforeEach(() => {
+  resetFakes()
+  // Bad-file copies from earlier tests would otherwise pile up in the shared fake folder.
+  const userData = app.getPath('userData')
+  for (const file of readdirSync(userData)) {
+    if (file.startsWith('settings.bad-')) rmSync(join(userData, file))
+  }
+  calls.length = 0
+})
 
 afterEach(() => {
   vi.unstubAllEnvs()
@@ -38,10 +50,13 @@ describe('startup', () => {
     await settle()
     expect(calls).toEqual([
       'lock',
+      'getPath:logs',
+      'getPath:userData',
       'registerScheme',
       'whenReady',
       'permissions',
       'serveProtocol',
+      'menu',
       'window',
       'load'
     ])
@@ -92,12 +107,30 @@ describe('startup', () => {
   })
 
   it('exits 1 when startup fails', async () => {
-    vi.spyOn(console, 'error').mockImplementation(() => undefined)
     vi.spyOn(BrowserWindow.prototype, 'loadURL').mockRejectedValue(new Error('no page'))
     startApp({ argv: [] })
     await vi.waitFor(() => {
       expect(app.exitCodes).toEqual([1])
     })
+  })
+})
+
+describe('settings and logging at startup', () => {
+  it('applies the saved log level', () => {
+    writeFileSync(
+      join(app.getPath('userData'), 'settings.json'),
+      JSON.stringify({ version: 1, logLevel: 'debug' })
+    )
+    startApp({ argv: [] })
+    expect(fakeLog.transports.file.level).toBe('debug')
+  })
+
+  it('starts on defaults when the settings file is corrupt', async () => {
+    writeFileSync(join(app.getPath('userData'), 'settings.json'), '{ not json')
+    startApp({ argv: [] })
+    await settle()
+    expect(fakeLog.transports.file.level).toBe('info')
+    expect(onlyWindow().loadedUrl).toBe('app://voiceup/terminal/index.html')
   })
 })
 
@@ -138,11 +171,10 @@ describe('the app:// handler', () => {
     ['a foreign host', 'app://evil/terminal/index.html', 'GET'],
     ['a non-GET method', 'app://voiceup/terminal/index.html', 'POST']
   ])('answers 404 to %s, without touching the disk', async (_label, url, method) => {
-    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
     const response = await request(url, method)
     expect(response.status).toBe(404)
     expect(net.fetched).toEqual([])
-    expect(console.warn).toHaveBeenCalledOnce()
+    expect(fakeLog.messages('warn')).toHaveLength(1)
   })
 })
 
@@ -193,18 +225,16 @@ describe('shutdown', () => {
   })
 
   it('logs a failed step and still exits 0', async () => {
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     startApp({ argv: [], shutdownSteps: { pty: () => Promise.reject(new Error('stuck')) } })
     quit()
     await vi.waitFor(() => {
       expect(app.exitCodes).toEqual([0])
     })
-    expect(consoleError).toHaveBeenCalledOnce()
+    expect(fakeLog.messages('error')).toHaveLength(1)
   })
 
   it('force-exits after 5 s when a step hangs', async () => {
     vi.useFakeTimers()
-    vi.spyOn(console, 'error').mockImplementation(() => undefined)
     startApp({ argv: [], shutdownSteps: { pty: () => new Promise(() => undefined) } })
     quit()
     await vi.advanceTimersByTimeAsync(4999)
@@ -219,6 +249,7 @@ describe('--smoke-test', () => {
     app.hasLock = false
     startApp({ argv: ['--smoke-test=C:\\nowhere\\r.json'] })
     expect(calls).not.toContain('lock')
+    expect(calls).not.toContain('getPath:userData')
     expect(app.quitCount).toBe(0)
   })
 })

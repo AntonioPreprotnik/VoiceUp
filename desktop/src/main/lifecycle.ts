@@ -2,15 +2,18 @@ import { join } from 'node:path'
 import { app, session, type BrowserWindow } from 'electron'
 import { runShutdown, type ShutdownSteps } from '../core/shutdown'
 import { parseSmokeTestPath } from '../core/smokeTest'
+import { initLogging, log, setLogLevel } from './log'
+import { installAppMenu } from './menu'
 import { denyAllPermissions } from './permissions'
 import { registerAppScheme, serveAppProtocol } from './protocol'
+import { loadSettings } from './settings/store'
 import { runSmokeTest } from './smokeTest'
 import { createWindow, loadRenderer } from './windows/factory'
 
 const SHUTDOWN_WATCHDOG_MS = 5000
 
 function failStartup(error: unknown): void {
-  console.error('Startup failed', error)
+  log.error('Startup failed', error)
   app.exit(1)
 }
 
@@ -30,12 +33,12 @@ function installShutdown(steps: ShutdownSteps): void {
     shuttingDown = true
 
     const watchdog = setTimeout(() => {
-      console.error(`Shutdown still running after ${String(SHUTDOWN_WATCHDOG_MS)} ms, forcing exit`)
+      log.error(`Shutdown still running after ${String(SHUTDOWN_WATCHDOG_MS)} ms, forcing exit`)
       app.exit(1)
     }, SHUTDOWN_WATCHDOG_MS)
 
     void runShutdown(steps, (step, error) => {
-      console.error(`Shutdown step ${step} failed`, error)
+      log.error(`Shutdown step ${step} failed`, error)
     }).then(() => {
       clearTimeout(watchdog)
       app.exit(0)
@@ -49,7 +52,7 @@ export interface StartOptions {
   readonly shutdownSteps?: ShutdownSteps
 }
 
-/** The startup order from TECH_SPEC §3. Steps 2 and 4 to 7 arrive with their stories. */
+/** The startup order from TECH_SPEC §3. Steps 4 to 7 arrive with their stories. */
 export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptions = {}): void {
   const smokeTestPath = parseSmokeTestPath(argv)
 
@@ -57,6 +60,14 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
   if (smokeTestPath === undefined && !app.requestSingleInstanceLock()) {
     app.quit()
     return
+  }
+
+  // Step 2: logs first, so a settings problem can be logged. A smoke test leaves settings alone,
+  // because it may run beside an open copy that owns the file.
+  initLogging()
+  log.info(`VoiceUp ${app.getVersion()} starting`)
+  if (smokeTestPath === undefined) {
+    setLogLevel(loadSettings(app.getPath('userData'), log).logLevel)
   }
 
   // Step 3: the scheme must be registered before app ready.
@@ -76,6 +87,7 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
     .then(async () => {
       denyAllPermissions(session.defaultSession)
       serveAppProtocol(join(__dirname, '../renderer'))
+      installAppMenu()
 
       if (smokeTestPath !== undefined) {
         await runSmokeTest(smokeTestPath)

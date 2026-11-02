@@ -1,10 +1,12 @@
 import type { IpcMainEvent } from 'electron'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { app, BrowserWindow, resetFakes } from '../../../test/fakes/electron'
+import fakeLog from '../../../test/fakes/electronLog'
 import { createWindow } from '../windows/factory'
 import { validateSender } from './validateSender'
 
 vi.mock('electron', () => import('../../../test/fakes/electron'))
+vi.mock('electron-log/main', () => import('../../../test/fakes/electronLog'))
 
 const DEV_URL = 'http://localhost:5173'
 const APP_PAGE = 'app://voiceup/terminal/index.html'
@@ -26,7 +28,6 @@ function eventFrom(id: number, frameUrl: string | undefined): IpcMainEvent {
 
 beforeEach(() => {
   resetFakes()
-  vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 })
 
 afterEach(() => {
@@ -37,7 +38,7 @@ afterEach(() => {
 describe('validateSender', () => {
   it('accepts an allowed window on app://', () => {
     expect(validateSender(eventFrom(terminalId(), APP_PAGE), 'terminal')).toBe(true)
-    expect(console.warn).not.toHaveBeenCalled()
+    expect(fakeLog.messages('warn')).toEqual([])
   })
 
   it('rejects a window kind the channel does not allow', () => {
@@ -61,7 +62,7 @@ describe('validateSender', () => {
 
   it('logs every rejection', () => {
     validateSender(eventFrom(999_999, APP_PAGE), 'terminal')
-    expect(console.warn).toHaveBeenCalledOnce()
+    expect(fakeLog.messages('warn')).toHaveLength(1)
   })
 
   it('rejects the dev server when packaged', () => {

@@ -1,5 +1,6 @@
 import { writeFile } from 'node:fs/promises'
 import { app } from 'electron'
+import { log } from './log'
 import { createWindow, loadRenderer } from './windows/factory'
 
 /** Loads the terminal page in a hidden window. A failed load or a console error is a failure. */
@@ -9,7 +10,7 @@ async function checkRenderer(): Promise<'ok' | 'failed'> {
   window.webContents.on('console-message', (details) => {
     if (details.level === 'error') {
       consoleErrors.push(details.message)
-      console.error(`Smoke test renderer error: ${details.message}`)
+      log.error(`Smoke test renderer error: ${details.message}`)
     }
   })
 
@@ -17,7 +18,7 @@ async function checkRenderer(): Promise<'ok' | 'failed'> {
     await loadRenderer(window, 'terminal')
     return consoleErrors.length === 0 ? 'ok' : 'failed'
   } catch (error: unknown) {
-    console.error('Smoke test could not load the renderer', error)
+    log.error('Smoke test could not load the renderer', error)
     return 'failed'
   }
 }
@@ -33,7 +34,7 @@ export async function runSmokeTest(resultPath: string): Promise<void> {
     await writeFile(resultPath, JSON.stringify({ app: 'ok', renderer }))
     app.exit(renderer === 'ok' ? 0 : 1)
   } catch (error: unknown) {
-    console.error(`Smoke test failed writing ${resultPath}`, error)
+    log.error(`Smoke test failed writing ${resultPath}`, error)
     app.exit(1)
   }
 }

@@ -436,7 +436,7 @@ Every merge to `main` produces a packaged, smoke-tested `.exe`; a tag publishes 
 - `electron-vite` with three targets: main (entries `index` and `speechWorker`), preload (one entry per window), renderer (one HTML entry per window).
 - `node-pty` and `sherpa-onnx-node` are externals, never bundled.
 - Renderers load from a custom `app://` protocol served by `protocol.handle` from the packaged renderer folder, never `file://` (Electron security item 18). The scheme is registered with `protocol.registerSchemesAsPrivileged` as `standard`, `secure` and `supportFetchAPI` before `ready`, because `getUserMedia` and AudioWorklet need a secure context. Media permission is granted by `setPermissionRequestHandler` and `setPermissionCheckHandler` only to the recorder window.
-- **Dev mode.** `npm run dev` serves renderers from the electron-vite dev server. Only when `!app.isPackaged`, windows may load that exact `ELECTRON_RENDERER_URL` origin, `validateSender` accepts it, and the CSP adds it and its `ws:` address to `connect-src`. Packaged builds accept `app://` only, and a test proves it.
+- **Dev mode.** `npm run dev` serves renderers from the electron-vite dev server. Only when `!app.isPackaged`, windows may load that exact `ELECTRON_RENDERER_URL` origin and `validateSender` accepts it. The CSP needs no dev exception: pages come from that origin, and `connect-src 'self'` covers its same-origin HMR WebSocket (measured in S0.1). Packaged builds accept `app://` only, and a test proves it.
 
 ### 7.2 Packaging (`electron-builder.yml`)
 

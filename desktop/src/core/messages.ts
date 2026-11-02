@@ -6,11 +6,14 @@ export const MESSAGES = {
   },
   CLAUDE_NOT_FOUND: {
     title: "Claude Code isn't installed",
-    detail: 'Install Claude Code, then restart VoiceUp.'
+    detail: 'Run this command in PowerShell to install it, then check again.',
+    command: 'irm https://claude.ai/install.ps1 | iex',
+    action: 'Check again'
   },
   CLAUDE_EXITED: {
     title: 'Claude Code stopped',
-    detail: 'Restart the session to continue.'
+    detail: 'Restart the session to continue.',
+    action: 'Restart session'
   },
   NO_PROJECT_FOLDER: {
     title: 'No project folder chosen',

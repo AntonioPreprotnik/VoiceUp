@@ -21,6 +21,7 @@ function createHost(command: typeof claude | null = claude): {
   const host = new PtyHost({
     send: (data) => sent.push(data),
     onExit: (exitCode) => exits.push(exitCode),
+    onNotFound: () => undefined,
     resolveCommand: () => Promise.resolve(command),
     resolveCwd: () => Promise.resolve('C:\\work')
   })
@@ -87,13 +88,19 @@ describe('starting', () => {
     expect(env['VOICEUP_TEST_VAR']).toBe('kept')
   })
 
-  it('shows a message and a next step when Claude is not installed', async () => {
-    const { host, sent } = createHost(null)
+  it('reports when Claude is not installed, and spawns nothing', async () => {
+    const onNotFound = vi.fn()
+    const host = new PtyHost({
+      send: () => undefined,
+      onExit: () => undefined,
+      onNotFound,
+      resolveCommand: () => Promise.resolve(null),
+      resolveCwd: () => Promise.resolve('C:\\work')
+    })
     host.resize({ cols: 80, rows: 24 })
     await vi.waitFor(() => {
-      expect(sent.join('')).toContain("Claude Code isn't installed")
+      expect(onNotFound).toHaveBeenCalledOnce()
     })
-    expect(sent.join('')).toContain('Install Claude Code')
     expect(spawned).toEqual([])
     expect(fakeLog.messages('error')).toEqual([['CLAUDE_NOT_FOUND']])
   })
@@ -103,6 +110,7 @@ describe('starting', () => {
     const host = new PtyHost({
       send: () => undefined,
       onExit: (exitCode) => exits.push(exitCode),
+      onNotFound: () => undefined,
       resolveCommand: () => Promise.reject(new Error('boom')),
       resolveCwd: () => Promise.resolve('C:\\work')
     })
@@ -326,6 +334,7 @@ describe('only the first size starts Claude', () => {
     const host = new PtyHost({
       send: () => undefined,
       onExit: () => undefined,
+      onNotFound: () => undefined,
       resolveCommand: () => Promise.resolve(claude),
       resolveCwd
     })
@@ -344,6 +353,7 @@ describe('only the first size starts Claude', () => {
     const host = new PtyHost({
       send: () => undefined,
       onExit: () => undefined,
+      onNotFound: () => undefined,
       resolveCommand,
       resolveCwd: () => Promise.resolve('C:\\work')
     })

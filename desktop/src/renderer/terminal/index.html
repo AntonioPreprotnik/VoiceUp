@@ -59,12 +59,46 @@
         color: #cccccc;
         cursor: progress;
       }
+      #session-command {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+      }
+      #session-command[hidden] {
+        display: none;
+      }
+      #session-command-text {
+        padding: 8px 12px;
+        border-radius: 3px;
+        background: #2d2d30;
+        font-family: 'Cascadia Mono', Consolas, monospace;
+        user-select: text;
+      }
+      #copy-command {
+        padding: 8px 12px;
+        border: 1px solid #6e6e6e;
+        border-radius: 3px;
+        background: transparent;
+        color: inherit;
+        font: inherit;
+        cursor: pointer;
+      }
+      #copy-command:hover,
+      #copy-command:focus-visible {
+        background: #3a3a3d;
+      }
     </style>
   </head>
   <body>
     <div id="terminal"></div>
     <div id="session-exited" role="alert" hidden>
       <span id="session-exited-text"></span>
+      <div id="session-command" hidden>
+        <code id="session-command-text"></code>
+        <button id="copy-command" type="button">Copy command</button>
+      </div>
       <button id="restart-session" type="button">Restart session</button>
     </div>
     <script type="module" src="./main.ts"></script>

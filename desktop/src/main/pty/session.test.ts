@@ -155,6 +155,8 @@ describe('when Claude exits', () => {
       {
         title: 'Claude Code stopped',
         detail: 'Restart the session to continue.',
+        action: 'Restart session',
+        command: null,
         exitCode: 3
       }
     ])
@@ -187,6 +189,65 @@ describe('when Claude exits', () => {
     expect(spawned).toHaveLength(2)
     expect(lastPty().options['cwd']).toBe(folderA)
     expect(dialog.requests).toEqual([])
+  })
+})
+
+describe('when Claude Code is not installed', () => {
+  function reports(): unknown[] {
+    return window.webContents.sent
+      .filter(([channel]) => channel === 'session:exited')
+      .map(([, payload]) => payload)
+  }
+
+  function missingSession(): { session: ClaudeSession; claude: { installed: boolean } } {
+    const claude = { installed: false }
+    const defaults = defaultSettings()
+    const session = new ClaudeSession({
+      window: window as unknown as RealBrowserWindow,
+      settings: { ...defaults, claude: { ...defaults.claude, projectDir: folderA } },
+      settingsDir,
+      resolveCommand: () =>
+        Promise.resolve(claude.installed ? { file: 'claude.exe', args: [] } : null)
+    })
+    return { session, claude }
+  }
+
+  it('shows the official install command instead of a blank terminal', async () => {
+    missingSession().session.host.resize({ cols: 80, rows: 24 })
+    await vi.waitFor(() => {
+      expect(reports()).toHaveLength(1)
+    })
+    expect(reports()[0]).toEqual({
+      title: "Claude Code isn't installed",
+      detail: 'Run this command in PowerShell to install it, then check again.',
+      command: 'irm https://claude.ai/install.ps1 | iex',
+      action: 'Check again',
+      exitCode: null
+    })
+    expect(spawned).toEqual([])
+  })
+
+  it('reports again when checking and it is still missing', async () => {
+    const { session } = missingSession()
+    session.host.resize({ cols: 80, rows: 24 })
+    await vi.waitFor(() => {
+      expect(reports()).toHaveLength(1)
+    })
+    await session.host.restart()
+    expect(reports()).toHaveLength(2)
+    expect(spawned).toEqual([])
+  })
+
+  it('starts Claude when checking finds it installed', async () => {
+    const { session, claude } = missingSession()
+    session.host.resize({ cols: 90, rows: 30 })
+    await vi.waitFor(() => {
+      expect(reports()).toHaveLength(1)
+    })
+    claude.installed = true
+    await session.host.restart()
+    expect(spawned).toHaveLength(1)
+    expect(lastPty().options).toMatchObject({ cols: 90, rows: 30, cwd: folderA })
   })
 })
 

@@ -8,6 +8,17 @@ type Check = 'ok' | 'failed'
 
 const PTY_TIMEOUT_MS = 15000
 
+// xterm's layers have their own z-index, and once covered the button by taking its clicks. A
+// script's click() can't catch that, so this asks what a real click at its center would hit.
+const RESTART_BUTTON_ON_TOP = `(() => {
+  const banner = document.getElementById('session-exited')
+  banner.hidden = false
+  const box = document.getElementById('restart-session').getBoundingClientRect()
+  const top = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2)
+  banner.hidden = true
+  return top !== null && top.id === 'restart-session'
+})()`
+
 /**
  * Loads the terminal page in a hidden window. A failed load, a console error or a page that never
  * built its terminal is a failure. No IPC handlers are registered, so this can't start Claude.
@@ -28,7 +39,9 @@ async function checkRenderer(): Promise<Check> {
       "document.querySelector('.xterm') !== null"
     )
     if (built !== true) log.error('Smoke test: the page did not build its terminal')
-    return consoleErrors.length === 0 && built === true ? 'ok' : 'failed'
+    const clickable: unknown = await window.webContents.executeJavaScript(RESTART_BUTTON_ON_TOP)
+    if (clickable !== true) log.error('Smoke test: something covers the Restart session button')
+    return consoleErrors.length === 0 && built === true && clickable === true ? 'ok' : 'failed'
   } catch (error: unknown) {
     log.error('Smoke test could not load the renderer', error)
     return 'failed'

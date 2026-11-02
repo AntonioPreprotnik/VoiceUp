@@ -173,7 +173,7 @@ Streaming a desktop to a phone is the most dangerous thing this project does; th
 ### Dependency hygiene
 
 - **Exact versions and a committed lockfile.** No `^` ranges for Electron, native addons or speech models.
-- **Baseline at project start (October 2026):** Electron 45.x (current stable; Electron supports the latest three majors), electron-vite 5 with Vite 7, TypeScript 6, zod 4, Vitest 4, ESLint flat config, scoped `@xterm/*` packages, `node-pty`, `sherpa-onnx-node`. When S0.1 runs, confirm each with `npm view <pkg>@<line> version`: the latest release in the named line, not the latest overall. Checked 2026-11-02: Electron 45.2.1, electron-vite 5.0.0, Vite 7.3.7, TypeScript 6.0.3, Vitest 4.1.12, electron-builder 26.18.1, sherpa-onnx-node 2.0.0 (2.0.1 exists but is not verified), ESLint 10.14.0, typescript-eslint 8.72.1, Prettier 3.9.10. TypeScript 7 is not usable yet: typescript-eslint 8.72.1 requires `<6.1.0`. S0.6 picks the `node-pty` version.
+- **Baseline at project start (October 2026):** Electron 45.x (current stable; Electron supports the latest three majors), electron-vite 5 with Vite 7, TypeScript 6, zod 4, Vitest 4, ESLint flat config, scoped `@xterm/*` packages, `node-pty`, `sherpa-onnx-node`. When S0.1 runs, confirm each with `npm view <pkg>@<line> version`: the latest release in the named line, not the latest overall. Checked 2026-11-02: Electron 45.2.1, electron-vite 5.0.0, Vite 7.3.7, TypeScript 6.0.3, Vitest 4.1.12, electron-builder 26.18.1, sherpa-onnx-node 2.0.0 (2.0.1 exists but is not verified), ESLint 10.14.0, typescript-eslint 8.72.1, Prettier 3.9.10. TypeScript 7 is not usable yet: typescript-eslint 8.72.1 requires `<6.1.0`. S0.6 picked `node-pty` 1.2.0-beta.18, from prebuilds with no rebuild (`docs/decisions/S0.6-node-pty-packaging.md`).
 - **Upgrade cadence:** Dependabot or Renovate weekly for patches; Electron major upgrades within 8 weeks of release so the app never leaves the supported window.
 - **Native modules** (`node-pty`, `sherpa-onnx-node`) are verified in a packaged build for every Electron major before the upgrade merges.
 - **CI gates:** `npm audit --omit=dev` fails on high severity; a license check allows only MIT, Apache-2.0, BSD and ISC.
@@ -252,7 +252,7 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 - AC: rotating log file (e.g. electron-log), levels `error`/`warn`/`info`/`debug`; transcripts only at `debug`.
 - AC: "Open logs folder" menu item.
 
-**[ ] S0.6 Native module spike (Spike, ≤ 2 h).** As the developer, I want proof that `node-pty` builds and loads inside packaged Electron on Windows before building on it.
+**[x] S0.6 Native module spike (Spike, ≤ 2 h).** As the developer, I want proof that `node-pty` builds and loads inside packaged Electron on Windows before building on it.
 
 - AC: packaged build spawns `cmd.exe` through `node-pty` and echoes output.
 - AC: decision note records how the native module is rebuilt for Electron (`electron-builder install-app-deps` or `@electron/rebuild`) and any build-tool prerequisites (Visual Studio Build Tools with the Spectre-mitigated C++ libraries, Python). It also picks the node-pty version: stable 1.1.0 or the latest 1.2.0 beta (beta.18 on 2026-11-02), whose beta line includes a Windows use-after-free fix (#922).
@@ -269,6 +269,8 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 - AC: colors, cursor, arrow-key menus and Ctrl+C behave as in Windows Terminal.
 - AC: window resize resizes the PTY; no garbled redraw.
 - AC: `--smoke-test` also spawns `cmd.exe /c exit 0` through `node-pty`.
+- AC: per S0.6, `node-pty` is pinned to 1.2.0-beta.18; `electron-builder.yml` sets `npmRebuild: false` and the node-pty excludes in TECH_SPEC §7.2; no compiler is needed to install or package.
+- AC: a process-wide `unhandledRejection` handler logs every rejection. The known `child_process.fork() is not supported` rejection from `node-pty`'s `kill()` under the `runAsNode` fuse logs at `debug`.
 - AC: `desktop/CLAUDE.md` records the dev gotcha: `CLAUDECODE` and `CLAUDE_CODE_ENTRYPOINT` are removed from the child environment when the app itself runs under Claude Code (TECH_SPEC §4.1).
 
 **[ ] S1.2 Choose the working folder.** As a user, I want Claude to work in a project folder I pick.

@@ -14,5 +14,6 @@ if (-not (Test-Path $Result)) { throw "Smoke test wrote no result file at $Resul
 $content = Get-Content $Result -Raw
 Write-Output "Result: $content"
 if ($process.ExitCode -ne 0) { throw "Smoke test exited with $($process.ExitCode)" }
-if ((ConvertFrom-Json $content).app -ne 'ok') { throw 'Smoke test did not report app=ok' }
+$parsed = ConvertFrom-Json $content
+if ($parsed.app -ne 'ok' -or $parsed.renderer -ne 'ok') { throw 'Smoke test did not report app=ok and renderer=ok' }
 Write-Output 'Smoke test passed'

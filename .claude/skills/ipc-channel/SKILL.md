@@ -12,7 +12,7 @@ paths:
 Channel list and payloads are specified in `docs/TECH_SPEC.md` §6.1. Update that table in the same commit.
 
 ## Steps
-1. **Schema** — `desktop/src/shared/ipc.ts`:
+1. **Schema** — `desktop/src/shared/ipc.ts` (zod, main only). Channel names go in `desktop/src/shared/ipcChannels.ts`, which imports nothing, because a sandboxed preload cannot load zod:
    ```ts
    export const TermResize = z.object({ cols: z.number().int(), rows: z.number().int() });
    export type TermResize = z.infer<typeof TermResize>;

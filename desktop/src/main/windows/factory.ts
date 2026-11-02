@@ -9,7 +9,7 @@ const WINDOWS = {
   terminal: {
     // Security rule 2: one dedicated preload per window kind.
     preload: 'terminal.js',
-    options: { width: 900, height: 670, autoHideMenuBar: true }
+    options: { width: 900, height: 670, autoHideMenuBar: true, backgroundColor: '#0c0c0c' }
   }
 } satisfies Record<string, { preload: string; options: BrowserWindowConstructorOptions }>
 

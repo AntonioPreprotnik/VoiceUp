@@ -5,16 +5,19 @@ import {
   app,
   BrowserWindow,
   calls,
+  ipcMain,
   net,
   protocol,
   resetFakes,
   session
 } from '../../test/fakes/electron'
+import { spawned } from '../../test/fakes/nodePty'
 import fakeLog from '../../test/fakes/electronLog'
 import { startApp } from './lifecycle'
 
 vi.mock('electron', () => import('../../test/fakes/electron'))
 vi.mock('electron-log/main', () => import('../../test/fakes/electronLog'))
+vi.mock('node-pty', () => import('../../test/fakes/nodePty'))
 
 function onlyWindow(): BrowserWindow {
   const window = BrowserWindow.instances.at(0)
@@ -58,6 +61,7 @@ describe('startup', () => {
       'serveProtocol',
       'menu',
       'window',
+      'getPath:home',
       'load'
     ])
   })
@@ -131,6 +135,22 @@ describe('settings and logging at startup', () => {
     await settle()
     expect(fakeLog.transports.file.level).toBe('info')
     expect(onlyWindow().loadedUrl).toBe('app://voiceup/terminal/index.html')
+  })
+})
+
+describe('the Claude session', () => {
+  it('registers the terminal channels', async () => {
+    startApp({ argv: [] })
+    await settle()
+    expect(ipcMain.listenerCount('term:input')).toBe(1)
+    expect(ipcMain.listenerCount('term:resize')).toBe(1)
+    expect(ipcMain.listenerCount('term:ack')).toBe(1)
+  })
+
+  it('does not start Claude on its own', async () => {
+    startApp({ argv: [] })
+    await settle()
+    expect(spawned).toEqual([])
   })
 })
 

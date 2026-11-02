@@ -263,7 +263,7 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 
 *Goal: the app runs a real interactive `claude` session that looks and behaves like a normal terminal.*
 
-**[ ] S1.1 Run Claude Code in an embedded terminal.** As a user, I want Claude Code inside the app window.
+**[x] S1.1 Run Claude Code in an embedded terminal.** As a user, I want Claude Code inside the app window.
 
 - AC: main process spawns `claude` via `node-pty` (Windows ConPTY); renderer shows it with `@xterm/xterm` plus `@xterm/addon-fit`, `@xterm/addon-webgl` and `@xterm/addon-unicode11` (the old unscoped `xterm` packages are deprecated).
 - AC: colors, cursor, arrow-key menus and Ctrl+C behave as in Windows Terminal.

@@ -26,7 +26,11 @@ export function installAppMenu(): void {
   }
   const devTools: MenuItemConstructorOptions = {
     label: 'Developer',
-    submenu: [{ role: 'reload' }, { role: 'toggleDevTools' }]
+    // No accelerators: Ctrl+R and friends belong to the terminal.
+    submenu: [
+      { role: 'reload', registerAccelerator: false },
+      { role: 'toggleDevTools', registerAccelerator: false }
+    ]
   }
   Menu.setApplicationMenu(Menu.buildFromTemplate(app.isPackaged ? [help] : [help, devTools]))
 }

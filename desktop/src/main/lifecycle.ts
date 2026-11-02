@@ -2,10 +2,16 @@ import { join } from 'node:path'
 import { app, session, type BrowserWindow } from 'electron'
 import { runShutdown, type ShutdownSteps } from '../core/shutdown'
 import { parseSmokeTestPath } from '../core/smokeTest'
+import { Channels } from '../shared/ipcChannels'
+import type { Settings } from '../shared/settings'
+import { registerTerminalIpc } from './ipc/terminal'
 import { initLogging, log, setLogLevel } from './log'
 import { installAppMenu } from './menu'
 import { denyAllPermissions } from './permissions'
+import { installProcessErrorLogging } from './processErrors'
 import { registerAppScheme, serveAppProtocol } from './protocol'
+import { PtyHost } from './pty/host'
+import { resolveClaude } from './pty/resolveClaude'
 import { loadSettings } from './settings/store'
 import { runSmokeTest } from './smokeTest'
 import { createWindow, loadRenderer } from './windows/factory'
@@ -52,7 +58,19 @@ export interface StartOptions {
   readonly shutdownSteps?: ShutdownSteps
 }
 
-/** The startup order from TECH_SPEC §3. Steps 4 to 7 arrive with their stories. */
+/** Step 6: Claude itself starts at the renderer's first size, so it never draws at a wrong one. */
+function createPtyHost(window: BrowserWindow, settings: Settings): PtyHost {
+  return new PtyHost({
+    send: (data) => {
+      if (!window.isDestroyed()) window.webContents.send(Channels.termData, data)
+    },
+    resolveCommand: () => resolveClaude(app.isPackaged),
+    // S1.2 adds the folder picker. Until then, an unset folder means the user's home.
+    cwd: settings.claude.projectDir ?? app.getPath('home')
+  })
+}
+
+/** The startup order from TECH_SPEC §3. Steps 4, 5 and 7 arrive with their stories. */
 export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptions = {}): void {
   const smokeTestPath = parseSmokeTestPath(argv)
 
@@ -65,10 +83,10 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
   // Step 2: logs first, so a settings problem can be logged. A smoke test leaves settings alone,
   // because it may run beside an open copy that owns the file.
   initLogging()
+  installProcessErrorLogging()
   log.info(`VoiceUp ${app.getVersion()} starting`)
-  if (smokeTestPath === undefined) {
-    setLogLevel(loadSettings(app.getPath('userData'), log).logLevel)
-  }
+  const settings = smokeTestPath === undefined ? loadSettings(app.getPath('userData'), log) : null
+  if (settings !== null) setLogLevel(settings.logLevel)
 
   // Step 3: the scheme must be registered before app ready.
   registerAppScheme()
@@ -80,7 +98,8 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
   app.on('window-all-closed', () => {
     app.quit()
   })
-  installShutdown(shutdownSteps)
+  const steps: ShutdownSteps = { ...shutdownSteps }
+  installShutdown(steps)
 
   app
     .whenReady()
@@ -89,12 +108,15 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
       serveAppProtocol(join(__dirname, '../renderer'))
       installAppMenu()
 
-      if (smokeTestPath !== undefined) {
-        await runSmokeTest(smokeTestPath)
+      if (settings === null) {
+        await runSmokeTest(smokeTestPath ?? '')
         return
       }
 
       mainWindow = createWindow('terminal')
+      const host = createPtyHost(mainWindow, settings)
+      registerTerminalIpc(host)
+      steps.pty ??= () => host.stop()
       mainWindow.once('closed', () => {
         mainWindow = undefined
       })

@@ -17,6 +17,11 @@ let nextWebContentsId = 1
 
 class FakeWebContents extends EventEmitter {
   readonly id = nextWebContentsId++
+  sent: [string, unknown][] = []
+
+  send(channel: string, payload: unknown): void {
+    this.sent.push([channel, payload])
+  }
   windowOpenHandler: (() => { action: string }) | undefined
 
   setWindowOpenHandler(handler: () => { action: string }): void {
@@ -43,6 +48,10 @@ export class BrowserWindow extends EventEmitter {
     calls.push('load')
     this.loadedUrl = url
     return Promise.resolve()
+  }
+
+  isDestroyed(): boolean {
+    return false
   }
 
   isMinimized(): boolean {
@@ -133,6 +142,8 @@ export const shell = {
   }
 }
 
+export const ipcMain = new EventEmitter()
+
 export const net = {
   fetched: [] as string[],
   fetch(url: string): Promise<Response> {
@@ -165,6 +176,7 @@ export const session = {
 
 export function resetFakes(): void {
   fakeLog.reset()
+  ipcMain.removeAllListeners()
   rmSync(join(pathRoot, 'settings.json'), { force: true })
   Menu.installed = undefined
   shell.opened = []

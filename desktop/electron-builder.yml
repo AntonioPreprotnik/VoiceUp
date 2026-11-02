@@ -5,6 +5,14 @@ files:
   - out/**/*
   - resources/**/*
   - package.json
+  # Decision note S0.6: only what Windows needs from node-pty, 7.0 MB down to 2.9 MB unpacked.
+  - '!**/node_modules/node-pty/prebuilds/{darwin,linux}-*/**'
+  - '!**/node_modules/node-pty/prebuilds/win32-arm64/**'
+  - '!**/node_modules/node-pty/{deps,src,third_party,scripts,typings}/**'
+  - '!**/node_modules/node-pty/binding.gyp'
+  - '!**/*.pdb'
+# Decision note S0.6: the default compiles node-pty and fails without Visual Studio.
+npmRebuild: false
 asarUnpack:
   - '**/node_modules/node-pty/**'
   - '**/node_modules/sherpa-onnx-*/**'

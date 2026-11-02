@@ -18,7 +18,7 @@ Electron app. Root `CLAUDE.md`, `docs/PLAN.md` and `docs/TECH_SPEC.md` hold the 
 
 ## Pinned versions
 
-Exact versions only. Confirmed with `npm view` on 2026-11-02: Electron 45.2.1, electron-vite 5.0.0, Vite 7.3.7, TypeScript 6.0.3, @types/node 24.19.2, ESLint 10.14.0, @eslint/js 10.0.1, typescript-eslint 8.72.1, Prettier 3.9.10, Vitest 4.1.12, electron-builder 26.18.1, @electron/fuses 2.1.3 (reads the wire only; electron-builder keeps its own 1.8.0 to write it), license-checker-rseidelsohn 5.0.1, zod 4.6.7, electron-log 5.4.4. Later stories pin and sherpa-onnx-node 2.0.0.
+Exact versions only. Confirmed with `npm view` on 2026-11-02: Electron 45.2.1, electron-vite 5.0.0, Vite 7.3.7, TypeScript 6.0.3, @types/node 24.19.2, ESLint 10.14.0, @eslint/js 10.0.1, typescript-eslint 8.72.1, Prettier 3.9.10, Vitest 4.1.12, electron-builder 26.18.1, @electron/fuses 2.1.3 (reads the wire only; electron-builder keeps its own 1.8.0 to write it), license-checker-rseidelsohn 5.0.1, zod 4.6.7, electron-log 5.4.4. node-pty 1.2.0-beta.18 (S0.6), @xterm/xterm 6.0.0, @xterm/addon-fit 0.11.0, @xterm/addon-webgl 0.19.0, @xterm/addon-unicode11 0.9.0. Later stories pin sherpa-onnx-node 2.0.0.
 
 ## Gotchas
 
@@ -27,6 +27,8 @@ Exact versions only. Confirmed with `npm view` on 2026-11-02: Electron 45.2.1, e
 - Create windows only through `src/main/windows/factory.ts`. A new kind goes in its table, and `factory.test.ts` then covers it. Every IPC handler starts with `validateSender` (`src/main/ipc/`).
 - Log through `log` from `src/main/log.ts`, never `console`. A transcript goes through `logTranscript` only, so it stays at `debug`.
 - Dev and packaged builds share `%APPDATA%\VoiceUp` (the folder name is case-insensitive), so they share settings and logs.
+- `CLAUDECODE` and `CLAUDE_CODE_ENTRYPOINT` are removed from Claude's environment, because they are set when the app itself runs under Claude Code (TECH_SPEC §4.1). Other `CLAUDE_CODE_*` variables from such a session still pass through, so test a real session from a normal terminal.
+- A sandboxed preload can't load packages. Channel names live in `src/shared/ipcChannels.ts`, which imports nothing; `src/shared/ipc.ts` pulls in zod and is for main only.
 - Main-process tests use the fake in `test/fakes/electron.ts`, which records the order of effects. It proves ordering and policy, not that Electron behaves: the packaged smoke test covers that.
 - Same-origin Vite HMR works under `connect-src 'self'`; the CSP needs no `ws:` entry in dev.
 - electron-builder does not bundle: run `npm run build` first, or it packages a stale `out/`.

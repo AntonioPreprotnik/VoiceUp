@@ -7,8 +7,19 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; media-src 'self' blob:"
     />
+    <style>
+      html,
+      body,
+      #terminal {
+        height: 100%;
+        margin: 0;
+        background: #0c0c0c;
+        overflow: hidden;
+      }
+    </style>
   </head>
   <body>
+    <div id="terminal"></div>
     <script type="module" src="./main.ts"></script>
   </body>
 </html>

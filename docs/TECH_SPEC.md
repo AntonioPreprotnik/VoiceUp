@@ -16,7 +16,7 @@ This spec turns `docs/PLAN.md` into implementable contracts: process layout, int
 | --- | --- | --- |
 | Hotkey press → "Listening" overlay | ≤ 150 ms | S3.4 |
 | End of speech → preview shown, 5 s command, low-end CPU | ≤ 1.5 s after the silence window | S4.1 |
-| Cold start → usable terminal | ≤ 3 s | S1.1 |
+| Cold start → usable terminal | ≤ 3 s; measured about 1.4 s to Claude's first text (S1.3), logged as `First Claude text` | S1.1 |
 | Idle CPU, app in tray, Claude idle | < 1% | S7.1 |
 | Speech worker RAM, model loaded | ≤ 1.2 GB Parakeet, ≤ 600 MB Moonshine (measured on Linux, 16.7 s clip: 1.06 GB and 0.53 GB peak RSS; Windows confirmed in S4.1) | S4.1 |
 | Installer size, no models | ≤ 150 MB | S6.1 |
@@ -342,6 +342,8 @@ Every boundary has one zod schema in `shared/`, imported by both sides; nothing 
 | `devices:list` | invoke | → `[{ deviceId, label }]` (the recorder enumerates) | settings |
 | `app:openLogs` | invoke | none | settings |
 | `state:rearm` | renderer → main | `{}`; ignored unless the state is `unknown` | terminal |
+| `session:exited` | main → renderer | `{ title, detail, exitCode \| null }`; `null` means Claude never started | terminal |
+| `session:restart` | renderer → main | `{}`; restarts Claude in the saved folder; a second request during a restart joins it | terminal |
 
 Rules for every handler: `validateSender(event)` checks that the sending frame's origin is `app://` and that the window id is in the channel's allowlist; then `schema.parse`. A failed check logs at `warn` and drops the message. Each preload exposes only its own window's channels as named functions, never `ipcRenderer` itself. Payloads are objects, except the high-frequency `term:*` stream channels, which may carry a bare string or number. Main clamps `term:resize` values rather than rejecting them.
 
@@ -480,7 +482,7 @@ publish:
 
 - Fuses: `electronFuses` is a top-level electron-builder option (type `FuseOptionsV1`, backed by its own `@electron/fuses` dependency) and is flipped before code signing, so the signature covers the fused binary. Do not also flip fuses in `afterPack`. `runAsNode: false` breaks `child_process.fork` and anything using `ELECTRON_RUN_AS_NODE`; VoiceUp uses `utilityProcess`, which is unaffected. `node-pty`'s `kill()` does call `child_process.fork`, which then throws and leaves one unhandled rejection per `kill()`. The native kill still runs, and S0.6 measured no crash and no surviving console grandchild; S1.1 handles the log noise. CI verifies them with `scripts/check-fuses.mjs`, which reads the packaged exe back and fails if any differs. Run it locally on the same path, or read them with `npx @electron/fuses read --app dist/win-unpacked/VoiceUp.exe`.
 - Native modules: `node-pty` 1.2.0-beta.18 loads from its bundled prebuilds with no rebuild, so neither dev machines nor CI need Visual Studio or Python to install or package (S0.6, measured on a machine with no Visual Studio). `npmRebuild: false` is required: electron-builder's default tries to compile and fails without Visual Studio. A compile from source works on `windows-latest` if ever needed. `sherpa-onnx-node` ships N-API prebuilds and needs no rebuild. Unused platforms' prebuilds and build sources are excluded to protect the installer budget.
-- A `--smoke-test=<file>` flag makes the packaged app load `node-pty` (spawn `cmd.exe /c exit 0`) and `sherpa-onnx-node` (create a VAD from the bundled Silero model), write a JSON result to `<file>` and exit 0 on success or 1 on failure. It also loads the terminal page in a hidden window over `app://` and fails on a load error or a console error, which is what catches asar and protocol mistakes. Until speech arrives, the result is `{"app":"ok","renderer":"ok","pty":"ok"}`. Stdout from a Windows GUI exe isn't reliable, and PowerShell doesn't wait for one, so run it with `Start-Process -Wait -PassThru`, as `scripts/smoke-test.ps1` does (confirmed in S0.6). CI runs it on every packaged build, which catches asar-unpack and ABI mistakes that unit tests in plain Node never see.
+- A `--smoke-test=<file>` flag makes the packaged app load `node-pty` (spawn `cmd.exe /c exit 0`) and `sherpa-onnx-node` (create a VAD from the bundled Silero model), write a JSON result to `<file>` and exit 0 on success or 1 on failure. It also loads the terminal page in a hidden window over `app://` and fails on a load error, a console error, a page that did not build xterm, or anything covering the Restart session button, which is what catches asar and protocol mistakes. Until speech arrives, the result is `{"app":"ok","renderer":"ok","pty":"ok"}`. Stdout from a Windows GUI exe isn't reliable, and PowerShell doesn't wait for one, so run it with `Start-Process -Wait -PassThru`, as `scripts/smoke-test.ps1` does (confirmed in S0.6). CI runs it on every packaged build, which catches asar-unpack and ABI mistakes that unit tests in plain Node never see.
 
 ### 7.3 CI (GitHub Actions, `windows-latest`)
 

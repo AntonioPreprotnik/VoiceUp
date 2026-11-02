@@ -1,7 +1,8 @@
 import { statSync } from 'node:fs'
 import { app, dialog, type BrowserWindow } from 'electron'
 import type { ClaudeCommand } from '../../core/claudeCommand'
-import { Channels } from '../../shared/ipcChannels'
+import { MESSAGES } from '../../core/messages'
+import { Channels, type SessionExit } from '../../shared/ipcChannels'
 import type { Settings } from '../../shared/settings'
 import { log } from '../log'
 import { saveSettings } from '../settings/store'
@@ -35,6 +36,11 @@ export class ClaudeSession {
     this.host = new PtyHost({
       send: (data) => {
         if (!window.isDestroyed()) window.webContents.send(Channels.termData, data)
+      },
+      onExit: (exitCode) => {
+        if (window.isDestroyed()) return
+        const exit: SessionExit = { ...MESSAGES.CLAUDE_EXITED, exitCode }
+        window.webContents.send(Channels.sessionExited, exit)
       },
       resolveCommand: options.resolveCommand,
       resolveCwd: () => this.resolveFolder()

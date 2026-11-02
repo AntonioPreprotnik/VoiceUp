@@ -3,18 +3,20 @@ import { childEnv, type ClaudeCommand } from '../../core/claudeCommand'
 import { MESSAGES } from '../../core/messages'
 import { clampTermSize, FlowControl, OutputBatcher } from '../../core/terminalFlow'
 import type { TermResize } from '../../shared/ipc'
+import { TERMINAL_RESET } from '../../shared/ipcChannels'
+import { hasVisibleText } from '../../shared/terminalText'
 import { log } from '../log'
 
 const BATCH_MS = 16
 const RESIZE_DEBOUNCE_MS = 50
 const STOP_TIMEOUT_MS = 2000
-/** RIS, the terminal's full reset. */
-const CLEAR_SCREEN = '\x1bc'
 
 export interface PtyHostOptions {
   /** Sends output to the terminal window. */
   readonly send: (data: string) => void
   readonly resolveCommand: () => Promise<ClaudeCommand | null>
+  /** Claude ended or failed to start, and not because we stopped it. Null: no exit code. */
+  readonly onExit: (exitCode: number | null) => void
   /** The folder to run in, which may ask the user. Null means they declined. */
   readonly resolveCwd: () => Promise<string | null>
 }
@@ -22,12 +24,13 @@ export interface PtyHostOptions {
 /** Owns the Claude PTY (TECH_SPEC §4.1). Only the main process writes to it. */
 export class PtyHost {
   private pty: IPty | undefined
-  private starting = false
+  private hasStarted = false
   private stopping = false
   private latestSize: TermResize | undefined
   private resizeTimer: ReturnType<typeof setTimeout> | undefined
   private exited: Promise<void> | undefined
   private startup: Promise<void> | undefined
+  private restarting: Promise<void> | undefined
   private flow = new FlowControl()
   private readonly batcher: OutputBatcher
 
@@ -43,12 +46,15 @@ export class PtyHost {
     )
   }
 
-  /** The renderer's first size starts Claude, so it never draws at the wrong size. */
+  /**
+   * The renderer's first size starts Claude, so it never draws at the wrong size. Only the first:
+   * after that, a session starts only on request, or resizing the window would restart Claude.
+   */
   resize(raw: TermResize): void {
     const size = clampTermSize(raw)
     this.latestSize = size
     if (this.pty === undefined) {
-      if (!this.starting && !this.stopping) this.startup = this.start(size)
+      if (!this.hasStarted && !this.stopping) this.startup = this.start(size)
       return
     }
     clearTimeout(this.resizeTimer)
@@ -82,14 +88,24 @@ export class PtyHost {
     this.pty = undefined
   }
 
-  /** Replaces the session with a new one, at the current size, on a cleared screen. */
-  async restart(): Promise<void> {
+  /**
+   * Replaces the session with a new one, at the current size, on a cleared screen. A second call
+   * while one is in progress joins it, so a double click can't start two sessions.
+   */
+  restart(): Promise<void> {
+    this.restarting ??= this.replaceSession().finally(() => {
+      this.restarting = undefined
+    })
+    return this.restarting
+  }
+
+  private async replaceSession(): Promise<void> {
     await this.stop()
     await this.startup // a start in progress gives up when it sees stopping
     this.batcher.flush()
     this.flow = new FlowControl()
     this.stopping = false
-    this.options.send(CLEAR_SCREEN)
+    this.options.send(TERMINAL_RESET)
     if (this.latestSize !== undefined) {
       this.startup = this.start(this.latestSize)
       await this.startup
@@ -113,7 +129,7 @@ export class PtyHost {
   }
 
   private async start(size: TermResize): Promise<void> {
-    this.starting = true
+    this.hasStarted = true
     try {
       const cwd = await this.options.resolveCwd()
       if (this.isStopping()) return
@@ -135,9 +151,7 @@ export class PtyHost {
       this.launch(spawn, command, size, cwd)
     } catch (error: unknown) {
       log.error('Could not start Claude Code', error)
-      this.showMessage('CLAUDE_EXITED')
-    } finally {
-      this.starting = false
+      this.options.onExit(null)
     }
   }
 
@@ -156,14 +170,12 @@ export class PtyHost {
     })
     this.pty = pty
 
-    let sawOutput = false
+    let sawText = false
     pty.onData((data) => {
       if (this.pty !== pty) return
-      if (!sawOutput) {
-        sawOutput = true
-        log.info(
-          `First Claude output ${String(Math.round(process.uptime() * 1000))} ms after start`
-        )
+      if (!sawText && hasVisibleText(data)) {
+        sawText = true
+        log.info(`First Claude text ${String(Math.round(process.uptime() * 1000))} ms after start`)
       }
       this.batcher.push(data)
     })
@@ -174,7 +186,7 @@ export class PtyHost {
         if (this.pty === pty) {
           this.batcher.flush()
           this.pty = undefined
-          if (!this.stopping) this.showMessage('CLAUDE_EXITED', ` (exit code ${String(exitCode)})`)
+          if (!this.stopping) this.options.onExit(exitCode)
         }
         resolve()
       })

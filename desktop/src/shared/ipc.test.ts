@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { chunkInput } from './chunkInput'
-import { MAX_TERM_INPUT_CHARS, TermAck, TermInput, TermResize } from './ipc'
+import { MAX_TERM_INPUT_CHARS, SessionRestart, TermAck, TermInput, TermResize } from './ipc'
 
 describe('term:* schemas', () => {
   it('accepts input up to the limit and rejects more', () => {
@@ -29,6 +29,16 @@ describe('term:* schemas', () => {
 
   it.each([-1, 1.5, '5', null])('rejects an ack of %s', (value) => {
     expect(TermAck.safeParse(value).success).toBe(false)
+  })
+})
+
+describe('session:restart schema', () => {
+  it('accepts an empty object', () => {
+    expect(SessionRestart.safeParse({}).success).toBe(true)
+  })
+
+  it.each([null, 'restart', { folder: 'C:\\Windows' }])('rejects %j', (value) => {
+    expect(SessionRestart.safeParse(value).success).toBe(false)
   })
 })
 

@@ -4,8 +4,21 @@ export const Channels = {
   termData: 'term:data',
   termInput: 'term:input',
   termResize: 'term:resize',
-  termAck: 'term:ack'
+  termAck: 'term:ack',
+  sessionExited: 'session:exited',
+  sessionRestart: 'session:restart'
 } as const
+
+/** RIS, the terminal's full reset, sent on its own as a session is replaced. */
+export const TERMINAL_RESET = '\x1bc'
+
+/** Why the session ended, in words the terminal window can show as they are. */
+export interface SessionExit {
+  readonly title: string
+  readonly detail: string
+  /** Null when Claude never started, so there is no code to show. */
+  readonly exitCode: number | null
+}
 
 /** What the terminal preload exposes as window.voiceup. */
 export interface TerminalApi {
@@ -16,4 +29,7 @@ export interface TerminalApi {
   ack(chars: number): void
   /** Returns the function that unsubscribes. */
   onData(listener: (data: string) => void): () => void
+  /** Returns the function that unsubscribes. */
+  onSessionExit(listener: (exit: SessionExit) => void): () => void
+  restartSession(): void
 }

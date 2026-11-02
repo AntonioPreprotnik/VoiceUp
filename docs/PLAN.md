@@ -277,7 +277,7 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 
 - AC: folder picker before first launch; last folder remembered; "Change folder" restarts the session there.
 
-**[ ] S1.3 Session lifecycle.** As a user, I want to recover when Claude exits or crashes.
+**[x] S1.3 Session lifecycle.** As a user, I want to recover when Claude exits or crashes.
 
 - AC: on PTY exit, show the exit code and a "Restart session" button; no zombie processes after app quit (verified in Task Manager).
 

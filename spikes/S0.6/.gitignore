@@ -1,0 +1,4 @@
+result-*
+*.builder.*
+dist-*/
+package-lock.json

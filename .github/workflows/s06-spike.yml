@@ -1,0 +1,42 @@
+# TEMP for S0.6: dropped before merge. Measures node-pty on a machine with Visual Studio.
+# Each outcome is its own step, because step results are readable without a token.
+name: S0.6 spike
+
+on:
+  push:
+    branches: [story/S0.6-native-spike]
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: spikes/S0.6
+    shell: pwsh
+
+jobs:
+  measure:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: npm install
+      - run: npx install-electron
+      - name: Prebuilds only, rebuild off, app passes
+        continue-on-error: true
+        run: ./run-variant.ps1 -Label ci1 -Rebuild false
+      - name: Rebuild on, packaging succeeds and app passes
+        id: rebuild
+        continue-on-error: true
+        run: ./run-variant.ps1 -Label ci2 -Rebuild true
+      - name: Rebuild on actually compiled a binary
+        continue-on-error: true
+        run: |
+          $built = @(Get-ChildItem 'dist-ci2/win-unpacked/resources/app.asar.unpacked/node_modules/node-pty/build/Release/*.node' -ErrorAction SilentlyContinue)
+          Write-Output "Compiled binaries: $($built.Name -join ', ')"
+          if ($built.Count -eq 0) { throw 'No compiled binary' }

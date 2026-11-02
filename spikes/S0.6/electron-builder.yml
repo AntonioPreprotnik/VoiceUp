@@ -1,0 +1,15 @@
+# Same asar and fuse settings as desktop/electron-builder.yml.
+appId: app.voiceup.s06spike
+productName: S06Spike
+asar: true
+files:
+  - main.js
+  - package.json
+asarUnpack:
+  - '**/node_modules/node-pty/**'
+electronFuses:
+  runAsNode: false
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true

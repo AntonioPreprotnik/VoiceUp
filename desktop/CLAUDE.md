@@ -14,7 +14,7 @@ Electron app. Root `CLAUDE.md`, `docs/PLAN.md` and `docs/TECH_SPEC.md` hold the 
 - `npm run licenses`: license gate on the production tree.
 - `npm run build`, then `npx electron-builder --win --publish never`: package to `dist/`. Add `--dir` to skip the installer.
 - `node scripts/check-fuses.mjs dist/win-unpacked/VoiceUp.exe`: read the fuses back.
-- `./scripts/smoke-test.ps1`: packaged smoke test.
+- `./scripts/smoke-test.ps1`: packaged smoke test. Loads the terminal page over `app://`.
 
 ## Pinned versions
 
@@ -24,9 +24,9 @@ Exact versions only. Confirmed with `npm view` on 2026-11-02: Electron 45.2.1, e
 
 - Electron 45 has no install script of its own. Without `install-electron` in `postinstall`, there is no Electron binary. `npm install <pkg>` skips that `postinstall`; `npm install` and `npm ci` run it.
 - Do not copy from the current `@quick-start/create-electron` template without checking it: it targets other versions and turns off the sandbox.
-- The app can only load from the dev server until S0.4 adds `app://`. Run without it, the app logs an error and exits 1.
+- Create windows only through `src/main/windows/factory.ts`. A new kind goes in its table, and `factory.test.ts` then covers it. Every IPC handler starts with `validateSender` (`src/main/ipc/`).
+- Main-process tests use the fake in `test/fakes/electron.ts`, which records the order of effects. It proves ordering and policy, not that Electron behaves: the packaged smoke test covers that.
 - Same-origin Vite HMR works under `connect-src 'self'`; the CSP needs no `ws:` entry in dev.
 - electron-builder does not bundle: run `npm run build` first, or it packages a stale `out/`.
-- A packaged build runs only `--smoke-test` until S0.4 adds `app://`; started normally, it logs an error and exits 1.
 - Plain `tsc --noEmit` checks nothing here: the root `tsconfig.json` has `files: []` and only references the two projects. Use `npm run typecheck`.
 - Import rules live in `eslint.import-rules.mjs`, as an allowlist per folder. A new allowed package goes there and in the table in `test/lint/import-rules.test.ts`.

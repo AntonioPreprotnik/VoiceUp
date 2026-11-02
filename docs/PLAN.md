@@ -239,7 +239,7 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 - AC: the packaged `.exe` is uploaded as a build artifact.
 - AC: fuses are set with the `electronFuses` key in `electron-builder.yml` (built into electron-builder 26, applied before signing); CI reads them back with `npx @electron/fuses read` and fails if any differs.
 
-**[ ] S0.4 Security baseline.** As a user, I want the app hardened before it touches my files and mic.
+**[x] S0.4 Security baseline.** As a user, I want the app hardened before it touches my files and mic.
 
 - AC: every Electron security baseline rule from the practices section is implemented and has a comment pointing to it.
 - AC: a test asserts `BrowserWindow` options (`contextIsolation`, `sandbox`, `nodeIntegration`) for every window factory.

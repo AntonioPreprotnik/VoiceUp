@@ -75,7 +75,7 @@ Seven processes at runtime; only the main process holds authority, and it is the
 
 **Startup order.**
 
-1. Single-instance lock (`app.requestSingleInstanceLock()`); a second launch focuses the first.
+1. Single-instance lock (`app.requestSingleInstanceLock()`); a second launch focuses the first. `--smoke-test` skips the lock so it can run beside an open copy.
 2. Load and migrate settings; open logs.
 3. Register `app://` as a privileged scheme before `ready`, serve it with `protocol.handle`, then create the terminal and hidden windows.
 4. Delete hook and token files left by a crashed run. Start the hook server on `127.0.0.1:0`; generate the per-launch token and hook settings file.
@@ -472,7 +472,7 @@ publish:
 
 - Fuses: `electronFuses` is a top-level electron-builder option (type `FuseOptionsV1`, backed by its own `@electron/fuses` dependency) and is flipped before code signing, so the signature covers the fused binary. Do not also flip fuses in `afterPack`. `runAsNode: false` breaks `child_process.fork` and anything using `ELECTRON_RUN_AS_NODE`; VoiceUp uses `utilityProcess`, which is unaffected. CI verifies them with `scripts/check-fuses.mjs`, which reads the packaged exe back and fails if any differs. Run it locally on the same path, or read them with `npx @electron/fuses read --app dist/win-unpacked/VoiceUp.exe`.
 - Native modules: `electron-builder install-app-deps` as `postinstall` rebuilds `node-pty` against Electron's headers (needs Visual Studio 2022 Build Tools with the Spectre-mitigated C++ libraries, plus Python, already on `windows-latest`). `sherpa-onnx-node` ships N-API prebuilds and needs no rebuild. S0.6 measures whether `node-pty` needs its rebuild at all: 1.1.0's install script uses bundled prebuilds when present and falls back to `node-gyp`, whose `binding.gyp` requires the Spectre libraries. It also trims unused platforms' prebuilds from the unpack, to protect the installer budget.
-- A `--smoke-test=<file>` flag makes the packaged app load `node-pty` (spawn `cmd.exe /c exit 0`) and `sherpa-onnx-node` (create a VAD from the bundled Silero model), write a JSON result to `<file>` and exit 0 on success or 1 on failure. Until those modules arrive, the result is `{"app":"ok"}` and only proves the app starts (S0.3). Stdout from a Windows GUI exe isn't reliable, and PowerShell doesn't wait for one, so run it with `Start-Process -Wait -PassThru`, as `scripts/smoke-test.ps1` does (S0.6 confirms). CI runs it on every packaged build, which catches asar-unpack and ABI mistakes that unit tests in plain Node never see.
+- A `--smoke-test=<file>` flag makes the packaged app load `node-pty` (spawn `cmd.exe /c exit 0`) and `sherpa-onnx-node` (create a VAD from the bundled Silero model), write a JSON result to `<file>` and exit 0 on success or 1 on failure. It also loads the terminal page in a hidden window over `app://` and fails on a load error or a console error, which is what catches asar and protocol mistakes. Until the native modules arrive, the result is `{"app":"ok","renderer":"ok"}`. Stdout from a Windows GUI exe isn't reliable, and PowerShell doesn't wait for one, so run it with `Start-Process -Wait -PassThru`, as `scripts/smoke-test.ps1` does (S0.6 confirms). CI runs it on every packaged build, which catches asar-unpack and ABI mistakes that unit tests in plain Node never see.
 
 ### 7.3 CI (GitHub Actions, `windows-latest`)
 

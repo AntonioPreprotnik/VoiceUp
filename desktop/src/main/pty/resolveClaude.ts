@@ -13,6 +13,11 @@ import { log } from '../log'
 
 const run = promisify(execFile)
 
+/** The full path to cmd.exe, which node-pty needs (see chooseClaudeCommand). */
+export function cmdExePath(): string {
+  return join(process.env['SystemRoot'] ?? 'C:\\Windows', 'System32', 'cmd.exe')
+}
+
 async function where(name: string): Promise<string | undefined> {
   try {
     const { stdout } = await run('where.exe', [name], { windowsHide: true })
@@ -36,6 +41,7 @@ export async function resolveClaude(isPackaged: boolean): Promise<ClaudeCommand 
   return chooseClaudeCommand({
     whereExe: await where('claude.exe'),
     localBinExe: existsSync(localBin) ? localBin : undefined,
-    whereCmd: await where('claude.cmd')
+    whereCmd: await where('claude.cmd'),
+    cmdExe: cmdExePath()
   })
 }

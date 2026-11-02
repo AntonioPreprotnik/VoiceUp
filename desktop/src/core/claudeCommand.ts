@@ -9,14 +9,20 @@ export interface ClaudeLocations {
   readonly whereExe: string | undefined
   readonly localBinExe: string | undefined
   readonly whereCmd: string | undefined
+  /** Must be a full path: see the note in chooseClaudeCommand. */
+  readonly cmdExe: string
 }
 
-/** A .cmd can't be spawned directly, so it runs through cmd.exe. */
+/**
+ * A .cmd can't be spawned directly, so it runs through cmd.exe, by its full path: node-pty fails
+ * with an empty "File not found" on a relative name that exists in the current folder, and an app
+ * launched from Explorer starts in System32.
+ */
 export function chooseClaudeCommand(locations: ClaudeLocations): ClaudeCommand | null {
   const exe = locations.whereExe ?? locations.localBinExe
   if (exe !== undefined) return { file: exe, args: [] }
   if (locations.whereCmd !== undefined) {
-    return { file: 'cmd.exe', args: ['/d', '/s', '/c', locations.whereCmd] }
+    return { file: locations.cmdExe, args: ['/d', '/s', '/c', locations.whereCmd] }
   }
   return null
 }

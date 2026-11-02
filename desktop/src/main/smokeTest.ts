@@ -1,6 +1,7 @@
 import { writeFile } from 'node:fs/promises'
 import { app } from 'electron'
 import { log } from './log'
+import { cmdExePath } from './pty/resolveClaude'
 import { createWindow, loadRenderer } from './windows/factory'
 
 type Check = 'ok' | 'failed'
@@ -42,7 +43,7 @@ async function checkPty(): Promise<Check> {
       const timer = setTimeout(() => {
         reject(new Error(`No exit within ${String(PTY_TIMEOUT_MS)} ms`))
       }, PTY_TIMEOUT_MS)
-      const pty = spawn('cmd.exe', ['/c', 'exit', '0'], { cols: 80, rows: 24 })
+      const pty = spawn(cmdExePath(), ['/c', 'exit', '0'], { cols: 80, rows: 24 })
       pty.onExit((event) => {
         clearTimeout(timer)
         resolve(event.exitCode)

@@ -6,14 +6,21 @@ import {
   parseClaudeOverride
 } from './claudeCommand'
 
-const none = { whereExe: undefined, localBinExe: undefined, whereCmd: undefined }
+const CMD_EXE = 'C:\\Windows\\System32\\cmd.exe'
+const none = {
+  whereExe: undefined,
+  localBinExe: undefined,
+  whereCmd: undefined,
+  cmdExe: CMD_EXE
+}
 
 describe('chooseClaudeCommand', () => {
   it('prefers the exe on PATH over everything else', () => {
     const command = chooseClaudeCommand({
       whereExe: 'C:\\path\\claude.exe',
       localBinExe: 'C:\\local\\claude.exe',
-      whereCmd: 'C:\\npm\\claude.cmd'
+      whereCmd: 'C:\\npm\\claude.cmd',
+      cmdExe: CMD_EXE
     })
     expect(command).toEqual({ file: 'C:\\path\\claude.exe', args: [] })
   })
@@ -27,9 +34,11 @@ describe('chooseClaudeCommand', () => {
     expect(command).toEqual({ file: 'C:\\local\\claude.exe', args: [] })
   })
 
-  it('runs a .cmd through cmd.exe', () => {
+  it('runs a .cmd through the full path to cmd.exe', () => {
+    // node-pty fails with an empty "File not found" on a relative name that exists in the current
+    // folder, and an app launched from Explorer starts in System32.
     const command = chooseClaudeCommand({ ...none, whereCmd: 'C:\\npm\\claude.cmd' })
-    expect(command).toEqual({ file: 'cmd.exe', args: ['/d', '/s', '/c', 'C:\\npm\\claude.cmd'] })
+    expect(command).toEqual({ file: CMD_EXE, args: ['/d', '/s', '/c', 'C:\\npm\\claude.cmd'] })
   })
 
   it('returns null when Claude is not installed', () => {

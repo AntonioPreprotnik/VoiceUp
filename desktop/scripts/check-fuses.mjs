@@ -2,12 +2,9 @@
 // Usage: node scripts/check-fuses.mjs <path to exe>
 import console from 'node:console'
 import process from 'node:process'
-import fuses from '@electron/fuses'
+import { FuseV1Options, getCurrentFuseWire } from '@electron/fuses'
 
-// @electron/fuses 1.8.0 is CommonJS without named ESM exports.
-const { FuseV1Options, getCurrentFuseWire } = fuses
-
-// The wire stores each fuse as an ASCII digit. 1.8.0 does not export its FuseState enum.
+// The wire stores each fuse as an ASCII digit. The package does not export its FuseState enum.
 const DISABLE = '0'.charCodeAt(0)
 const ENABLE = '1'.charCodeAt(0)
 const STATE_NAMES = { [DISABLE]: 'DISABLE', [ENABLE]: 'ENABLE' }

@@ -5,3 +5,4 @@ out/
 .env
 desktop/resources/models/
 .claude/settings.local.json
+*.tsbuildinfo

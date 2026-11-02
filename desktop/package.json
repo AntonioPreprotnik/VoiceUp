@@ -8,13 +8,22 @@
   "scripts": {
     "postinstall": "install-electron",
     "dev": "electron-vite dev",
-    "build": "electron-vite build"
+    "build": "electron-vite build",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "typecheck": "tsc -b --noEmit",
+    "test": "vitest run"
   },
   "devDependencies": {
+    "@eslint/js": "10.0.1",
     "@types/node": "24.19.2",
     "electron": "45.2.1",
     "electron-vite": "5.0.0",
+    "eslint": "10.14.0",
+    "prettier": "3.9.10",
     "typescript": "6.0.3",
-    "vite": "7.3.7"
+    "typescript-eslint": "8.72.1",
+    "vite": "7.3.7",
+    "vitest": "4.1.12"
   }
 }

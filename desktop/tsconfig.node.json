@@ -14,6 +14,9 @@
   },
   "include": [
     "electron.vite.config.ts",
+    "vitest.config.ts",
+    "eslint.import-rules.d.mts",
+    "test/**/*",
     "src/core/**/*",
     "src/shared/**/*",
     "src/main/**/*",

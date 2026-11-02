@@ -15,7 +15,9 @@ function createMainWindow(rendererUrl: string): void {
     }
   })
 
-  window.once('ready-to-show', () => window.show())
+  window.once('ready-to-show', () => {
+    window.show()
+  })
   window.loadURL(new URL('terminal/index.html', rendererUrl).href).catch((error: unknown) => {
     console.error('Failed to load the main window', error)
     app.exit(1)
@@ -39,4 +41,6 @@ app
     app.exit(1)
   })
 
-app.on('window-all-closed', () => app.quit())
+app.on('window-all-closed', () => {
+  app.quit()
+})

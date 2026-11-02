@@ -48,7 +48,7 @@ voiceup/
 └── android/                   # v1.2: Kotlin + Compose app
 ```
 
-Import rules are enforced by ESLint (`no-restricted-imports` per folder), so a violation fails CI rather than review:
+Import rules are enforced by ESLint (`no-restricted-imports` per folder, in `desktop/eslint.import-rules.mjs`), so a violation fails CI rather than review. "May import" is an allowlist: anything not listed is rejected, even if "Must not import" does not name it. Test files may also import `vitest`. `core/`, `shared/`, `preload/` and `renderer/` also ban dynamic `import()`, which `no-restricted-imports` cannot see. `process.parentPort` is a global, so `worker/` needs no `electron` import at all:
 
 | Folder | May import | Must not import |
 | --- | --- | --- |

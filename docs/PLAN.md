@@ -173,7 +173,7 @@ Streaming a desktop to a phone is the most dangerous thing this project does; th
 ### Dependency hygiene
 
 - **Exact versions and a committed lockfile.** No `^` ranges for Electron, native addons or speech models.
-- **Baseline at project start (October 2026):** Electron 45.x (current stable; Electron supports the latest three majors), electron-vite 5 with Vite 7, TypeScript 6, zod 4, Vitest 4, ESLint flat config, scoped `@xterm/*` packages, `node-pty`, `sherpa-onnx-node`. When S0.1 runs, confirm each with `npm view <pkg>@<line> version`: the latest release in the named line, not the latest overall. Checked 2026-11-02: Electron 45.2.1, electron-vite 5.0.0, Vite 7.3.7, TypeScript 6.0.3, Vitest 4.1.12, electron-builder 26.18.1, sherpa-onnx-node 2.0.0 (2.0.1 exists but is not verified). TypeScript 7 is not usable yet: typescript-eslint 8.72.1 requires `<6.1.0`. S0.6 picks the `node-pty` version.
+- **Baseline at project start (October 2026):** Electron 45.x (current stable; Electron supports the latest three majors), electron-vite 5 with Vite 7, TypeScript 6, zod 4, Vitest 4, ESLint flat config, scoped `@xterm/*` packages, `node-pty`, `sherpa-onnx-node`. When S0.1 runs, confirm each with `npm view <pkg>@<line> version`: the latest release in the named line, not the latest overall. Checked 2026-11-02: Electron 45.2.1, electron-vite 5.0.0, Vite 7.3.7, TypeScript 6.0.3, Vitest 4.1.12, electron-builder 26.18.1, sherpa-onnx-node 2.0.0 (2.0.1 exists but is not verified), ESLint 10.14.0, typescript-eslint 8.72.1, Prettier 3.9.10. TypeScript 7 is not usable yet: typescript-eslint 8.72.1 requires `<6.1.0`. S0.6 picks the `node-pty` version.
 - **Upgrade cadence:** Dependabot or Renovate weekly for patches; Electron major upgrades within 8 weeks of release so the app never leaves the supported window.
 - **Native modules** (`node-pty`, `sherpa-onnx-node`) are verified in a packaged build for every Electron major before the upgrade merges.
 - **CI gates:** `npm audit --omit=dev` fails on high severity; a license check allows only MIT, Apache-2.0, BSD and ISC.
@@ -225,7 +225,7 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 - AC: folder layout under `desktop/`: `src/core`, `src/shared`, `src/main`, `src/preload`, `src/renderer`, `src/worker`, `resources/`, `test/` (TECH_SPEC §2).
 - AC: short `desktop/CLAUDE.md` created; versions pinned exactly per the dependency baseline.
 
-**[ ] S0.2 Quality tooling.** As the developer, I want lint, format, typecheck and tests wired up from day one.
+**[x] S0.2 Quality tooling.** As the developer, I want lint, format, typecheck and tests wired up from day one.
 
 - AC: ESLint (typescript-eslint, strict), Prettier, Vitest; scripts `lint`, `format`, `typecheck`, `test`.
 - AC: one sample core test passes.

@@ -273,7 +273,7 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 - AC: a process-wide `unhandledRejection` handler logs every rejection. The known `child_process.fork() is not supported` rejection from `node-pty`'s `kill()` under the `runAsNode` fuse logs at `debug`.
 - AC: `desktop/CLAUDE.md` records the dev gotcha: `CLAUDECODE` and `CLAUDE_CODE_ENTRYPOINT` are removed from the child environment when the app itself runs under Claude Code (TECH_SPEC §4.1).
 
-**[ ] S1.2 Choose the working folder.** As a user, I want Claude to work in a project folder I pick.
+**[x] S1.2 Choose the working folder.** As a user, I want Claude to work in a project folder I pick.
 
 - AC: folder picker before first launch; last folder remembered; "Change folder" restarts the session there.
 

@@ -59,9 +59,9 @@ describe('startup', () => {
       'whenReady',
       'permissions',
       'serveProtocol',
-      'menu',
       'window',
-      'getPath:home',
+      'getPath:userData',
+      'menu',
       'load'
     ])
   })

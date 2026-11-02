@@ -412,6 +412,7 @@ export const Settings = z.object({
 | `MODEL_MISSING`, `MODEL_CORRUPT` | file absent, hash mismatch | "Speech model needs downloading" | download button |
 | `WORKER_CRASHED` | worker exit ≠ 0 three times in 60 s | "Speech engine stopped" | restart button, logs link |
 | `APP_START_FAILED` | a package fails to load, or an uncaught exception in main | "VoiceUp could not start" and the error | reinstall; the app exits 1 and never lingers without a window |
+| `NO_PROJECT_FOLDER` | the folder picker is cancelled with no saved folder | "No project folder chosen" | File > Change folder |
 | `CLAUDE_NOT_FOUND` | no binary | install screen (S1.5 / S6.3) | install |
 | `CLAUDE_EXITED` | PTY exit | exit code + "Restart session" | restart |
 | `HOOKS_BLOCKED` | `allowedHttpHookUrls` excludes us, `disableAllHooks` or `allowManagedHooksOnly` applies | "Your Claude settings block VoiceUp's status hooks" | docs link; voice disabled |

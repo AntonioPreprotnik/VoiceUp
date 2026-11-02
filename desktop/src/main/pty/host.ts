@@ -8,12 +8,15 @@ import { log } from '../log'
 const BATCH_MS = 16
 const RESIZE_DEBOUNCE_MS = 50
 const STOP_TIMEOUT_MS = 2000
+/** RIS, the terminal's full reset. */
+const CLEAR_SCREEN = '\x1bc'
 
 export interface PtyHostOptions {
   /** Sends output to the terminal window. */
   readonly send: (data: string) => void
   readonly resolveCommand: () => Promise<ClaudeCommand | null>
-  readonly cwd: string
+  /** The folder to run in, which may ask the user. Null means they declined. */
+  readonly resolveCwd: () => Promise<string | null>
 }
 
 /** Owns the Claude PTY (TECH_SPEC §4.1). Only the main process writes to it. */
@@ -24,7 +27,8 @@ export class PtyHost {
   private latestSize: TermResize | undefined
   private resizeTimer: ReturnType<typeof setTimeout> | undefined
   private exited: Promise<void> | undefined
-  private readonly flow = new FlowControl()
+  private startup: Promise<void> | undefined
+  private flow = new FlowControl()
   private readonly batcher: OutputBatcher
 
   constructor(private readonly options: PtyHostOptions) {
@@ -44,7 +48,7 @@ export class PtyHost {
     const size = clampTermSize(raw)
     this.latestSize = size
     if (this.pty === undefined) {
-      if (!this.starting) void this.start(size)
+      if (!this.starting && !this.stopping) this.startup = this.start(size)
       return
     }
     clearTimeout(this.resizeTimer)
@@ -74,6 +78,22 @@ export class PtyHost {
         setTimeout(resolve, STOP_TIMEOUT_MS)
       })
     ])
+    // If it outlived the wait, this retires it: its late events are then ignored.
+    this.pty = undefined
+  }
+
+  /** Replaces the session with a new one, at the current size, on a cleared screen. */
+  async restart(): Promise<void> {
+    await this.stop()
+    await this.startup // a start in progress gives up when it sees stopping
+    this.batcher.flush()
+    this.flow = new FlowControl()
+    this.stopping = false
+    this.options.send(CLEAR_SCREEN)
+    if (this.latestSize !== undefined) {
+      this.startup = this.start(this.latestSize)
+      await this.startup
+    }
   }
 
   /** A method, because stop() can run during an await and TypeScript can't see that. */
@@ -95,8 +115,15 @@ export class PtyHost {
   private async start(size: TermResize): Promise<void> {
     this.starting = true
     try {
+      const cwd = await this.options.resolveCwd()
+      if (this.isStopping()) return
+      if (cwd === null) {
+        log.warn('NO_PROJECT_FOLDER')
+        this.showMessage('NO_PROJECT_FOLDER')
+        return
+      }
       const command = await this.options.resolveCommand()
-      if (this.stopping) return
+      if (this.isStopping()) return
       if (command === null) {
         log.error('CLAUDE_NOT_FOUND')
         this.showMessage('CLAUDE_NOT_FOUND')
@@ -105,7 +132,7 @@ export class PtyHost {
       // Loaded here so a native module failure is reported, not fatal at startup.
       const { spawn } = await import('node-pty')
       if (this.isStopping()) return
-      this.launch(spawn, command, size)
+      this.launch(spawn, command, size, cwd)
     } catch (error: unknown) {
       log.error('Could not start Claude Code', error)
       this.showMessage('CLAUDE_EXITED')
@@ -117,19 +144,21 @@ export class PtyHost {
   private launch(
     spawn: (typeof import('node-pty'))['spawn'],
     command: ClaudeCommand,
-    size: TermResize
+    size: TermResize,
+    cwd: string
   ): void {
     const pty = spawn(command.file, [...command.args], {
       name: 'xterm-256color',
       cols: size.cols,
       rows: size.rows,
-      cwd: this.options.cwd,
+      cwd,
       env: childEnv(process.env)
     })
     this.pty = pty
 
     let sawOutput = false
     pty.onData((data) => {
+      if (this.pty !== pty) return
       if (!sawOutput) {
         sawOutput = true
         log.info(
@@ -140,10 +169,13 @@ export class PtyHost {
     })
     this.exited = new Promise((resolve) => {
       pty.onExit(({ exitCode }) => {
-        this.batcher.flush()
-        this.pty = undefined
         log.info(`CLAUDE_EXITED with code ${String(exitCode)}`)
-        if (!this.stopping) this.showMessage('CLAUDE_EXITED', ` (exit code ${String(exitCode)})`)
+        // A session already replaced by a restart must not touch the new one.
+        if (this.pty === pty) {
+          this.batcher.flush()
+          this.pty = undefined
+          if (!this.stopping) this.showMessage('CLAUDE_EXITED', ` (exit code ${String(exitCode)})`)
+        }
         resolve()
       })
     })

@@ -15,7 +15,7 @@ function createHost(command: typeof claude | null = claude): { host: PtyHost; se
   const host = new PtyHost({
     send: (data) => sent.push(data),
     resolveCommand: () => Promise.resolve(command),
-    cwd: 'C:\\work'
+    resolveCwd: () => Promise.resolve('C:\\work')
   })
   return { host, sent }
 }
@@ -96,7 +96,7 @@ describe('starting', () => {
     const host = new PtyHost({
       send: (data) => sent.push(data),
       resolveCommand: () => Promise.reject(new Error('boom')),
-      cwd: 'C:\\work'
+      resolveCwd: () => Promise.resolve('C:\\work')
     })
     host.resize({ cols: 80, rows: 24 })
     await vi.waitFor(() => {
@@ -177,6 +177,64 @@ describe('resizing', () => {
     host.resize({ cols: 100, rows: 30 })
     await vi.advanceTimersByTimeAsync(50)
     expect(pty.resizes).toEqual([])
+  })
+})
+
+describe('restarting', () => {
+  it('kills the old session and starts a new one at the current size', async () => {
+    const { host, sent } = createHost()
+    const first = await started(host, 90, 30)
+    const restarted = host.restart()
+    expect(first.killCount).toBe(1)
+    first.emitExit(0)
+    await restarted
+    expect(spawned).toHaveLength(2)
+    expect(lastPty().options).toMatchObject({ cols: 90, rows: 30 })
+    expect(sent.join('')).not.toContain('Claude Code stopped')
+  })
+
+  it('starts a new session even if the old one will not exit', async () => {
+    const { host } = createHost()
+    await started(host)
+    const restarted = host.restart()
+    await vi.advanceTimersByTimeAsync(2000)
+    await restarted
+    expect(spawned).toHaveLength(2)
+  })
+
+  it('ignores a late exit and late output from the replaced session', async () => {
+    const { host, sent } = createHost()
+    const first = await started(host)
+    const restarted = host.restart()
+    await vi.advanceTimersByTimeAsync(2000)
+    await restarted
+    const second = lastPty()
+
+    first.emitData('old output')
+    first.emitExit(1)
+    await vi.advanceTimersByTimeAsync(16)
+    expect(sent.join('')).not.toContain('old output')
+    expect(sent.join('')).not.toContain('Claude Code stopped')
+
+    host.write('still connected')
+    expect(second.written).toEqual(['still connected'])
+  })
+
+  it('does not begin a second start during a restart', async () => {
+    const { host } = createHost()
+    const first = await started(host)
+    const restarted = host.restart()
+    host.resize({ cols: 70, rows: 20 })
+    first.emitExit(0)
+    await restarted
+    expect(spawned).toHaveLength(2)
+    expect(lastPty().options).toMatchObject({ cols: 70, rows: 20 })
+  })
+
+  it('does nothing beyond clearing when no size has arrived yet', async () => {
+    const { host } = createHost()
+    await host.restart()
+    expect(spawned).toEqual([])
   })
 })
 

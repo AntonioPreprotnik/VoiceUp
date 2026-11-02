@@ -1,0 +1,255 @@
+import { readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  app,
+  BrowserWindow,
+  calls,
+  net,
+  protocol,
+  resetFakes,
+  session
+} from '../../test/fakes/electron'
+import fakeLog from '../../test/fakes/electronLog'
+import { startApp } from './lifecycle'
+
+vi.mock('electron', () => import('../../test/fakes/electron'))
+vi.mock('electron-log/main', () => import('../../test/fakes/electronLog'))
+
+function onlyWindow(): BrowserWindow {
+  const window = BrowserWindow.instances.at(0)
+  if (window === undefined) throw new Error('No window was created')
+  return window
+}
+
+async function settle(): Promise<void> {
+  await vi.waitFor(() => {
+    expect(calls).toContain('load')
+  })
+}
+
+beforeEach(() => {
+  resetFakes()
+  // Bad-file copies from earlier tests would otherwise pile up in the shared fake folder.
+  const userData = app.getPath('userData')
+  for (const file of readdirSync(userData)) {
+    if (file.startsWith('settings.bad-')) rmSync(join(userData, file))
+  }
+  calls.length = 0
+})
+
+afterEach(() => {
+  vi.unstubAllEnvs()
+  vi.restoreAllMocks()
+  vi.useRealTimers()
+})
+
+describe('startup', () => {
+  it('follows the TECH_SPEC §3 order', async () => {
+    startApp({ argv: [] })
+    await settle()
+    expect(calls).toEqual([
+      'lock',
+      'getPath:logs',
+      'getPath:userData',
+      'registerScheme',
+      'whenReady',
+      'permissions',
+      'serveProtocol',
+      'menu',
+      'window',
+      'load'
+    ])
+  })
+
+  it('registers app:// as standard and secure', () => {
+    startApp({ argv: [] })
+    expect(protocol.privileged).toEqual([
+      { scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true } }
+    ])
+  })
+
+  it('quits a second instance before doing anything else', () => {
+    app.hasLock = false
+    startApp({ argv: [] })
+    expect(calls).toEqual(['lock'])
+    expect(app.quitCount).toBe(1)
+  })
+
+  it('focuses the first window when a second instance starts', async () => {
+    startApp({ argv: [] })
+    await settle()
+    const window = onlyWindow()
+    window.minimized = true
+    app.emit('second-instance')
+    expect(window.restored).toBe(true)
+    expect(window.shown).toBe(true)
+    expect(window.focused).toBe(true)
+  })
+
+  it('ignores a second instance after the window has closed', async () => {
+    startApp({ argv: [] })
+    await settle()
+    const window = onlyWindow()
+    window.emit('closed')
+    app.emit('second-instance')
+    expect(window.focused).toBe(false)
+  })
+
+  it('denies every permission (rule 6)', async () => {
+    startApp({ argv: [] })
+    await settle()
+    const { requestHandler, checkHandler } = session.defaultSession
+    const decisions: boolean[] = []
+    requestHandler?.(undefined, 'media', (allow) => decisions.push(allow))
+    expect(decisions).toEqual([false])
+    expect(checkHandler?.()).toBe(false)
+  })
+
+  it('exits 1 when startup fails', async () => {
+    vi.spyOn(BrowserWindow.prototype, 'loadURL').mockRejectedValue(new Error('no page'))
+    startApp({ argv: [] })
+    await vi.waitFor(() => {
+      expect(app.exitCodes).toEqual([1])
+    })
+  })
+})
+
+describe('settings and logging at startup', () => {
+  it('applies the saved log level', () => {
+    writeFileSync(
+      join(app.getPath('userData'), 'settings.json'),
+      JSON.stringify({ version: 1, logLevel: 'debug' })
+    )
+    startApp({ argv: [] })
+    expect(fakeLog.transports.file.level).toBe('debug')
+  })
+
+  it('starts on defaults when the settings file is corrupt', async () => {
+    writeFileSync(join(app.getPath('userData'), 'settings.json'), '{ not json')
+    startApp({ argv: [] })
+    await settle()
+    expect(fakeLog.transports.file.level).toBe('info')
+    expect(onlyWindow().loadedUrl).toBe('app://voiceup/terminal/index.html')
+  })
+})
+
+describe('renderer source', () => {
+  it('is app:// when packaged, even with a dev server URL set', async () => {
+    vi.stubEnv('ELECTRON_RENDERER_URL', 'http://localhost:5173')
+    startApp({ argv: [] })
+    await settle()
+    expect(onlyWindow().loadedUrl).toBe('app://voiceup/terminal/index.html')
+  })
+
+  it('is the dev server when unpackaged', async () => {
+    vi.stubEnv('ELECTRON_RENDERER_URL', 'http://localhost:5173')
+    app.isPackaged = false
+    startApp({ argv: [] })
+    await settle()
+    expect(onlyWindow().loadedUrl).toBe('http://localhost:5173/terminal/index.html')
+  })
+})
+
+describe('the app:// handler', () => {
+  async function request(url: string, method = 'GET'): Promise<Response> {
+    startApp({ argv: [] })
+    await settle()
+    if (protocol.handler === undefined) throw new Error('No protocol handler')
+    return protocol.handler({ url, method } as Request)
+  }
+
+  it('serves files from the renderer folder', async () => {
+    const response = await request('app://voiceup/terminal/index.html')
+    expect(response.status).toBe(200)
+    expect(net.fetched).toHaveLength(1)
+    expect(net.fetched[0]).toMatch(/^file:\/\/.*\/renderer\/terminal\/index\.html$/)
+  })
+
+  it.each([
+    ['traversal', 'app://voiceup/..%5c..%5csecret', 'GET'],
+    ['a foreign host', 'app://evil/terminal/index.html', 'GET'],
+    ['a non-GET method', 'app://voiceup/terminal/index.html', 'POST']
+  ])('answers 404 to %s, without touching the disk', async (_label, url, method) => {
+    const response = await request(url, method)
+    expect(response.status).toBe(404)
+    expect(net.fetched).toEqual([])
+    expect(fakeLog.messages('warn')).toHaveLength(1)
+  })
+})
+
+describe('shutdown', () => {
+  function quit(): { preventDefault: ReturnType<typeof vi.fn> } {
+    const event = { preventDefault: vi.fn() }
+    app.emit('before-quit', event)
+    return event
+  }
+
+  it('quits the app when the last window closes', () => {
+    startApp({ argv: [] })
+    app.emit('window-all-closed')
+    expect(app.quitCount).toBe(1)
+  })
+
+  it('holds the quit, runs the steps in order, then exits 0', async () => {
+    const ran: string[] = []
+    startApp({
+      argv: [],
+      shutdownSteps: {
+        logs: () => {
+          ran.push('logs')
+        },
+        pty: () => {
+          ran.push('pty')
+        }
+      }
+    })
+    const event = quit()
+    expect(event.preventDefault).toHaveBeenCalledOnce()
+    await vi.waitFor(() => {
+      expect(app.exitCodes).toEqual([0])
+    })
+    expect(ran).toEqual(['pty', 'logs'])
+  })
+
+  it('runs the steps once when quit fires twice', async () => {
+    const step = vi.fn()
+    startApp({ argv: [], shutdownSteps: { pty: step } })
+    quit()
+    const second = quit()
+    expect(second.preventDefault).toHaveBeenCalledOnce()
+    await vi.waitFor(() => {
+      expect(app.exitCodes).toEqual([0])
+    })
+    expect(step).toHaveBeenCalledOnce()
+  })
+
+  it('logs a failed step and still exits 0', async () => {
+    startApp({ argv: [], shutdownSteps: { pty: () => Promise.reject(new Error('stuck')) } })
+    quit()
+    await vi.waitFor(() => {
+      expect(app.exitCodes).toEqual([0])
+    })
+    expect(fakeLog.messages('error')).toHaveLength(1)
+  })
+
+  it('force-exits after 5 s when a step hangs', async () => {
+    vi.useFakeTimers()
+    startApp({ argv: [], shutdownSteps: { pty: () => new Promise(() => undefined) } })
+    quit()
+    await vi.advanceTimersByTimeAsync(4999)
+    expect(app.exitCodes).toEqual([])
+    await vi.advanceTimersByTimeAsync(1)
+    expect(app.exitCodes).toEqual([1])
+  })
+})
+
+describe('--smoke-test', () => {
+  it('skips the lock, so it can run beside an open copy', () => {
+    app.hasLock = false
+    startApp({ argv: ['--smoke-test=C:\\nowhere\\r.json'] })
+    expect(calls).not.toContain('lock')
+    expect(calls).not.toContain('getPath:userData')
+    expect(app.quitCount).toBe(0)
+  })
+})

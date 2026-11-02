@@ -34,7 +34,7 @@ When S0.1 runs, confirm each with `npm view <pkg>@<line> version`: the latest re
 - `npm run dev`: run the app
 - `npm test`: Vitest
 - `npm run lint`: ESLint
-- `npm run typecheck`: tsc --noEmit
+- `npm run typecheck`: `tsc -b --noEmit` (plain `tsc --noEmit` checks nothing, the root tsconfig only holds references)
 - `npx electron-builder --win --dir --publish never` then `dist/win-unpacked/VoiceUp.exe --smoke-test=<file>`: packaged smoke test (result in the file and the exit code; `node-pty` from S1.1, speech from S4.2)
 
 Dev machine needs VS 2022 Build Tools (Desktop C++ + Spectre-mitigated libs) and Python for node-pty, unless S0.6 proves the prebuilds are enough.

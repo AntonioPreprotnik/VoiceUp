@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "composite": true,
+    "strict": true,
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["node", "electron-vite/node"],
+    "skipLibCheck": true,
+    "noEmit": true,
+    "isolatedModules": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": [
+    "electron.vite.config.ts",
+    "vitest.config.ts",
+    "eslint.import-rules.d.mts",
+    "test/**/*",
+    "src/core/**/*",
+    "src/shared/**/*",
+    "src/main/**/*",
+    "src/preload/**/*",
+    "src/worker/**/*"
+  ]
+}

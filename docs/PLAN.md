@@ -231,7 +231,7 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 - AC: one sample core test passes.
 - AC: ESLint `no-restricted-imports` enforces the module import rules in TECH_SPEC §2.
 
-**[ ] S0.3 CI.** As the developer, I want every push checked on a real Windows runner.
+**[x] S0.3 CI.** As the developer, I want every push checked on a real Windows runner.
 
 - AC: GitHub Actions on `windows-latest`, per TECH_SPEC §7.3: the `check` job (install, typecheck, lint, test, audit, license check) on every push and PR; the `package` job (unsigned) on `main`, tags and manual dispatch.
 - AC: `npm audit --omit=dev --audit-level=high` and the license check fail the build; Renovate or Dependabot is configured.

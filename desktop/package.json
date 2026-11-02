@@ -12,14 +12,18 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "typecheck": "tsc -b --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "licenses": "license-checker-rseidelsohn --production --excludePrivatePackages --onlyAllow \"MIT;Apache-2.0;BSD;BSD-2-Clause;BSD-3-Clause;ISC\""
   },
   "devDependencies": {
+    "@electron/fuses": "1.8.0",
     "@eslint/js": "10.0.1",
     "@types/node": "24.19.2",
     "electron": "45.2.1",
+    "electron-builder": "26.18.1",
     "electron-vite": "5.0.0",
     "eslint": "10.14.0",
+    "license-checker-rseidelsohn": "5.0.1",
     "prettier": "3.9.10",
     "typescript": "6.0.3",
     "typescript-eslint": "8.72.1",

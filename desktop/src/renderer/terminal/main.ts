@@ -4,7 +4,8 @@ import { WebglAddon } from '@xterm/addon-webgl'
 import { Terminal } from '@xterm/xterm'
 import '@xterm/xterm/css/xterm.css'
 import { chunkInput } from '../../shared/chunkInput'
-import { TERMINAL_RESET, type TerminalApi } from '../../shared/ipcChannels'
+import type { TerminalApi } from '../../shared/ipcChannels'
+import { hasVisibleText } from '../../shared/terminalText'
 
 declare global {
   interface Window {
@@ -67,9 +68,9 @@ const setRestarting = (active: boolean): void => {
 
 // Acknowledged only once xterm has drawn it, which is what makes the flow control work.
 api.onData((data) => {
-  // The banner stays until the new session prints something. The reset that clears the screen
-  // comes first and doesn't count, or the banner would vanish before Claude has started.
-  if (restarting && data !== TERMINAL_RESET) {
+  // The banner stays until there is something to look at. A new session's first second of output
+  // is only setup codes, and hiding on those would leave a blank screen.
+  if (restarting && hasVisibleText(data)) {
     setRestarting(false)
     exitBanner.hidden = true
     terminal.focus()

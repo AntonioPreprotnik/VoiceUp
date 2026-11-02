@@ -139,6 +139,19 @@ describe('input and output', () => {
     expect(sent).toEqual(['ab'])
   })
 
+  it('logs the time to the first visible text, not to the first setup codes', async () => {
+    const { host } = createHost()
+    const pty = await started(host)
+    pty.emitData('\x1b[2J\x1b[H')
+    expect(JSON.stringify(fakeLog.messages('info'))).not.toContain('First Claude text')
+    pty.emitData('Welcome')
+    pty.emitData('more')
+    const timings = fakeLog
+      .messages('info')
+      .filter(([message]) => String(message).includes('First'))
+    expect(timings).toHaveLength(1)
+  })
+
   it('never logs what Claude printed', async () => {
     const { host } = createHost()
     const pty = await started(host)

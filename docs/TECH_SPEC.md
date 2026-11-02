@@ -16,7 +16,7 @@ This spec turns `docs/PLAN.md` into implementable contracts: process layout, int
 | --- | --- | --- |
 | Hotkey press → "Listening" overlay | ≤ 150 ms | S3.4 |
 | End of speech → preview shown, 5 s command, low-end CPU | ≤ 1.5 s after the silence window | S4.1 |
-| Cold start → usable terminal | ≤ 3 s | S1.1 |
+| Cold start → usable terminal | ≤ 3 s; measured about 1.4 s to Claude's first text (S1.3), logged as `First Claude text` | S1.1 |
 | Idle CPU, app in tray, Claude idle | < 1% | S7.1 |
 | Speech worker RAM, model loaded | ≤ 1.2 GB Parakeet, ≤ 600 MB Moonshine (measured on Linux, 16.7 s clip: 1.06 GB and 0.53 GB peak RSS; Windows confirmed in S4.1) | S4.1 |
 | Installer size, no models | ≤ 150 MB | S6.1 |

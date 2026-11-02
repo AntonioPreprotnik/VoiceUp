@@ -4,6 +4,7 @@ import { MESSAGES } from '../../core/messages'
 import { clampTermSize, FlowControl, OutputBatcher } from '../../core/terminalFlow'
 import type { TermResize } from '../../shared/ipc'
 import { TERMINAL_RESET } from '../../shared/ipcChannels'
+import { hasVisibleText } from '../../shared/terminalText'
 import { log } from '../log'
 
 const BATCH_MS = 16
@@ -168,14 +169,12 @@ export class PtyHost {
     })
     this.pty = pty
 
-    let sawOutput = false
+    let sawText = false
     pty.onData((data) => {
       if (this.pty !== pty) return
-      if (!sawOutput) {
-        sawOutput = true
-        log.info(
-          `First Claude output ${String(Math.round(process.uptime() * 1000))} ms after start`
-        )
+      if (!sawText && hasVisibleText(data)) {
+        sawText = true
+        log.info(`First Claude text ${String(Math.round(process.uptime() * 1000))} ms after start`)
       }
       this.batcher.push(data)
     })

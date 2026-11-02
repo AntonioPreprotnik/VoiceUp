@@ -1,0 +1,28 @@
+appId: app.voiceup.desktop
+productName: VoiceUp
+asar: true
+files:
+  - out/**/*
+  - resources/**/*
+  - package.json
+asarUnpack:
+  - '**/node_modules/node-pty/**'
+  - '**/node_modules/sherpa-onnx-*/**'
+  - resources/**
+win:
+  target: [nsis]
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+# Security baseline rule 10. Read back by scripts/check-fuses.mjs: keep the two in sync.
+electronFuses:
+  runAsNode: false
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
+publish:
+  provider: github
+  owner: AntonioPreprotnik
+  repo: VoiceUp

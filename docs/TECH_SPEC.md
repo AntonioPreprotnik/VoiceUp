@@ -444,6 +444,10 @@ Every merge to `main` produces a packaged, smoke-tested `.exe`; a tag publishes 
 appId: app.voiceup.desktop
 productName: VoiceUp
 asar: true
+files:                     # only what ships; the default would also pack src/ and tests
+  - out/**/*
+  - resources/**/*
+  - package.json
 asarUnpack:
   - "**/node_modules/node-pty/**"
   - "**/node_modules/sherpa-onnx-*/**"
@@ -462,19 +466,23 @@ electronFuses:              # native since electron-builder 26 (verified in 26.1
   onlyLoadAppFromAsar: true
 publish:
   provider: github
+  owner: AntonioPreprotnik
+  repo: VoiceUp
 ```
 
-- Fuses: `electronFuses` is a top-level electron-builder option (type `FuseOptionsV1`, backed by its own `@electron/fuses` dependency) and is flipped before code signing, so the signature covers the fused binary. Do not also flip fuses in `afterPack`. `runAsNode: false` breaks `child_process.fork` and anything using `ELECTRON_RUN_AS_NODE`; VoiceUp uses `utilityProcess`, which is unaffected. Verify with `npx @electron/fuses read --app dist/win-unpacked/VoiceUp.exe` in CI.
+- Fuses: `electronFuses` is a top-level electron-builder option (type `FuseOptionsV1`, backed by its own `@electron/fuses` dependency) and is flipped before code signing, so the signature covers the fused binary. Do not also flip fuses in `afterPack`. `runAsNode: false` breaks `child_process.fork` and anything using `ELECTRON_RUN_AS_NODE`; VoiceUp uses `utilityProcess`, which is unaffected. CI verifies them with `scripts/check-fuses.mjs`, which reads the packaged exe back and fails if any differs. Run it locally on the same path, or read them with `npx @electron/fuses read --app dist/win-unpacked/VoiceUp.exe`.
 - Native modules: `electron-builder install-app-deps` as `postinstall` rebuilds `node-pty` against Electron's headers (needs Visual Studio 2022 Build Tools with the Spectre-mitigated C++ libraries, plus Python, already on `windows-latest`). `sherpa-onnx-node` ships N-API prebuilds and needs no rebuild. S0.6 measures whether `node-pty` needs its rebuild at all: 1.1.0's install script uses bundled prebuilds when present and falls back to `node-gyp`, whose `binding.gyp` requires the Spectre libraries. It also trims unused platforms' prebuilds from the unpack, to protect the installer budget.
-- A `--smoke-test=<file>` flag makes the packaged app load `node-pty` (spawn `cmd.exe /c exit 0`) and `sherpa-onnx-node` (create a VAD from the bundled Silero model), write a JSON result to `<file>` and exit 0 on success or 1 on failure. Stdout from a Windows GUI exe isn't reliable, and PowerShell doesn't wait for one, so run it with `Start-Process -Wait -PassThru` (S0.6 confirms). CI runs it on every packaged build, which catches asar-unpack and ABI mistakes that unit tests in plain Node never see.
+- A `--smoke-test=<file>` flag makes the packaged app load `node-pty` (spawn `cmd.exe /c exit 0`) and `sherpa-onnx-node` (create a VAD from the bundled Silero model), write a JSON result to `<file>` and exit 0 on success or 1 on failure. Until those modules arrive, the result is `{"app":"ok"}` and only proves the app starts (S0.3). Stdout from a Windows GUI exe isn't reliable, and PowerShell doesn't wait for one, so run it with `Start-Process -Wait -PassThru`, as `scripts/smoke-test.ps1` does (S0.6 confirms). CI runs it on every packaged build, which catches asar-unpack and ABI mistakes that unit tests in plain Node never see.
 
 ### 7.3 CI (GitHub Actions, `windows-latest`)
 
 | Job | Runs on | Steps |
 | --- | --- | --- |
 | `check` | every push and PR | `npm ci`, typecheck, lint, test, `npm audit --omit=dev --audit-level=high`, license check |
-| `package` | push to `main`, tags, manual dispatch | build, `electron-builder --win --publish never`, `--smoke-test`, upload `.exe` |
+| `package` | push to `main`, tags, manual dispatch | build, `electron-builder --win --publish never`, read fuses back, `--smoke-test`, upload `.exe` |
 | `release` | tags `v*` | package, write `SHA256SUMS.txt`, create the GitHub Release (draft until you publish it) |
+
+The license check covers the production dependency tree, which is what ships. The dev tree contains licenses outside the allowlist (for example BlueOak-1.0.0 and CC-BY) that never reach users.
 
 Versioning is semver; commit messages follow Conventional Commits with the story ID as scope (`feat(S2.3): …`), so the changelog generates itself.
 

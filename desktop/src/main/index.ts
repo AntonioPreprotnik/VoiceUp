@@ -1,5 +1,7 @@
 import { join } from 'node:path'
 import { app, BrowserWindow } from 'electron'
+import { parseSmokeTestPath } from '../core/smokeTest'
+import { runSmokeTest } from './smokeTest'
 
 function createMainWindow(rendererUrl: string): void {
   const window = new BrowserWindow({
@@ -26,7 +28,13 @@ function createMainWindow(rendererUrl: string): void {
 
 app
   .whenReady()
-  .then(() => {
+  .then(async () => {
+    const smokeTestPath = parseSmokeTestPath(process.argv)
+    if (smokeTestPath !== undefined) {
+      await runSmokeTest(smokeTestPath)
+      return
+    }
+
     // Only the dev server can serve renderers until S0.4 adds app://. file:// is forbidden.
     const rendererUrl = app.isPackaged ? undefined : process.env['ELECTRON_RENDERER_URL']
     if (rendererUrl === undefined) {

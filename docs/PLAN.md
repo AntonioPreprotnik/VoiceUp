@@ -281,7 +281,7 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 
 - AC: on PTY exit, show the exit code and a "Restart session" button; no zombie processes after app quit (verified in Task Manager).
 
-**[ ] S1.4 Terminal ergonomics.** As a user, I want copy, paste and readable text.
+**[x] S1.4 Terminal ergonomics.** As a user, I want copy, paste and readable text.
 
 - AC: Ctrl+Shift+C/V copy/paste, right-click menu, 10,000-line scrollback, font size setting, clickable links opened only via a URL allowlist (`https:` only).
 

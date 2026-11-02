@@ -3,6 +3,7 @@ import { app, session, type BrowserWindow } from 'electron'
 import { runShutdown, type ShutdownSteps } from '../core/shutdown'
 import { parseSmokeTestPath } from '../core/smokeTest'
 import { registerTerminalIpc } from './ipc/terminal'
+import { registerTerminalUiIpc } from './ipc/terminalUi'
 import { initLogging, log, setLogLevel } from './log'
 import { installAppMenu } from './menu'
 import { denyAllPermissions } from './permissions'
@@ -109,7 +110,13 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
       })
       registerTerminalIpc(claude.host)
       steps.pty ??= () => claude.host.stop()
-      installAppMenu(() => claude.changeFolder())
+      registerTerminalUiIpc(mainWindow, () => claude.fontSize)
+      installAppMenu({
+        changeFolder: () => claude.changeFolder(),
+        changeFontSize: (change) => {
+          claude.changeFontSize(change)
+        }
+      })
       mainWindow.once('closed', () => {
         mainWindow = undefined
       })

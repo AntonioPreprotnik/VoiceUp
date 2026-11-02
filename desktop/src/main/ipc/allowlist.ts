@@ -6,11 +6,21 @@ type RendererChannel =
   | typeof Channels.termResize
   | typeof Channels.termAck
   | typeof Channels.sessionRestart
+  | typeof Channels.clipboardWrite
+  | typeof Channels.clipboardRead
+  | typeof Channels.linkOpen
+  | typeof Channels.termContextMenu
+  | typeof Channels.settingsFontSize
 
 /** The window kinds allowed to send each renderer-to-main channel (TECH_SPEC §6.1). */
 export const SENDERS: Readonly<Record<RendererChannel, readonly WindowKind[]>> = {
   [Channels.termInput]: ['terminal'],
   [Channels.termResize]: ['terminal'],
   [Channels.termAck]: ['terminal'],
-  [Channels.sessionRestart]: ['terminal']
+  [Channels.sessionRestart]: ['terminal'],
+  [Channels.clipboardWrite]: ['terminal'],
+  [Channels.clipboardRead]: ['terminal'],
+  [Channels.linkOpen]: ['terminal'],
+  [Channels.termContextMenu]: ['terminal'],
+  [Channels.settingsFontSize]: ['terminal']
 }

@@ -343,6 +343,13 @@ Every boundary has one zod schema in `shared/`, imported by both sides; nothing 
 | `app:openLogs` | invoke | none | settings |
 | `state:rearm` | renderer → main | `{}`; ignored unless the state is `unknown` | terminal |
 | `session:exited` | main → renderer | `{ title, detail, exitCode \| null }`; `null` means Claude never started | terminal |
+| `clipboard:write` | renderer → main | string, ≤ 10 MB | terminal |
+| `clipboard:read` | invoke | → string | terminal |
+| `link:open` | renderer → main | `{ url }`, ≤ 2048 chars; only `https:` opens | terminal |
+| `term:contextMenu` | renderer → main | `{ hasSelection }`; main shows the native menu | terminal |
+| `term:menuAction` | main → renderer | `copy` or `paste`, chosen in that menu | terminal |
+| `term:fontSize` | main → renderer | number, after a change | terminal |
+| `settings:fontSize` | invoke | → number; the saved size | terminal |
 | `session:restart` | renderer → main | `{}`; restarts Claude in the saved folder; a second request during a restart joins it | terminal |
 
 Rules for every handler: `validateSender(event)` checks that the sending frame's origin is `app://` and that the window id is in the channel's allowlist; then `schema.parse`. A failed check logs at `warn` and drops the message. Each preload exposes only its own window's channels as named functions, never `ipcRenderer` itself. Payloads are objects, except the high-frequency `term:*` stream channels, which may carry a bare string or number. Main clamps `term:resize` values rather than rejecting them.

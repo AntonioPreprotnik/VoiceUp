@@ -18,7 +18,7 @@ Electron app. Root `CLAUDE.md`, `docs/PLAN.md` and `docs/TECH_SPEC.md` hold the 
 
 ## Pinned versions
 
-Exact versions only. Confirmed with `npm view` on 2026-11-02: Electron 45.2.1, electron-vite 5.0.0, Vite 7.3.7, TypeScript 6.0.3, @types/node 24.19.2, ESLint 10.14.0, @eslint/js 10.0.1, typescript-eslint 8.72.1, Prettier 3.9.10, Vitest 4.1.12, electron-builder 26.18.1, @electron/fuses 2.1.3 (reads the wire only; electron-builder keeps its own 1.8.0 to write it), license-checker-rseidelsohn 5.0.1, zod 4.6.7, electron-log 5.4.4. Later stories pin node-pty 1.2.0-beta.18 (S0.6), and sherpa-onnx-node 2.0.0.
+Exact versions only. Confirmed with `npm view` on 2026-11-02: Electron 45.2.1, electron-vite 5.0.0, Vite 7.3.7, TypeScript 6.0.3, @types/node 24.19.2, ESLint 10.14.0, @eslint/js 10.0.1, typescript-eslint 8.72.1, Prettier 3.9.10, Vitest 4.1.12, electron-builder 26.18.1, @electron/fuses 2.1.3 (reads the wire only; electron-builder keeps its own 1.8.0 to write it), license-checker-rseidelsohn 5.0.1, zod 4.6.7, electron-log 5.4.4. Later stories pin and sherpa-onnx-node 2.0.0.
 
 ## Gotchas
 

@@ -2,16 +2,14 @@ import { join } from 'node:path'
 import { app, session, type BrowserWindow } from 'electron'
 import { runShutdown, type ShutdownSteps } from '../core/shutdown'
 import { parseSmokeTestPath } from '../core/smokeTest'
-import { Channels } from '../shared/ipcChannels'
-import type { Settings } from '../shared/settings'
 import { registerTerminalIpc } from './ipc/terminal'
 import { initLogging, log, setLogLevel } from './log'
 import { installAppMenu } from './menu'
 import { denyAllPermissions } from './permissions'
 import { installProcessErrorLogging } from './processErrors'
 import { registerAppScheme, serveAppProtocol } from './protocol'
-import { PtyHost } from './pty/host'
 import { resolveClaude } from './pty/resolveClaude'
+import { ClaudeSession } from './pty/session'
 import { loadSettings } from './settings/store'
 import { runSmokeTest } from './smokeTest'
 import { createWindow, loadRenderer } from './windows/factory'
@@ -58,18 +56,6 @@ export interface StartOptions {
   readonly shutdownSteps?: ShutdownSteps
 }
 
-/** Step 6: Claude itself starts at the renderer's first size, so it never draws at a wrong one. */
-function createPtyHost(window: BrowserWindow, settings: Settings): PtyHost {
-  return new PtyHost({
-    send: (data) => {
-      if (!window.isDestroyed()) window.webContents.send(Channels.termData, data)
-    },
-    resolveCommand: () => resolveClaude(app.isPackaged),
-    // S1.2 adds the folder picker. Until then, an unset folder means the user's home.
-    cwd: settings.claude.projectDir ?? app.getPath('home')
-  })
-}
-
 /** The startup order from TECH_SPEC §3. Steps 4, 5 and 7 arrive with their stories. */
 export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptions = {}): void {
   const smokeTestPath = parseSmokeTestPath(argv)
@@ -106,17 +92,24 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
     .then(async () => {
       denyAllPermissions(session.defaultSession)
       serveAppProtocol(join(__dirname, '../renderer'))
-      installAppMenu()
 
       if (settings === null) {
+        installAppMenu()
         await runSmokeTest(smokeTestPath ?? '')
         return
       }
 
       mainWindow = createWindow('terminal')
-      const host = createPtyHost(mainWindow, settings)
-      registerTerminalIpc(host)
-      steps.pty ??= () => host.stop()
+      // Step 6: Claude itself starts at the renderer's first size, so it never draws at a wrong one.
+      const claude = new ClaudeSession({
+        window: mainWindow,
+        settings,
+        settingsDir: app.getPath('userData'),
+        resolveCommand: () => resolveClaude(app.isPackaged)
+      })
+      registerTerminalIpc(claude.host)
+      steps.pty ??= () => claude.host.stop()
+      installAppMenu(() => claude.changeFolder())
       mainWindow.once('closed', () => {
         mainWindow = undefined
       })

@@ -37,6 +37,8 @@ export class BrowserWindow extends EventEmitter {
   restored = false
   shown = false
   focused = false
+  visible = false
+  destroyed = false
 
   constructor(readonly options: Record<string, unknown>) {
     super()
@@ -51,7 +53,11 @@ export class BrowserWindow extends EventEmitter {
   }
 
   isDestroyed(): boolean {
-    return false
+    return this.destroyed
+  }
+
+  isVisible(): boolean {
+    return this.visible
   }
 
   isMinimized(): boolean {
@@ -144,6 +150,22 @@ export const shell = {
 
 export const ipcMain = new EventEmitter()
 
+export const dialog = {
+  /** Queued replies: a folder, or null for cancel. Anything unexpected counts as cancel. */
+  answers: [] as (string | null)[],
+  requests: [] as { window: unknown; options: Record<string, unknown> }[],
+  showOpenDialog(
+    window: unknown,
+    options: Record<string, unknown>
+  ): Promise<{ canceled: boolean; filePaths: string[] }> {
+    this.requests.push({ window, options })
+    const answer = this.answers.shift() ?? null
+    return Promise.resolve(
+      answer === null ? { canceled: true, filePaths: [] } : { canceled: false, filePaths: [answer] }
+    )
+  }
+}
+
 export const net = {
   fetched: [] as string[],
   fetch(url: string): Promise<Response> {
@@ -177,6 +199,8 @@ export const session = {
 export function resetFakes(): void {
   fakeLog.reset()
   ipcMain.removeAllListeners()
+  dialog.answers = []
+  dialog.requests = []
   rmSync(join(pathRoot, 'settings.json'), { force: true })
   Menu.installed = undefined
   shell.opened = []

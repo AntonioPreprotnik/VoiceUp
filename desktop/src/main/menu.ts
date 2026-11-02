@@ -9,8 +9,27 @@ async function openLogsFolder(): Promise<void> {
   if (failure !== '') log.error(`Could not open the logs folder ${directory}: ${failure}`)
 }
 
-/** Replaces Electron's default menu, which offers reload and DevTools in packaged builds too. */
-export function installAppMenu(): void {
+/**
+ * Replaces Electron's default menu, which offers reload and DevTools in packaged builds too. A
+ * smoke test has no session, so it passes no onChangeFolder and gets no File menu.
+ */
+export function installAppMenu(onChangeFolder?: () => Promise<void>): void {
+  const file: MenuItemConstructorOptions | undefined =
+    onChangeFolder === undefined
+      ? undefined
+      : {
+          label: 'File',
+          submenu: [
+            {
+              label: 'Change folder...',
+              click: () => {
+                onChangeFolder().catch((error: unknown) => {
+                  log.error('Could not change the project folder', error)
+                })
+              }
+            }
+          ]
+        }
   const help: MenuItemConstructorOptions = {
     label: 'Help',
     submenu: [
@@ -32,5 +51,6 @@ export function installAppMenu(): void {
       { role: 'toggleDevTools', registerAccelerator: false }
     ]
   }
-  Menu.setApplicationMenu(Menu.buildFromTemplate(app.isPackaged ? [help] : [help, devTools]))
+  const items = [file, help, app.isPackaged ? undefined : devTools]
+  Menu.setApplicationMenu(Menu.buildFromTemplate(items.filter((item) => item !== undefined)))
 }

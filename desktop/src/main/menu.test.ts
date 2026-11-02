@@ -32,6 +32,22 @@ describe('the app menu', () => {
     expect(template().map((item) => item.label)).toEqual(['Help'])
   })
 
+  it('adds File only when there is a session to change', () => {
+    installAppMenu(() => Promise.resolve())
+    expect(template().map((item) => item.label)).toEqual(['File', 'Help'])
+  })
+
+  it('runs Change folder and logs a failure', async () => {
+    const change = vi.fn(() => Promise.reject(new Error('boom')))
+    installAppMenu(change)
+    const file = template().find((item) => item.label === 'File')
+    file?.submenu?.find((entry) => entry.label === 'Change folder...')?.click?.()
+    expect(change).toHaveBeenCalledOnce()
+    await vi.waitFor(() => {
+      expect(fakeLog.messages('error')).toHaveLength(1)
+    })
+  })
+
   it('adds reload and DevTools when unpackaged', () => {
     app.isPackaged = false
     installAppMenu()

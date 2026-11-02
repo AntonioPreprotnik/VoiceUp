@@ -11,6 +11,10 @@ export const MESSAGES = {
   CLAUDE_EXITED: {
     title: 'Claude Code stopped',
     detail: 'Close and reopen VoiceUp to start a new session.'
+  },
+  NO_PROJECT_FOLDER: {
+    title: 'No project folder chosen',
+    detail: 'Press Alt and choose File > Change folder to start Claude Code.'
   }
 } as const
 

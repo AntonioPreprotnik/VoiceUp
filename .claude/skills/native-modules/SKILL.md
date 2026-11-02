@@ -12,7 +12,8 @@ paths:
 # Native modules in Electron
 
 ## Facts
-- S0.6 measures whether `node-pty` needs a rebuild at all: 1.1.0's install script uses bundled prebuilds when present and falls back to `node-gyp`. Until then, assume `postinstall: electron-builder install-app-deps` rebuilds it. Compiling needs VS 2022 Build Tools (Desktop C++ + the Spectre-mitigated libraries, else error MSB8040) + Python on dev machines; `windows-latest` CI has them. Version choice (1.1.0 vs 1.2.0-beta.x) is recorded in `docs/decisions/S0.6-*.md`.
+- `node-pty` is pinned to 1.2.0-beta.18 and loads from bundled prebuilds with no rebuild (`docs/decisions/S0.6-node-pty-packaging.md`). `npmRebuild: false` in `electron-builder.yml` is required, because electron-builder's default compiles and fails without Visual Studio. Dev machines need no compiler.
+- Under the `runAsNode` fuse, `node-pty`'s `kill()` leaves one unhandled rejection (`child_process.fork() is not supported`). It is harmless: the native kill still runs.
 - `sherpa-onnx-node` is N-API with platform prebuilds (`sherpa-onnx-win-x64` package): no rebuild, ABI-stable across Electron majors.
 - Both must be **externals** in `electron.vite.config.ts` and **asarUnpack**ed in `electron-builder.yml` (`**/node_modules/node-pty/**`, `**/node_modules/sherpa-onnx-*/**`).
 - `sherpa-onnx-node` runs only in the speech `utilityProcess`, never in main or a renderer.
@@ -32,7 +33,7 @@ Start-Process dist/win-unpacked/VoiceUp.exe -ArgumentList '--smoke-test=smoke.js
 Expected: `smoke.json` contains `{"pty":"ok","speech":"ok"}` and the exit code is 0. Don't rely on stdout from a GUI exe. The smoke path spawns `cmd.exe /c exit 0` through node-pty and creates a VAD from `resources/silero_vad.onnx`.
 
 ## Upgrading Electron
-1. Bump Electron, run `npm ci` (rebuilds node-pty).
+1. Bump Electron, run `npm ci`.
 2. Run the smoke test on the packaged build.
 3. Check node-pty and sherpa-onnx release notes for the new Electron/Node versions.
 4. Record versions in the commit message.
@@ -40,7 +41,8 @@ Expected: `smoke.json` contains `{"pty":"ok","speech":"ok"}` and the exit code i
 ## Common failures
 | Symptom | Cause | Fix |
 | --- | --- | --- |
-| `was compiled against a different Node.js version` | node-pty not rebuilt for Electron | `npx electron-builder install-app-deps` |
+| `Could not find any Visual Studio installation` while packaging | `npmRebuild` is on | set `npmRebuild: false`; prebuilds need no compile |
+| `was compiled against a different Node.js version` | a stale `build/Release` from a manual rebuild wins over the prebuilds | delete `node_modules/node-pty/build`, or `npm ci` |
 | `Cannot find module …pty.node` in packaged app only | missing asarUnpack | add the glob |
 | `External buffers are not allowed` | sherpa API returned external buffer | use the `false` / copy variant |
 | worker exits immediately, no log | addon load failed in utilityProcess | log `process.on('uncaughtException')` in the worker entry |

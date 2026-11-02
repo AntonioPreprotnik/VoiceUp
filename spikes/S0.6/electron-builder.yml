@@ -5,6 +5,11 @@ asar: true
 files:
   - main.js
   - package.json
+  - '!**/node_modules/node-pty/prebuilds/{darwin,linux}-*/**'
+  - '!**/node_modules/node-pty/prebuilds/win32-arm64/**'
+  - '!**/node_modules/node-pty/{deps,src,third_party,scripts,typings}/**'
+  - '!**/node_modules/node-pty/binding.gyp'
+  - '!**/*.pdb'
 asarUnpack:
   - '**/node_modules/node-pty/**'
 electronFuses:

@@ -58,6 +58,15 @@ export class ClaudeSession {
     return this.settings.ui.fontSize
   }
 
+  get micDeviceId(): string | null {
+    return this.settings.micDeviceId
+  }
+
+  /** Null is the system default. Applies from the next recording. */
+  setMicDevice(micDeviceId: string | null): void {
+    this.save({ ...this.settings, micDeviceId })
+  }
+
   changeFontSize(change: FontSizeChange): void {
     const fontSize = adjustFontSize(this.settings.ui.fontSize, change)
     if (fontSize === this.settings.ui.fontSize) return

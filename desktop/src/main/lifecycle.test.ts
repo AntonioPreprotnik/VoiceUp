@@ -8,6 +8,7 @@ import {
   dialog,
   globalShortcut,
   ipcMain,
+  Menu,
   net,
   protocol,
   resetFakes,
@@ -264,6 +265,32 @@ describe('the recorder window', () => {
     expect(portsSent()).toBe(0)
     recorderWindow().webContents.emit('did-finish-load')
     expect(portsSent()).toBe(1)
+  })
+
+  it('fills the Microphone menu from what it reports, and a choice is remembered', async () => {
+    startApp({ argv: [] })
+    await settle()
+    const event = {
+      sender: { id: recorderWindow().webContents.id },
+      senderFrame: { url: 'app://voiceup/recorder/index.html' }
+    }
+    ipcMain.emit('recorder:devices', event, [{ deviceId: 'usb', label: 'USB Mic' }])
+    interface Item {
+      label?: string
+      checked?: boolean
+      click?: () => void
+      submenu?: Item[]
+    }
+    const entries = (): Item[] =>
+      (Menu.installed as Item[]).find((item) => item.label === 'Microphone')?.submenu ?? []
+    expect(entries().map((item) => item.label)).toEqual(['System default', 'USB Mic'])
+    entries()
+      .find((item) => item.label === 'USB Mic')
+      ?.click?.()
+    expect(entries().find((item) => item.label === 'USB Mic')?.checked).toBe(true)
+
+    globalShortcut.press('Control+Shift+Space')
+    expect(recorderWindow().webContents.sent.at(-1)?.[1]).toMatchObject({ deviceId: 'usb' })
   })
 
   it('stays hidden', async () => {

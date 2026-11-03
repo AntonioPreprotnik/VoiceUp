@@ -13,7 +13,8 @@ export interface RecordingOptions {
   readonly toggle: RecordingToggle
   readonly sendToWorker: (command: WorkerCommand) => void
   readonly recorder: WebContents
-  readonly deviceId: string | null
+  /** Read at each recording, so a new choice applies from the next one. */
+  readonly getDeviceId: () => string | null
   /** Esc, held only while there is something to cancel (TECH_SPEC §4.4). */
   readonly escape: { hold(onPress: () => void): void; release(): void }
   readonly overlay: Pick<
@@ -37,13 +38,16 @@ export class RecordingController {
   }
 
   press(): void {
-    const { toggle, sendToWorker, deviceId, overlay, escape } = this.options
+    const { toggle, sendToWorker, getDeviceId, overlay, escape } = this.options
     const command = toggle.press()
     log.info(`Hotkey: ${command.type} recording`)
     sendToWorker(command)
     if (command.type === 'start') {
       // The worker first, so it has a VAD ready when the first frame arrives.
-      this.toRecorder(Channels.recorderStart, { recordingId: command.recordingId, deviceId })
+      this.toRecorder(Channels.recorderStart, {
+        recordingId: command.recordingId,
+        deviceId: getDeviceId()
+      })
       overlay.recordingStarted()
       escape.hold(() => {
         this.cancel()

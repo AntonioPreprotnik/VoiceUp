@@ -12,6 +12,7 @@ type RendererChannel =
   | typeof Channels.termContextMenu
   | typeof Channels.settingsFontSize
   | typeof Channels.recorderError
+  | typeof Channels.recorderDevices
 
 /** The window kinds allowed to send each renderer-to-main channel (TECH_SPEC §6.1). */
 export const SENDERS: Readonly<Record<RendererChannel, readonly WindowKind[]>> = {
@@ -24,5 +25,6 @@ export const SENDERS: Readonly<Record<RendererChannel, readonly WindowKind[]>> =
   [Channels.linkOpen]: ['terminal'],
   [Channels.termContextMenu]: ['terminal'],
   [Channels.settingsFontSize]: ['terminal'],
-  [Channels.recorderError]: ['recorder']
+  [Channels.recorderError]: ['recorder'],
+  [Channels.recorderDevices]: ['recorder']
 }

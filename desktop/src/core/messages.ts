@@ -29,11 +29,12 @@ export const MESSAGES = {
   },
   MIC_DENIED: {
     title: 'Windows is blocking the microphone',
-    detail: 'Allow it in Settings > Privacy > Microphone.'
+    detail:
+      'In Settings > Privacy > Microphone, turn on "Allow desktop apps to access your microphone".'
   },
   MIC_MISSING: {
     title: 'No microphone found',
-    detail: 'Connect one and press the hotkey again.'
+    detail: 'It may have been unplugged. Connect one and press the hotkey again.'
   },
   MIC_FAILED: {
     title: 'The microphone could not start',

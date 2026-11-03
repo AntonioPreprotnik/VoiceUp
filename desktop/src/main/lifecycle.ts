@@ -5,8 +5,10 @@ import { MESSAGES } from '../core/messages'
 import { RecordingToggle } from '../core/recordingToggle'
 import { runShutdown, type ShutdownSteps } from '../core/shutdown'
 import { parseSmokeTestPath } from '../core/smokeTest'
+import { RecorderDevices } from '../shared/ipc'
+import { Channels, type MicDevice } from '../shared/ipcChannels'
 import { escapeKey, registerHotkey, reportHotkeyTaken, unregisterHotkeys } from './hotkey'
-import { registerTerminalIpc } from './ipc/terminal'
+import { on, registerTerminalIpc } from './ipc/terminal'
 import { registerTerminalUiIpc } from './ipc/terminalUi'
 import { initLogging, log, setLogLevel } from './log'
 import { installAppMenu } from './menu'
@@ -122,7 +124,7 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
           speech.send(command)
         },
         recorder: recorderWindow.webContents,
-        deviceId: settings.micDeviceId,
+        getDeviceId: () => claude.micDeviceId,
         overlay,
         escape: escapeKey
       })
@@ -162,11 +164,25 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
       registerTerminalIpc(claude.host)
       steps.pty ??= () => claude.host.stop()
       registerTerminalUiIpc(mainWindow, () => claude.fontSize)
-      installAppMenu({
-        changeFolder: () => claude.changeFolder(),
-        changeFontSize: (change) => {
-          claude.changeFontSize(change)
-        }
+      let microphones: readonly MicDevice[] = []
+      const rebuildMenu = (): void => {
+        installAppMenu({
+          changeFolder: () => claude.changeFolder(),
+          changeFontSize: (change) => {
+            claude.changeFontSize(change)
+          },
+          microphones,
+          selectedMicrophone: claude.micDeviceId,
+          selectMicrophone: (deviceId) => {
+            claude.setMicDevice(deviceId)
+            rebuildMenu()
+          }
+        })
+      }
+      rebuildMenu()
+      on(Channels.recorderDevices, RecorderDevices, (devices) => {
+        microphones = devices
+        rebuildMenu()
       })
       // Closing the terminal quits. window-all-closed can't do it: the hidden recorder stays open.
       mainWindow.once('closed', () => {

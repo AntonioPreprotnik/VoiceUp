@@ -204,6 +204,26 @@ export class MessageChannelMain {
   readonly port2 = { name: 'port2' }
 }
 
+export const globalShortcut = {
+  registered: new Map<string, () => void>(),
+  takenByAnotherApp: '',
+  throwsOn: '',
+  register(accelerator: string, callback: () => void): boolean {
+    calls.push('hotkey')
+    if (accelerator === this.throwsOn) throw new Error('bad accelerator')
+    if (accelerator === this.takenByAnotherApp) return false
+    this.registered.set(accelerator, callback)
+    return true
+  },
+  unregisterAll(): void {
+    this.registered.clear()
+  },
+  /** What the user pressing it would do. */
+  press(accelerator: string): void {
+    this.registered.get(accelerator)?.()
+  }
+}
+
 type InvokeHandler = (event: unknown) => unknown
 
 class FakeIpcMain extends EventEmitter {
@@ -231,6 +251,12 @@ export const dialog = {
   /** Queued replies: a folder, or null for cancel. Anything unexpected counts as cancel. */
   answers: [] as (string | null)[],
   requests: [] as { window: unknown; options: Record<string, unknown> }[],
+  messageBoxes: [] as Record<string, unknown>[],
+  messageBoxFails: false,
+  showMessageBox(_window: unknown, options: Record<string, unknown>): Promise<unknown> {
+    this.messageBoxes.push(options)
+    return this.messageBoxFails ? Promise.reject(new Error('no dialog')) : Promise.resolve({})
+  },
   showOpenDialog(
     window: unknown,
     options: Record<string, unknown>
@@ -283,6 +309,11 @@ export function resetFakes(): void {
   shell.external = []
   shell.openFails = false
   dialog.answers = []
+  dialog.messageBoxes = []
+  dialog.messageBoxFails = false
+  globalShortcut.registered.clear()
+  globalShortcut.takenByAnotherApp = ''
+  globalShortcut.throwsOn = ''
   dialog.requests = []
   rmSync(join(pathRoot, 'settings.json'), { force: true })
   Menu.installed = undefined

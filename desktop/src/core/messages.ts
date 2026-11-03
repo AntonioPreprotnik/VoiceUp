@@ -15,6 +15,10 @@ export const MESSAGES = {
     detail: 'Restart the session to continue.',
     action: 'Restart session'
   },
+  HOTKEY_TAKEN: {
+    title: 'Hotkey taken, pick another',
+    detail: 'Close the app using it, or set a different "hotkey" in this file and restart VoiceUp:'
+  },
   WORKER_CRASHED: {
     title: 'Speech engine stopped',
     detail: 'Restart VoiceUp. If it keeps happening, send the logs from Help > Open logs folder.'

@@ -9,9 +9,10 @@ import {
   net,
   protocol,
   resetFakes,
-  session
+  session,
+  utilityProcess
 } from '../../test/fakes/electron'
-import { spawned } from '../../test/fakes/nodePty'
+import { resetFakePty, spawned } from '../../test/fakes/nodePty'
 import fakeLog from '../../test/fakes/electronLog'
 import { startApp } from './lifecycle'
 
@@ -33,6 +34,7 @@ async function settle(): Promise<void> {
 
 beforeEach(() => {
   resetFakes()
+  resetFakePty()
   // Bad-file copies from earlier tests would otherwise pile up in the shared fake folder.
   const userData = app.getPath('userData')
   for (const file of readdirSync(userData)) {
@@ -60,6 +62,7 @@ describe('startup', () => {
       'permissions',
       'serveProtocol',
       'window',
+      'speechWorker',
       'getPath:userData',
       'menu',
       'load'
@@ -135,6 +138,24 @@ describe('settings and logging at startup', () => {
     await settle()
     expect(fakeLog.transports.file.level).toBe('info')
     expect(onlyWindow().loadedUrl).toBe('app://voiceup/terminal/index.html')
+  })
+})
+
+describe('the speech worker', () => {
+  it('starts with the settings, and stops on quit', async () => {
+    startApp({ argv: [] })
+    await settle()
+    expect(utilityProcess.children).toHaveLength(1)
+    const child = utilityProcess.children.at(0)
+    expect(child?.messages[0]?.message).toMatchObject({
+      type: 'init',
+      vad: { endSilenceSec: 1.2 }
+    })
+    app.emit('before-quit', { preventDefault: () => undefined })
+    await vi.waitFor(() => {
+      expect(app.exitCodes).toEqual([0])
+    })
+    expect(child?.killed).toBe(true)
   })
 })
 

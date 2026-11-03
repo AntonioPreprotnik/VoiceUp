@@ -15,6 +15,10 @@ export const MESSAGES = {
     detail: 'Restart the session to continue.',
     action: 'Restart session'
   },
+  WORKER_CRASHED: {
+    title: 'Speech engine stopped',
+    detail: 'Restart VoiceUp. If it keeps happening, send the logs from Help > Open logs folder.'
+  },
   NO_PROJECT_FOLDER: {
     title: 'No project folder chosen',
     detail: 'Press Alt and choose File > Change folder to start Claude Code.'

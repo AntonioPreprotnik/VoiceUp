@@ -359,7 +359,7 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 **[x] S3.5 Cancel.** As a user, I want to abort a bad recording.
 
 - AC: Esc while the overlay is visible (registered as a global shortcut only while recording or previewing, then released) or the hotkey again discards audio; nothing is sent.
-- Known limit, seen in S3.5: Esc can also reach the focused app while it cancels a recording. YouTube reacted to it during a test. The likely cause is browsers catching keys below the level of a global shortcut, which is not verified. The hotkey cancels too, without this side effect.
+- Known limit, seen in S3.5: Esc can also reach the focused app while it cancels a recording. YouTube reacted to it during a test. The likely cause is browsers catching keys below the level of a global shortcut, which is not verified. The hotkey also cancels, and is the alternative to try, though it has not been tested against this.
 
 **[ ] S3.6 Microphone selection and errors.** As a user, I want the right mic and clear errors.
 

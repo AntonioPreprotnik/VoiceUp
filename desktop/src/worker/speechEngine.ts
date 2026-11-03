@@ -55,6 +55,8 @@ interface Recording {
   readonly vad: Vad
   frames: number
   speechStarted: boolean
+  /** Frames at the last moment the VAD heard speech. The no-speech timeout counts from here. */
+  lastSpeechFrame: number
 }
 
 /** One recording at a time: VAD on incoming frames, then recognition of the first segment. */
@@ -103,6 +105,7 @@ export class SpeechEngine {
       id: recordingId,
       frames: 0,
       speechStarted: false,
+      lastSpeechFrame: 0,
       vad: this.sherpa.createVad(
         {
           sileroVad: {
@@ -133,13 +136,16 @@ export class SpeechEngine {
       if (recording.frames % FRAMES_PER_LEVEL === 0) {
         this.emit({ type: 'level', recordingId: recording.id, rms: rms(samples) })
       }
-      if (!recording.speechStarted && recording.vad.isDetected()) {
-        recording.speechStarted = true
-        this.emit({ type: 'speechStart', recordingId: recording.id })
+      if (recording.vad.isDetected()) {
+        recording.lastSpeechFrame = recording.frames
+        if (!recording.speechStarted) {
+          recording.speechStarted = true
+          this.emit({ type: 'speechStart', recordingId: recording.id })
+        }
       }
       if (!recording.vad.isEmpty()) {
         this.finishWithSegment(recording)
-      } else if (!recording.speechStarted && this.timedOut(recording, init)) {
+      } else if (this.timedOut(recording, init)) {
         this.endWithNoSpeech(recording)
       }
     } catch (error: unknown) {
@@ -168,8 +174,13 @@ export class SpeechEngine {
     else this.cancelled.add(recordingId)
   }
 
+  /**
+   * Counted from the last speech heard. A click can start speech and then be rejected as too short,
+   * with no segment to end the recording, so this has to keep running after speech starts. Real
+   * speech can't trip it: the shorter end-of-speech silence ends the recording first.
+   */
   private timedOut(recording: Recording, init: WorkerInit): boolean {
-    const seconds = (recording.frames * FRAME_SAMPLES) / SAMPLE_RATE
+    const seconds = ((recording.frames - recording.lastSpeechFrame) * FRAME_SAMPLES) / SAMPLE_RATE
     return seconds > init.vad.noSpeechTimeoutSec
   }
 

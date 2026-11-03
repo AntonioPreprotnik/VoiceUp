@@ -1,0 +1,61 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>S4.1 recorder</title>
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; worker-src 'self' blob:"
+    />
+    <style>
+      body {
+        margin: 0;
+        padding: 32px;
+        background: #1e1e1e;
+        color: #f0f0f0;
+        font: 16px 'Segoe UI', sans-serif;
+      }
+      #count {
+        color: #aaa;
+      }
+      #prompt {
+        margin: 16px 0 24px;
+        font-size: 28px;
+        line-height: 1.3;
+      }
+      button {
+        padding: 12px 22px;
+        margin-right: 8px;
+        border: 0;
+        border-radius: 3px;
+        background: #0e639c;
+        color: #fff;
+        font: inherit;
+        cursor: pointer;
+      }
+      button:disabled {
+        background: #4d4d50;
+        color: #ccc;
+        cursor: default;
+      }
+      #status {
+        margin: 20px 0 6px;
+        color: #9cdcfe;
+        min-height: 22px;
+      }
+      #heard {
+        min-height: 48px;
+        color: #ddd;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="count"></div>
+    <div id="prompt"></div>
+    <button id="record" type="button">Record</button>
+    <button id="redo" type="button" disabled>Redo last</button>
+    <div id="status">Press Record, say the command, then stop talking. It ends by itself.</div>
+    <div id="heard"></div>
+    <script src="./recorder.js"></script>
+  </body>
+</html>

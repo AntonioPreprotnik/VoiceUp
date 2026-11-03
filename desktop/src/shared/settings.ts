@@ -7,7 +7,7 @@ export const Settings = z.object({
   micDeviceId: z.string().nullable().default(null),
   speech: z
     .object({
-      // auto: >= 15 GiB reported RAM -> Parakeet, else Moonshine
+      // auto: Moonshine (decision note S4.1)
       modelId: z.enum(['auto', 'parakeet-tdt-0.6b-v2-int8', 'moonshine-base-en']).default('auto'),
       endSilenceSec: z.number().min(0.5).max(3).default(1.2),
       minSpeechSec: z.number().min(0.1).max(1).default(0.25),

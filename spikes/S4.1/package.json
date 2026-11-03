@@ -1,0 +1,16 @@
+{
+  "name": "s41-spike",
+  "productName": "S41Spike",
+  "version": "0.0.0",
+  "private": true,
+  "description": "S4.1 throwaway: does sherpa-onnx-node work in a packaged, fused Electron utilityProcess?",
+  "author": "Antonio Preprotnik",
+  "main": "main.js",
+  "dependencies": {
+    "sherpa-onnx-node": "2.0.0"
+  },
+  "devDependencies": {
+    "electron": "45.2.1",
+    "electron-builder": "26.18.1"
+  }
+}

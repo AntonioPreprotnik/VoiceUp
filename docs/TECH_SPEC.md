@@ -14,7 +14,7 @@ This spec turns `docs/PLAN.md` into implementable contracts: process layout, int
 
 | Metric | Budget | Verified in |
 | --- | --- | --- |
-| Hotkey press → "Listening" overlay | ≤ 150 ms | S3.4 |
+| Hotkey press → "Listening" overlay | ≤ 150 ms; logged as `Listening N ms after the hotkey`. Measured in S3.4: 101–119 ms once warm, but 170–192 ms on the first press after launch, which misses the target | S3.4 |
 | End of speech → preview shown, 5 s command, low-end CPU | ≤ 1.5 s after the silence window | S4.1 |
 | Cold start → usable terminal | ≤ 3 s; measured about 1.4 s to Claude's first text (S1.3), logged as `First Claude text` | S1.1 |
 | Idle CPU, app in tray, Claude idle | < 1% | S7.1 |
@@ -336,6 +336,7 @@ Every boundary has one zod schema in `shared/`, imported by both sides; nothing 
 | `term:ack` | renderer → main | bytes written (flow control) | terminal |
 | `state:changed` | main → renderer | `{ state, reason?, queue: [{ id, preview }] }` | terminal, overlay, settings |
 | `overlay:show` | main → renderer | union on `phase`: `listening{level}`, `transcribing`, `preview{text, countdownMs}`, `blocked{reason}`, `error{code, message}`, `hidden` | overlay |
+| `overlay:sound` | main → renderer | `start` or `stop`; generated tones, off with `ui.sounds` | overlay |
 | `recorder:start` / `recorder:stop` | main → renderer | `{ recordingId, deviceId }` / `{ recordingId }` | recorder |
 | `recorder:error` | renderer → main | `{ recordingId, code }`; `code` is `MIC_DENIED`, `MIC_MISSING` or `MIC_FAILED` | recorder |
 | `settings:get` / `settings:set` | invoke | → `Settings` / `Partial<Settings>` → `Result` | settings, wizard |

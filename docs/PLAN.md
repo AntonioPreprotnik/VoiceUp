@@ -351,7 +351,7 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 - AC: settings for end-of-speech silence (default ~1.2 s), minimum speech length (drop clicks/coughs), maximum recording length (default 60 s), and "no speech heard" timeout (default 8 s, then cancel).
 - AC: the silence timer starts only after speech is detected.
 
-**[ ] S3.4 Recording feedback.** As a user, I want to know when it's listening without looking at the app.
+**[x] S3.4 Recording feedback.** As a user, I want to know when it's listening without looking at the app.
 
 - AC: always-on-top, click-through overlay near the taskbar: "Listening…", live level meter, "Transcribing…".
 - AC: short start/stop sounds, toggleable.

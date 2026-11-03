@@ -1,5 +1,5 @@
 import type { WebContents } from 'electron'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { BrowserWindow, ipcMain, resetFakes } from '../../../test/fakes/electron'
 import fakeLog from '../../../test/fakes/electronLog'
 import { RecordingToggle } from '../../core/recordingToggle'
@@ -16,6 +16,14 @@ let toRecorder: [string, unknown][]
 let destroyed: boolean
 let controller: RecordingController
 let next: number
+let overlay: {
+  recordingStarted: Mock
+  level: Mock
+  speechEnded: Mock
+  finished: Mock
+  cancelled: Mock
+  failed: Mock
+}
 
 function recorderEvent(frameUrl = 'app://voiceup/recorder/index.html'): unknown {
   createWindow('recorder', { showWhenReady: false })
@@ -30,6 +38,14 @@ beforeEach(() => {
   toRecorder = []
   destroyed = false
   next = 1
+  overlay = {
+    recordingStarted: vi.fn(),
+    level: vi.fn(),
+    speechEnded: vi.fn(),
+    finished: vi.fn(),
+    cancelled: vi.fn(),
+    failed: vi.fn()
+  }
   const recorder = {
     isDestroyed: () => destroyed,
     send: (channel: string, payload: unknown) => {
@@ -40,7 +56,8 @@ beforeEach(() => {
     toggle: new RecordingToggle(() => `r${String(next++)}`),
     sendToWorker: (command) => toWorker.push(command),
     recorder,
-    deviceId: null
+    deviceId: null,
+    overlay
   })
 })
 
@@ -105,6 +122,50 @@ describe('worker events', () => {
     const before = toRecorder.length
     controller.onWorkerEvent({ type: 'ready', modelId: null, loadMs: 1 })
     expect(toRecorder).toHaveLength(before)
+  })
+})
+
+describe('the overlay', () => {
+  it('follows a recording from start to finish', () => {
+    controller.press()
+    expect(overlay.recordingStarted).toHaveBeenCalledOnce()
+    controller.onWorkerEvent({ type: 'level', recordingId: 'r1', rms: 0.3 })
+    expect(overlay.level).toHaveBeenCalledWith(0.3)
+    controller.onWorkerEvent({ type: 'speechEnd', recordingId: 'r1', durationMs: 900 })
+    expect(overlay.speechEnded).toHaveBeenCalledOnce()
+    controller.onWorkerEvent({ type: 'transcript', recordingId: 'r1', text: 'hi', decodeMs: 1 })
+    expect(overlay.finished).toHaveBeenCalledOnce()
+  })
+
+  it('shows a cancel', () => {
+    controller.press()
+    controller.press()
+    expect(overlay.cancelled).toHaveBeenCalledOnce()
+  })
+
+  it('shows a worker error by its code', () => {
+    controller.press()
+    controller.onWorkerEvent({
+      type: 'error',
+      recordingId: 'r1',
+      code: 'MODEL_MISSING',
+      message: 'No speech model is loaded'
+    })
+    expect(overlay.failed).toHaveBeenCalledWith('MODEL_MISSING')
+  })
+
+  it('shows a microphone error', () => {
+    controller.press()
+    ipcMain.emit(Channels.recorderError, recorderEvent(), { recordingId: 'r1', code: 'MIC_DENIED' })
+    expect(overlay.failed).toHaveBeenCalledWith('MIC_DENIED')
+  })
+
+  it('ignores anything from a cancelled recording', () => {
+    controller.press()
+    controller.press()
+    controller.press()
+    controller.onWorkerEvent({ type: 'level', recordingId: 'r1', rms: 0.3 })
+    expect(overlay.level).not.toHaveBeenCalled()
   })
 })
 

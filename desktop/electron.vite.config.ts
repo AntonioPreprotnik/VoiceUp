@@ -21,7 +21,8 @@ export default defineConfig({
       rollupOptions: {
         input: {
           terminal: resolve(__dirname, 'src/preload/terminal.ts'),
-          recorder: resolve(__dirname, 'src/preload/recorder.ts')
+          recorder: resolve(__dirname, 'src/preload/recorder.ts'),
+          overlay: resolve(__dirname, 'src/preload/overlay.ts')
         }
       }
     }
@@ -31,7 +32,8 @@ export default defineConfig({
       rollupOptions: {
         input: {
           terminal: resolve(__dirname, 'src/renderer/terminal/index.html'),
-          recorder: resolve(__dirname, 'src/renderer/recorder/index.html')
+          recorder: resolve(__dirname, 'src/renderer/recorder/index.html'),
+          overlay: resolve(__dirname, 'src/renderer/overlay/index.html')
         }
       }
     }

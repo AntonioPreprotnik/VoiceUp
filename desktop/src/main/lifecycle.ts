@@ -10,6 +10,7 @@ import { registerTerminalIpc } from './ipc/terminal'
 import { registerTerminalUiIpc } from './ipc/terminalUi'
 import { initLogging, log, setLogLevel } from './log'
 import { installAppMenu } from './menu'
+import { Overlay } from './overlay'
 import { installPermissions } from './permissions'
 import { installProcessErrorLogging } from './processErrors'
 import { registerAppScheme, serveAppProtocol } from './protocol'
@@ -110,13 +111,19 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
       mainWindow = createWindow('terminal')
       // Step 5: the hidden window that streams the mic, and the speech worker it streams to.
       const recorderWindow = createWindow('recorder', { showWhenReady: false })
+      const overlayWindow = createWindow('overlay', { showWhenReady: false })
+      const overlay = new Overlay({ window: overlayWindow, sounds: settings.ui.sounds })
+      loadRenderer(overlayWindow, 'overlay').catch((error: unknown) => {
+        log.error('Could not load the overlay window', error)
+      })
       const recording = new RecordingController({
         toggle: new RecordingToggle(randomUUID),
         sendToWorker: (command) => {
           speech.send(command)
         },
         recorder: recorderWindow.webContents,
-        deviceId: settings.micDeviceId
+        deviceId: settings.micDeviceId,
+        overlay
       })
       const speech = new SpeechSupervisor({
         onEvent: (event) => {

@@ -17,7 +17,9 @@ export const Channels = {
   recorderPort: 'recorder:port',
   recorderStart: 'recorder:start',
   recorderStop: 'recorder:stop',
-  recorderError: 'recorder:error'
+  recorderError: 'recorder:error',
+  overlayShow: 'overlay:show',
+  overlaySound: 'overlay:sound'
 } as const
 
 /** RIS, the terminal's full reset, sent on its own as a session is replaced. */
@@ -35,6 +37,21 @@ export interface SessionExit {
   readonly command: string | null
   /** Null when Claude never started, so there is no code to show. */
   readonly exitCode: number | null
+}
+
+/** What the overlay shows. TECH_SPEC §6.1 adds the preview and blocked phases with their stories. */
+export type OverlayState =
+  | { readonly phase: 'hidden' }
+  | { readonly phase: 'listening'; readonly level: number }
+  | { readonly phase: 'transcribing' }
+  | { readonly phase: 'error'; readonly code: string; readonly message: string }
+
+export type OverlaySound = 'start' | 'stop'
+
+/** What the overlay preload exposes as window.voiceupOverlay. */
+export interface OverlayApi {
+  onShow(listener: (state: OverlayState) => void): void
+  onSound(listener: (sound: OverlaySound) => void): void
 }
 
 export type RecorderErrorCode = 'MIC_DENIED' | 'MIC_MISSING' | 'MIC_FAILED'

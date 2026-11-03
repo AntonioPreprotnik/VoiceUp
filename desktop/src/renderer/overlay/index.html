@@ -1,0 +1,68 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>VoiceUp overlay</title>
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; media-src 'self' blob:"
+    />
+    <style>
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        background: transparent;
+      }
+      #pill {
+        box-sizing: border-box;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 6px;
+        padding: 0 20px;
+        border-radius: 12px;
+        background: rgb(30 30 32 / 92%);
+        color: #f0f0f0;
+        font:
+          15px 'Segoe UI',
+          sans-serif;
+        user-select: none;
+      }
+      #pill[hidden] {
+        display: none;
+      }
+      #pill[data-kind='error'] {
+        background: rgb(90 32 32 / 94%);
+      }
+      #text {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      #meter {
+        height: 4px;
+        border-radius: 2px;
+        background: rgb(255 255 255 / 15%);
+        overflow: hidden;
+      }
+      #meter[hidden] {
+        display: none;
+      }
+      #level {
+        height: 100%;
+        width: 0;
+        background: #4ec9b0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="pill" hidden>
+      <div id="text"></div>
+      <div id="meter" hidden><div id="level"></div></div>
+    </div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

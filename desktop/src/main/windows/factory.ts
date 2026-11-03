@@ -11,6 +11,23 @@ const WINDOWS = {
     preload: 'terminal.js',
     options: { width: 900, height: 670, autoHideMenuBar: true, backgroundColor: '#0c0c0c' }
   },
+  overlay: {
+    preload: 'overlay.js',
+    options: {
+      transparent: true,
+      frame: false,
+      hasShadow: false,
+      resizable: false,
+      movable: false,
+      minimizable: false,
+      maximizable: false,
+      fullscreenable: false,
+      skipTaskbar: true,
+      // Never takes focus, so the user keeps typing where they were.
+      focusable: false
+    },
+    webPreferences: { autoplayPolicy: 'no-user-gesture-required' }
+  },
   recorder: {
     preload: 'recorder.js',
     options: {},

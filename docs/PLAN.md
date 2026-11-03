@@ -334,7 +334,7 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 
 *Goal: one hotkey, from any app, records exactly one spoken command and ends it automatically on silence.*
 
-**[ ] S3.1 Global hotkey.** As a user, I want to start recording without switching windows.
+**[x] S3.1 Global hotkey.** As a user, I want to start recording without switching windows.
 
 - AC: registered with Electron `globalShortcut` (works while another app has focus); default `Ctrl+Shift+Space` (Ctrl+Alt is AltGr on Croatian and other European layouts), configurable.
 - AC: registration result is checked; if another app owns the combo, the user sees "Hotkey taken, pick another" (Electron fails silently otherwise).

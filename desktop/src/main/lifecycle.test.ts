@@ -5,6 +5,8 @@ import {
   app,
   BrowserWindow,
   calls,
+  dialog,
+  globalShortcut,
   ipcMain,
   net,
   protocol,
@@ -28,7 +30,7 @@ function onlyWindow(): BrowserWindow {
 
 async function settle(): Promise<void> {
   await vi.waitFor(() => {
-    expect(calls).toContain('load')
+    expect(calls).toContain('hotkey')
   })
 }
 
@@ -65,7 +67,8 @@ describe('startup', () => {
       'speechWorker',
       'getPath:userData',
       'menu',
-      'load'
+      'load',
+      'hotkey'
     ])
   })
 
@@ -138,6 +141,95 @@ describe('settings and logging at startup', () => {
     await settle()
     expect(fakeLog.transports.file.level).toBe('info')
     expect(onlyWindow().loadedUrl).toBe('app://voiceup/terminal/index.html')
+  })
+})
+
+describe('the hotkey', () => {
+  const HOTKEY = 'Control+Shift+Space'
+
+  function sentToWorker(): unknown[] {
+    return (utilityProcess.children.at(0)?.messages ?? []).map(({ message }) => message)
+  }
+
+  it('registers the default from the settings', async () => {
+    startApp({ argv: [] })
+    await settle()
+    expect(globalShortcut.registered.has(HOTKEY)).toBe(true)
+  })
+
+  it('registers a combination set in the settings', async () => {
+    writeFileSync(
+      join(app.getPath('userData'), 'settings.json'),
+      JSON.stringify({ version: 1, hotkey: 'Alt+V' })
+    )
+    startApp({ argv: [] })
+    await settle()
+    expect(globalShortcut.registered.has('Alt+V')).toBe(true)
+  })
+
+  it('starts a recording, then cancels it on the next press', async () => {
+    startApp({ argv: [] })
+    await settle()
+    globalShortcut.press(HOTKEY)
+    expect(sentToWorker().at(-1)).toMatchObject({ type: 'start' })
+    globalShortcut.press(HOTKEY)
+    expect(sentToWorker().at(-1)).toMatchObject({ type: 'cancel' })
+  })
+
+  it('cancels the same recording it started', async () => {
+    startApp({ argv: [] })
+    await settle()
+    globalShortcut.press(HOTKEY)
+    const started = sentToWorker().at(-1) as { recordingId: string }
+    globalShortcut.press(HOTKEY)
+    expect(sentToWorker().at(-1)).toMatchObject({ recordingId: started.recordingId })
+  })
+
+  it('starts fresh after the worker finishes the recording', async () => {
+    startApp({ argv: [] })
+    await settle()
+    globalShortcut.press(HOTKEY)
+    const { recordingId } = sentToWorker().at(-1) as { recordingId: string }
+    utilityProcess.children.at(0)?.emit('message', {
+      type: 'transcript',
+      recordingId,
+      text: 'hello',
+      decodeMs: 1
+    })
+    globalShortcut.press(HOTKEY)
+    expect(sentToWorker().at(-1)).toMatchObject({ type: 'start' })
+  })
+
+  it('tells the user when another app owns it, and the app keeps running', async () => {
+    globalShortcut.takenByAnotherApp = HOTKEY
+    startApp({ argv: [] })
+    await settle()
+    expect(dialog.messageBoxes[0]?.['message']).toBe('Hotkey taken, pick another')
+    expect(app.exitCodes).toEqual([])
+  })
+
+  it('releases it on quit', async () => {
+    startApp({ argv: [] })
+    await settle()
+    app.emit('before-quit', { preventDefault: () => undefined })
+    await vi.waitFor(() => {
+      expect(app.exitCodes).toEqual([0])
+    })
+    expect(globalShortcut.registered.size).toBe(0)
+  })
+
+  it('never logs anything transcribed', async () => {
+    startApp({ argv: [] })
+    await settle()
+    globalShortcut.press(HOTKEY)
+    const { recordingId } = sentToWorker().at(-1) as { recordingId: string }
+    utilityProcess.children.at(0)?.emit('message', {
+      type: 'transcript',
+      recordingId,
+      text: 'a private sentence',
+      decodeMs: 1
+    })
+    expect(JSON.stringify(fakeLog.messages('info'))).not.toContain('private')
   })
 })
 

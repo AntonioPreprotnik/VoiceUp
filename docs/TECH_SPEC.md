@@ -419,7 +419,7 @@ export const Settings = z.object({
 | --- | --- | --- | --- |
 | `MIC_DENIED` | `NotAllowedError` | "Windows is blocking the microphone" | button opens `ms-settings:privacy-microphone` |
 | `MIC_MISSING` | `NotFoundError`, device unplugged | "No microphone found" | device picker |
-| `HOTKEY_TAKEN` | `register()` returns false | "Another app uses this hotkey" | hotkey setting |
+| `HOTKEY_TAKEN` | `register()` returns false, or the combination is invalid | "Hotkey taken, pick another" | close the other app, or change `hotkey` in `settings.json` until S6.6 adds the setting |
 | `MODEL_MISSING`, `MODEL_CORRUPT` | file absent, hash mismatch | "Speech model needs downloading" | download button |
 | `WORKER_ERROR` | the worker reports a failure it survived, such as a failed decode | logged; S4.4 decides what the user sees | try again |
 | `WORKER_CRASHED` | worker exit ≠ 0 three times in 60 s | "Speech engine stopped" | restart button, logs link |

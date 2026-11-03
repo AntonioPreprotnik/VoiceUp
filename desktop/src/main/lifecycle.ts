@@ -1,8 +1,11 @@
+import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 import { app, session, type BrowserWindow } from 'electron'
 import { MESSAGES } from '../core/messages'
+import { RecordingToggle } from '../core/recordingToggle'
 import { runShutdown, type ShutdownSteps } from '../core/shutdown'
 import { parseSmokeTestPath } from '../core/smokeTest'
+import { registerHotkey, reportHotkeyTaken, unregisterHotkeys } from './hotkey'
 import { registerTerminalIpc } from './ipc/terminal'
 import { registerTerminalUiIpc } from './ipc/terminalUi'
 import { initLogging, log, setLogLevel } from './log'
@@ -60,7 +63,7 @@ export interface StartOptions {
   readonly shutdownSteps?: ShutdownSteps
 }
 
-/** The startup order from TECH_SPEC §3. Steps 4 and 7 arrive with their stories. */
+/** The startup order from TECH_SPEC §3. Step 4 arrives with its story. */
 export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptions = {}): void {
   const smokeTestPath = parseSmokeTestPath(argv)
 
@@ -104,11 +107,13 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
       }
 
       mainWindow = createWindow('terminal')
-      // Step 5: the speech worker. Recordings arrive with the recorder window in S3.2.
+      // Step 5: the speech worker. Audio arrives with the recorder window in S3.2.
+      const recording = new RecordingToggle(randomUUID)
       const speech = new SpeechSupervisor({
         onEvent: (event) => {
           if (event.type === 'ready') log.info(`Speech worker ready in ${String(event.loadMs)} ms`)
           if (event.type === 'error') log.warn(`Speech worker error: ${event.code}`)
+          recording.onWorkerEvent(event)
         },
         onGaveUp: () => {
           log.error(MESSAGES.WORKER_CRASHED.title)
@@ -137,6 +142,16 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
         mainWindow = undefined
       })
       await loadRenderer(mainWindow, 'terminal')
+
+      // Step 7: the global hotkey, last, so a press always finds everything running.
+      const { hotkey } = settings
+      steps.shortcuts ??= unregisterHotkeys
+      const registered = registerHotkey(hotkey, () => {
+        const command = recording.press()
+        log.info(`Hotkey: ${command.type} recording`)
+        speech.send(command)
+      })
+      if (!registered) reportHotkeyTaken(mainWindow, hotkey)
     })
     .catch(failStartup)
 }

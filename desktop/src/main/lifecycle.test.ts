@@ -65,6 +65,8 @@ describe('startup', () => {
       'serveProtocol',
       'window',
       'window',
+      'window',
+      'load',
       'speechWorker',
       'load',
       'getPath:userData',

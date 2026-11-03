@@ -59,6 +59,11 @@ async function checkRenderer(): Promise<Check> {
  * would otherwise fail for the first time with a user's microphone open. Opens no microphone.
  */
 async function checkRecorderPage(consoleErrors: string[]): Promise<void> {
+  const overlay = createWindow('overlay', { showWhenReady: false })
+  overlay.webContents.on('console-message', (details) => {
+    if (details.level === 'error') consoleErrors.push(details.message)
+  })
+  await loadRenderer(overlay, 'overlay')
   const window = createWindow('recorder', { showWhenReady: false })
   window.webContents.on('console-message', (details) => {
     if (details.level === 'error') consoleErrors.push(details.message)

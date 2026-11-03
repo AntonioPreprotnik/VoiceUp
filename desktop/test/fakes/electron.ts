@@ -60,6 +60,32 @@ export class BrowserWindow extends EventEmitter {
     return Promise.resolve()
   }
 
+  ignoresMouse = false
+  alwaysOnTop: unknown[] = []
+  shownInactive = 0
+  hideCount = 0
+  bounds: unknown
+
+  setIgnoreMouseEvents(ignore: boolean): void {
+    this.ignoresMouse = ignore
+  }
+
+  setAlwaysOnTop(...args: unknown[]): void {
+    this.alwaysOnTop = args
+  }
+
+  showInactive(): void {
+    this.shownInactive++
+  }
+
+  hide(): void {
+    this.hideCount++
+  }
+
+  setBounds(bounds: unknown): void {
+    this.bounds = bounds
+  }
+
   isDestroyed(): boolean {
     return this.destroyed
   }
@@ -195,6 +221,15 @@ class FakeUtilityProcess extends EventEmitter {
       })
     }
     return true
+  }
+}
+
+export const screen = {
+  getCursorScreenPoint(): { x: number; y: number } {
+    return { x: 0, y: 0 }
+  },
+  getDisplayNearestPoint(): { workArea: { x: number; y: number; width: number; height: number } } {
+    return { workArea: { x: 0, y: 0, width: 1920, height: 1040 } }
   }
 }
 

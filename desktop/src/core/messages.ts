@@ -19,6 +19,30 @@ export const MESSAGES = {
     title: 'Hotkey taken, pick another',
     detail: 'Close the app using it, or set a different "hotkey" in this file and restart VoiceUp:'
   },
+  NO_SPEECH: {
+    title: "Didn't hear anything",
+    detail: 'Check the mic and press the hotkey again.'
+  },
+  MODEL_MISSING: {
+    title: 'Speech model needs downloading',
+    detail: 'VoiceUp can hear you, but has no model to transcribe with yet.'
+  },
+  MIC_DENIED: {
+    title: 'Windows is blocking the microphone',
+    detail: 'Allow it in Settings > Privacy > Microphone.'
+  },
+  MIC_MISSING: {
+    title: 'No microphone found',
+    detail: 'Connect one and press the hotkey again.'
+  },
+  MIC_FAILED: {
+    title: 'The microphone could not start',
+    detail: 'Press the hotkey again. If it keeps happening, send the logs.'
+  },
+  WORKER_ERROR: {
+    title: 'Speech engine had a problem',
+    detail: 'Press the hotkey again. If it keeps happening, send the logs.'
+  },
   WORKER_CRASHED: {
     title: 'Speech engine stopped',
     detail: 'Restart VoiceUp. If it keeps happening, send the logs from Help > Open logs folder.'

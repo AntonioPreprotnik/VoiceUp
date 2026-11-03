@@ -37,7 +37,7 @@ describe('reportHotkeyTaken', () => {
 
   it('tells the user, with the combination and what to do next', () => {
     report()
-    const options = dialog.messageBoxes[0]
+    const options = dialog.messageBoxes.at(0)
     expect(options?.['message']).toBe('Hotkey taken, pick another')
     expect(options?.['detail']).toContain('Control+Shift+Space')
     expect(options?.['detail']).toContain('settings.json')

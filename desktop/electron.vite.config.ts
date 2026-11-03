@@ -3,7 +3,19 @@ import { defineConfig } from 'electron-vite'
 
 // One preload and one HTML entry per window (TECH_SPEC §7.1).
 export default defineConfig({
-  main: {},
+  // The speech worker is a second entry, because it runs in its own utilityProcess.
+  main: {
+    build: {
+      rollupOptions: {
+        input: {
+          index: resolve(__dirname, 'src/main/index.ts'),
+          speechWorker: resolve(__dirname, 'src/worker/speechWorker.ts')
+        },
+        // Beside the entries: main finds the worker, preload and renderer relative to __dirname.
+        output: { chunkFileNames: '[name]-[hash].js' }
+      }
+    }
+  },
   preload: {
     build: {
       rollupOptions: {

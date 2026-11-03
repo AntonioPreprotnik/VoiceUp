@@ -5,6 +5,7 @@ const ALL_FOLDERS = ['core', 'shared', 'main', 'preload', 'renderer', 'worker']
 
 // folders: other source folders this folder may import.
 // packages: regex fragments for allowed packages; null allows every package.
+// forbiddenPackages: regex fragments for packages banned from a folder that otherwise allows all.
 // dynamicImport: whether import() is allowed. no-restricted-imports cannot see import(), so
 // folders with a tight allowlist ban it outright.
 const RULES = {
@@ -20,6 +21,8 @@ const RULES = {
   main: {
     folders: ['core', 'shared', 'preload', 'worker'],
     packages: null,
+    // Only the speech worker loads the addon, so a native crash can't take the app down.
+    forbiddenPackages: ['sherpa-onnx'],
     dynamicImport: true
   }
 }
@@ -31,7 +34,7 @@ const PRELOAD_ELECTRON = {
   message: 'TECH_SPEC §2: preloads may use only contextBridge and ipcRenderer from electron.'
 }
 
-function configFor(folder, { folders, packages, dynamicImport }, { tests }) {
+function configFor(folder, { folders, packages, forbiddenPackages, dynamicImport }, { tests }) {
   const blocked = ALL_FOLDERS.filter((name) => name !== folder && !folders.includes(name))
   const patterns = [
     {
@@ -46,6 +49,13 @@ function configFor(folder, { folders, packages, dynamicImport }, { tests }) {
       // Anything that is neither a relative path nor an allowed package.
       regex: `^(?!${['\\.{1,2}(?:/|$)', ...allowed].join('|')})`,
       message: `TECH_SPEC §2: ${folder}/ must not import this package.`
+    })
+  }
+
+  if (forbiddenPackages !== undefined) {
+    patterns.push({
+      regex: `^(?:${forbiddenPackages.join('|')})`,
+      message: `TECH_SPEC §3: ${folder}/ must not load this package.`
     })
   }
 

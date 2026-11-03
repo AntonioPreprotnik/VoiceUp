@@ -57,7 +57,7 @@ Import rules are enforced by ESLint (`no-restricted-imports` per folder, in `des
 | `renderer/` | `shared/`, browser APIs, `@xterm/*` | `main/`, `worker/`, `node:*` |
 | `preload/` | `electron` (`contextBridge`, `ipcRenderer`), `shared/` | `main/`, `worker/` |
 | `worker/` | `core/`, `shared/`, `sherpa-onnx-node`, `node:*` | `electron` main APIs other than `process.parentPort` |
-| `main/` | everything except `renderer/` | `renderer/` |
+| `main/` | everything except `renderer/` and the `sherpa-onnx` packages | `renderer/`, `sherpa-onnx-*` |
 
 ## 3. Process model and runtime topology
 
@@ -342,6 +342,7 @@ Every boundary has one zod schema in `shared/`, imported by both sides; nothing 
 | `models:status` / `models:download` | invoke + `models:progress` events | `{ id }` → status | settings, wizard |
 | `devices:list` | invoke | → `[{ deviceId, label }]` (the recorder enumerates) | settings |
 | `app:openLogs` | invoke | none | settings |
+| `recorder:port` | main → renderer | a `MessagePort` for frames to the worker; sent again after a worker restart | recorder |
 | `state:rearm` | renderer → main | `{}`; ignored unless the state is `unknown` | terminal |
 | `session:exited` | main → renderer | `{ title, detail, action, command \| null, exitCode \| null }`; `null` exit code means Claude never started | terminal |
 | `clipboard:write` | renderer → main | string, ≤ 10 MB | terminal |
@@ -359,14 +360,14 @@ Rules for every handler: `validateSender(event)` checks that the sending frame's
 
 | Message | Direction | Payload |
 | --- | --- | --- |
-| `init` | main → worker | `{ modelId, modelPaths, sileroPath, vad: {...}, numThreads }` |
+| `init` | main → worker | `{ modelId, modelPaths, sileroPath, vad: {...}, numThreads }`; `modelId` and `modelPaths` are null until a model is downloaded, and a finished recording then reports `MODEL_MISSING` |
 | `start` / `stop` / `cancel` | main → worker | `{ recordingId }` |
 | `ready` | worker → main | `{ modelId, loadMs }` |
 | `speechStart` | worker → main | `{ recordingId }` |
 | `level` | worker → main | `{ recordingId, rms }`, at most 20 per second |
 | `speechEnd` | worker → main | `{ recordingId, durationMs }` |
 | `transcript` | worker → main | `{ recordingId, text, decodeMs }` |
-| `error` | worker → main | `{ recordingId?, code, message }` |
+| `error` | worker → main | `{ recordingId?, code, message }`; `code` is `NO_SPEECH`, `MODEL_MISSING` or `WORKER_ERROR` |
 
 ### 6.3 Hook HTTP API
 
@@ -420,6 +421,7 @@ export const Settings = z.object({
 | `MIC_MISSING` | `NotFoundError`, device unplugged | "No microphone found" | device picker |
 | `HOTKEY_TAKEN` | `register()` returns false | "Another app uses this hotkey" | hotkey setting |
 | `MODEL_MISSING`, `MODEL_CORRUPT` | file absent, hash mismatch | "Speech model needs downloading" | download button |
+| `WORKER_ERROR` | the worker reports a failure it survived, such as a failed decode | logged; S4.4 decides what the user sees | try again |
 | `WORKER_CRASHED` | worker exit ≠ 0 three times in 60 s | "Speech engine stopped" | restart button, logs link |
 | `APP_START_FAILED` | a package fails to load, or an uncaught exception in main | "VoiceUp could not start" and the error | reinstall; the app exits 1 and never lingers without a window |
 | `NO_PROJECT_FOLDER` | the folder picker is cancelled with no saved folder | "No project folder chosen" | File > Change folder |
@@ -490,7 +492,7 @@ publish:
 
 - Fuses: `electronFuses` is a top-level electron-builder option (type `FuseOptionsV1`, backed by its own `@electron/fuses` dependency) and is flipped before code signing, so the signature covers the fused binary. Do not also flip fuses in `afterPack`. `runAsNode: false` breaks `child_process.fork` and anything using `ELECTRON_RUN_AS_NODE`; VoiceUp uses `utilityProcess`, which is unaffected. `node-pty`'s `kill()` does call `child_process.fork`, which then throws and leaves one unhandled rejection per `kill()`. The native kill still runs, and S0.6 measured no crash and no surviving console grandchild; S1.1 handles the log noise. CI verifies them with `scripts/check-fuses.mjs`, which reads the packaged exe back and fails if any differs. Run it locally on the same path, or read them with `npx @electron/fuses read --app dist/win-unpacked/VoiceUp.exe`.
 - Native modules: `node-pty` 1.2.0-beta.18 loads from its bundled prebuilds with no rebuild, so neither dev machines nor CI need Visual Studio or Python to install or package (S0.6, measured on a machine with no Visual Studio). `npmRebuild: false` is required: electron-builder's default tries to compile and fails without Visual Studio. A compile from source works on `windows-latest` if ever needed. `sherpa-onnx-node` ships N-API prebuilds and needs no rebuild. Unused platforms' prebuilds and build sources are excluded to protect the installer budget.
-- A `--smoke-test=<file>` flag makes the packaged app load `node-pty` (spawn `cmd.exe /c exit 0`) and `sherpa-onnx-node` (create a VAD from the bundled Silero model), write a JSON result to `<file>` and exit 0 on success or 1 on failure. It also loads the terminal page in a hidden window over `app://` and fails on a load error, a console error, a page that did not build xterm, or anything covering the Restart session button, which is what catches asar and protocol mistakes. Until speech arrives, the result is `{"app":"ok","renderer":"ok","pty":"ok"}`. Stdout from a Windows GUI exe isn't reliable, and PowerShell doesn't wait for one, so run it with `Start-Process -Wait -PassThru`, as `scripts/smoke-test.ps1` does (confirmed in S0.6). CI runs it on every packaged build, which catches asar-unpack and ABI mistakes that unit tests in plain Node never see.
+- A `--smoke-test=<file>` flag makes the packaged app load `node-pty` (spawn `cmd.exe /c exit 0`) and `sherpa-onnx-node` (create a VAD from the bundled Silero model), write a JSON result to `<file>` and exit 0 on success or 1 on failure. It also loads the terminal page in a hidden window over `app://` and fails on a load error, a console error, a page that did not build xterm, or anything covering the Restart session button, which is what catches asar and protocol mistakes. The result is `{"app":"ok","renderer":"ok","pty":"ok","speech":"ok"}`. Speech starts the real worker, creates a VAD and sends frames over the real port. Stdout from a Windows GUI exe isn't reliable, and PowerShell doesn't wait for one, so run it with `Start-Process -Wait -PassThru`, as `scripts/smoke-test.ps1` does (confirmed in S0.6). CI runs it on every packaged build, which catches asar-unpack and ABI mistakes that unit tests in plain Node never see.
 
 ### 7.3 CI (GitHub Actions, `windows-latest`)
 

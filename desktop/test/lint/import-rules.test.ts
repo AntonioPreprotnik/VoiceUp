@@ -50,7 +50,7 @@ const table: [string, string[], string[]][] = [
   [
     'src/main/a.ts',
     ['electron', 'node:fs', 'zod', '../core/x', '../shared/x', '../worker/x', '../preload/x'],
-    ['../renderer/x', '../renderer/terminal/main']
+    ['../renderer/x', '../renderer/terminal/main', 'sherpa-onnx-node', 'sherpa-onnx-win-x64']
   ]
 ]
 

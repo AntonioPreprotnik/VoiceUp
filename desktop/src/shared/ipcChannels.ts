@@ -13,7 +13,8 @@ export const Channels = {
   termContextMenu: 'term:contextMenu',
   termMenuAction: 'term:menuAction',
   termFontSize: 'term:fontSize',
-  settingsFontSize: 'settings:fontSize'
+  settingsFontSize: 'settings:fontSize',
+  recorderPort: 'recorder:port'
 } as const
 
 /** RIS, the terminal's full reset, sent on its own as a session is replaced. */

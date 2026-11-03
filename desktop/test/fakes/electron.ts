@@ -83,6 +83,10 @@ class FakeApp extends EventEmitter {
   quitCount = 0
   exitCodes: number[] = []
 
+  getAppPath(): string {
+    return pathRoot
+  }
+
   getVersion(): string {
     return '0.0.0-test'
   }
@@ -160,6 +164,46 @@ export const shell = {
   }
 }
 
+class FakeUtilityProcess extends EventEmitter {
+  messages: { message: unknown; ports: unknown[] | undefined }[] = []
+  killed = false
+  /** Like the real one, it exits when killed. Turn off to test a worker that hangs. */
+  exitsWhenKilled = true
+
+  constructor(readonly modulePath: string) {
+    super()
+  }
+
+  postMessage(message: unknown, ports?: unknown[]): void {
+    this.messages.push({ message, ports })
+  }
+
+  kill(): boolean {
+    this.killed = true
+    if (this.exitsWhenKilled) {
+      queueMicrotask(() => {
+        this.emit('exit', 0)
+      })
+    }
+    return true
+  }
+}
+
+export const utilityProcess = {
+  children: [] as FakeUtilityProcess[],
+  fork(modulePath: string): FakeUtilityProcess {
+    calls.push('speechWorker')
+    const child = new FakeUtilityProcess(modulePath)
+    this.children.push(child)
+    return child
+  }
+}
+
+export class MessageChannelMain {
+  readonly port1 = { name: 'port1' }
+  readonly port2 = { name: 'port2' }
+}
+
 type InvokeHandler = (event: unknown) => unknown
 
 class FakeIpcMain extends EventEmitter {
@@ -233,6 +277,7 @@ export function resetFakes(): void {
   fakeLog.reset()
   ipcMain.removeAllListeners()
   ipcMain.handlers.clear()
+  utilityProcess.children = []
   clipboard.text = ''
   Menu.popups = []
   shell.external = []

@@ -378,7 +378,7 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 - AC: `npm run bench:speech` is kept as test tooling. It reads recordings from a folder path; recordings stay out of the public repo unless the speaker agrees.
 - AC: decision note with the numbers. Fallback if the addon can't work in Electron: whisper.cpp `whisper-server` on `127.0.0.1` plus `@ricky0123/vad-web` (the previous design).
 
-**[ ] S4.2 Speech worker.** As a user, I want transcription that never freezes the app.
+**[x] S4.2 Speech worker.** As a user, I want transcription that never freezes the app.
 
 - AC: VAD and recognition run in a supervised `utilityProcess` (restart on crash, max 3 tries, killed on quit); the main process never loads the addon.
 - AC: the recorder window streams frames to the worker over a `MessageChannelMain` port; the worker emits `speechStart`, `speechEnd`, `transcript` and `error` events, each schema-validated.

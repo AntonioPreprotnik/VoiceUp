@@ -18,5 +18,5 @@ $content = Get-Content $Result -Raw
 Write-Output "Result: $content"
 if ($process.ExitCode -ne 0) { throw "Smoke test exited with $($process.ExitCode)" }
 $parsed = ConvertFrom-Json $content
-if ($parsed.app -ne 'ok' -or $parsed.renderer -ne 'ok' -or $parsed.pty -ne 'ok') { throw 'Smoke test did not report app, renderer and pty ok' }
+if ($parsed.app -ne 'ok' -or $parsed.renderer -ne 'ok' -or $parsed.pty -ne 'ok' -or $parsed.speech -ne 'ok') { throw 'Smoke test did not report app, renderer, pty and speech ok' }
 Write-Output 'Smoke test passed'

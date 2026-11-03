@@ -1,5 +1,6 @@
 import { join } from 'node:path'
 import { app, session, type BrowserWindow } from 'electron'
+import { MESSAGES } from '../core/messages'
 import { runShutdown, type ShutdownSteps } from '../core/shutdown'
 import { parseSmokeTestPath } from '../core/smokeTest'
 import { registerTerminalIpc } from './ipc/terminal'
@@ -12,6 +13,8 @@ import { registerAppScheme, serveAppProtocol } from './protocol'
 import { resolveClaude } from './pty/resolveClaude'
 import { ClaudeSession } from './pty/session'
 import { loadSettings } from './settings/store'
+import { SpeechSupervisor } from './speech/supervisor'
+import { workerInit } from './speech/workerInit'
 import { runSmokeTest } from './smokeTest'
 import { createWindow, loadRenderer } from './windows/factory'
 
@@ -57,7 +60,7 @@ export interface StartOptions {
   readonly shutdownSteps?: ShutdownSteps
 }
 
-/** The startup order from TECH_SPEC §3. Steps 4, 5 and 7 arrive with their stories. */
+/** The startup order from TECH_SPEC §3. Steps 4 and 7 arrive with their stories. */
 export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptions = {}): void {
   const smokeTestPath = parseSmokeTestPath(argv)
 
@@ -101,6 +104,19 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
       }
 
       mainWindow = createWindow('terminal')
+      // Step 5: the speech worker. Recordings arrive with the recorder window in S3.2.
+      const speech = new SpeechSupervisor({
+        onEvent: (event) => {
+          if (event.type === 'ready') log.info(`Speech worker ready in ${String(event.loadMs)} ms`)
+          if (event.type === 'error') log.warn(`Speech worker error: ${event.code}`)
+        },
+        onGaveUp: () => {
+          log.error(MESSAGES.WORKER_CRASHED.title)
+        }
+      })
+      speech.start(workerInit(settings.speech))
+      steps.worker ??= () => speech.stop()
+
       // Step 6: Claude itself starts at the renderer's first size, so it never draws at a wrong one.
       const claude = new ClaudeSession({
         window: mainWindow,

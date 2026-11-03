@@ -47,18 +47,36 @@ function handle(raw: unknown): void {
   }
 }
 
+// Held here, not in the handler: a port with nothing referencing it can be garbage collected, and
+// the frames then stop with no error at all.
+let framePort: Electron.MessagePortMain | undefined
+
 parentPort.on(
   'message',
   ({ data, ports }: { data: unknown; ports: Electron.MessagePortMain[] }) => {
     // A message carrying a port is the recorder's direct line for audio frames (TECH_SPEC §5.1).
-    const framePort = ports.at(0)
-    if (framePort === undefined) {
+    const port = ports.at(0)
+    if (port === undefined) {
       handle(data)
       return
     }
-    framePort.on('message', ({ data: frame }: { data: unknown }) => {
-      if (frame instanceof Float32Array) engine.frame(frame)
+    framePort?.close()
+    framePort = port
+    let reportedBadFrame = false
+    port.on('message', ({ data: frame }: { data: unknown }) => {
+      // Not instanceof: a frame comes from another JavaScript realm, with its own Float32Array.
+      if (Object.prototype.toString.call(frame) === '[object Float32Array]') {
+        engine.frame(frame as Float32Array)
+      } else if (!reportedBadFrame) {
+        // Reported, once: a silent drop here means a recording that just never ends.
+        reportedBadFrame = true
+        parentPort.postMessage({
+          type: 'error',
+          code: 'WORKER_ERROR',
+          message: 'An audio frame arrived in an unusable form'
+        })
+      }
     })
-    framePort.start()
+    port.start()
   }
 )

@@ -44,6 +44,7 @@ async function checkRenderer(): Promise<Check> {
       "document.querySelector('.xterm') !== null"
     )
     if (built !== true) log.error('Smoke test: the page did not build its terminal')
+    await checkRecorderPage(consoleErrors)
     const clickable: unknown = await window.webContents.executeJavaScript(RESTART_BUTTON_ON_TOP)
     if (clickable !== true) log.error('Smoke test: something covers the Restart session button')
     return consoleErrors.length === 0 && built === true && clickable === true ? 'ok' : 'failed'
@@ -51,6 +52,22 @@ async function checkRenderer(): Promise<Check> {
     log.error('Smoke test could not load the renderer', error)
     return 'failed'
   }
+}
+
+/**
+ * Loads the recorder page and fetches its worklet, which is loaded only when a recording starts and
+ * would otherwise fail for the first time with a user's microphone open. Opens no microphone.
+ */
+async function checkRecorderPage(consoleErrors: string[]): Promise<void> {
+  const window = createWindow('recorder', { showWhenReady: false })
+  window.webContents.on('console-message', (details) => {
+    if (details.level === 'error') consoleErrors.push(details.message)
+  })
+  await loadRenderer(window, 'recorder')
+  const worklet: unknown = await window.webContents.executeJavaScript(
+    "fetch('/frames-worklet.js').then((response) => response.ok)"
+  )
+  if (worklet !== true) consoleErrors.push('The recorder worklet is missing')
 }
 
 /** Spawns `cmd.exe /c exit 0` through node-pty, proving the native module loads and runs. */
@@ -94,8 +111,11 @@ async function checkSpeech(): Promise<Check> {
         log.error(`Smoke test speech error: ${event.message}`)
       }
     },
+    // Any crash fails this: a restart would otherwise hide a worker that dies on its first frame.
+    onCrash: (code) => {
+      errors.push(`The speech worker exited with code ${String(code)}`)
+    },
     onGaveUp: () => {
-      errors.push('The speech worker kept crashing')
       markReady()
     }
   })

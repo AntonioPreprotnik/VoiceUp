@@ -10,8 +10,21 @@ const WINDOWS = {
     // Security rule 2: one dedicated preload per window kind.
     preload: 'terminal.js',
     options: { width: 900, height: 670, autoHideMenuBar: true, backgroundColor: '#0c0c0c' }
+  },
+  recorder: {
+    preload: 'recorder.js',
+    options: {},
+    // Never shown, and it has to keep capturing while hidden, with no click to allow audio.
+    webPreferences: { backgroundThrottling: false, autoplayPolicy: 'no-user-gesture-required' }
   }
-} satisfies Record<string, { preload: string; options: BrowserWindowConstructorOptions }>
+} satisfies Record<
+  string,
+  {
+    preload: string
+    options: BrowserWindowConstructorOptions
+    webPreferences?: BrowserWindowConstructorOptions['webPreferences']
+  }
+>
 
 export type WindowKind = keyof typeof WINDOWS
 export const WINDOW_KINDS = Object.keys(WINDOWS) as WindowKind[]
@@ -24,11 +37,14 @@ export function windowKindOf(webContentsId: number): WindowKind | undefined {
 }
 
 export function windowOptions(kind: WindowKind): BrowserWindowConstructorOptions {
-  const { preload, options } = WINDOWS[kind]
+  const window: (typeof WINDOWS)[WindowKind] = WINDOWS[kind]
+  const { preload, options } = window
+  const extras = 'webPreferences' in window ? window.webPreferences : {}
   return {
     ...options,
     show: false,
     webPreferences: {
+      ...extras,
       preload: join(__dirname, '../preload', preload),
       // Security rule 1: isolated, sandboxed, no Node in renderers.
       contextIsolation: true,

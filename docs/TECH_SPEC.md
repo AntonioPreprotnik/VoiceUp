@@ -55,7 +55,7 @@ Import rules are enforced by ESLint (`no-restricted-imports` per folder, in `des
 | `core/` | `core/`, `shared/` | `electron`, any `node:*`, `fs`, network |
 | `shared/` | `zod` | everything else |
 | `renderer/` | `shared/`, browser APIs, `@xterm/*` | `main/`, `worker/`, `node:*` |
-| `preload/` | `electron` (`contextBridge`, `ipcRenderer`), `shared/` | `main/`, `worker/` |
+| `preload/` | `electron` (`contextBridge`, `ipcRenderer`), types from `shared/` | `main/`, `worker/`, values from `shared/`: a sandboxed preload must be a single file, and two preloads sharing code would be split into a chunk it can't load (found in S3.2) |
 | `worker/` | `core/`, `shared/`, `sherpa-onnx-node`, `node:*` | `electron` main APIs other than `process.parentPort` |
 | `main/` | everything except `renderer/` and the `sherpa-onnx` packages | `renderer/`, `sherpa-onnx-*` |
 
@@ -221,7 +221,7 @@ One hotkey press produces exactly one recording, one VAD segment and one transcr
 
 - `getUserMedia({ audio: { deviceId, channelCount: 1, echoCancellation: false, noiseSuppression: true, autoGainControl: true } })`. The mic opens only while recording, so the Windows mic indicator is honest.
 - `new AudioContext({ sampleRate: 16000 })` lets Chromium resample; an AudioWorklet emits `Float32Array` frames of 512 samples (32 ms, Silero's window at 16 kHz).
-- Frames go to the worker over a `MessagePort` as transferables. Main wires the port once: `MessageChannelMain` → `port1` to the recorder (`webContents.postMessage`), `port2` to the worker (`utilityProcess.postMessage`).
+- Frames go to the worker over a `MessagePort` as copies, not transferables: a transferred `ArrayBuffer` reaches a `utilityProcess` as `null` (measured in S3.2). The worker reports a frame it can't use, because a silent drop looks like a recording that never ends. Main wires the port once: `MessageChannelMain` → `port1` to the recorder (`webContents.postMessage`), `port2` to the worker (`utilityProcess.postMessage`).
 - The overlay shows "Listening" only after the first frame arrives, so the 150 ms budget is measured against real audio, not intent.
 
 ### 5.2 Voice activity detection (worker)
@@ -337,7 +337,7 @@ Every boundary has one zod schema in `shared/`, imported by both sides; nothing 
 | `state:changed` | main → renderer | `{ state, reason?, queue: [{ id, preview }] }` | terminal, overlay, settings |
 | `overlay:show` | main → renderer | union on `phase`: `listening{level}`, `transcribing`, `preview{text, countdownMs}`, `blocked{reason}`, `error{code, message}`, `hidden` | overlay |
 | `recorder:start` / `recorder:stop` | main → renderer | `{ recordingId, deviceId }` / `{ recordingId }` | recorder |
-| `recorder:error` | renderer → main | `{ recordingId, code }` | recorder |
+| `recorder:error` | renderer → main | `{ recordingId, code }`; `code` is `MIC_DENIED`, `MIC_MISSING` or `MIC_FAILED` | recorder |
 | `settings:get` / `settings:set` | invoke | → `Settings` / `Partial<Settings>` → `Result` | settings, wizard |
 | `models:status` / `models:download` | invoke + `models:progress` events | `{ id }` → status | settings, wizard |
 | `devices:list` | invoke | → `[{ deviceId, label }]` (the recorder enumerates) | settings |

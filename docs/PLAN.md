@@ -340,7 +340,7 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 - AC: registration result is checked; if another app owns the combo, the user sees "Hotkey taken, pick another" (Electron fails silently otherwise).
 - AC: pressing the hotkey while recording or transcribing cancels (toggle).
 
-**[ ] S3.2 Mic capture with voice activity detection.** As a user, I want recording to stop by itself when I stop talking.
+**[x] S3.2 Mic capture with voice activity detection.** As a user, I want recording to stop by itself when I stop talking.
 
 - AC: a hidden, sandboxed recorder window captures the mic with `getUserMedia`, a 16 kHz `AudioContext` (Chromium resamples) and an AudioWorklet that emits 512-sample mono frames, streamed to the speech worker (S4.2) over a dedicated port. No speech processing runs in the renderer.
 - AC: end of speech comes from Silero VAD in the worker, using the S3.3 settings (the silence setting maps to the VAD's minimum silence duration).

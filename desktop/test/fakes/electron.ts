@@ -19,6 +19,14 @@ class FakeWebContents extends EventEmitter {
   readonly id = nextWebContentsId++
   sent: [string, unknown][] = []
 
+  isDestroyed(): boolean {
+    return false
+  }
+
+  postMessage(channel: string, payload: unknown): void {
+    this.sent.push([channel, payload])
+  }
+
   send(channel: string, payload: unknown): void {
     this.sent.push([channel, payload])
   }
@@ -167,6 +175,7 @@ export const shell = {
 class FakeUtilityProcess extends EventEmitter {
   messages: { message: unknown; ports: unknown[] | undefined }[] = []
   killed = false
+  readonly stderr = new EventEmitter()
   /** Like the real one, it exits when killed. Turn off to test a worker that hangs. */
   exitsWhenKilled = true
 
@@ -280,20 +289,28 @@ export const net = {
 export const session = {
   defaultSession: {
     requestHandler: undefined as
-      | ((webContents: unknown, permission: string, callback: (allow: boolean) => void) => void)
+      | ((
+          webContents: unknown,
+          permission: string,
+          callback: (allow: boolean) => void,
+          details?: unknown
+        ) => void)
       | undefined,
-    checkHandler: undefined as (() => boolean) | undefined,
+    checkHandler: undefined as ((webContents: unknown, permission: string) => boolean) | undefined,
     setPermissionRequestHandler(
       handler: (
         webContents: unknown,
         permission: string,
-        callback: (allow: boolean) => void
+        callback: (allow: boolean) => void,
+        details?: unknown
       ) => void
     ): void {
       calls.push('permissions')
       this.requestHandler = handler
     },
-    setPermissionCheckHandler(handler: () => boolean): void {
+    setPermissionCheckHandler(
+      handler: (webContents: unknown, permission: string) => boolean
+    ): void {
       this.checkHandler = handler
     }
   }

@@ -12,6 +12,7 @@ const RULES = {
   core: { folders: ['shared'], packages: [], dynamicImport: false },
   shared: { folders: [], packages: ['zod(?:/|$)'], dynamicImport: false },
   renderer: { folders: ['shared'], packages: ['@xterm/'], dynamicImport: false },
+  // Types only from shared/, enforced below: a sandboxed preload must stay a single file.
   preload: { folders: ['shared'], packages: ['electron$'], dynamicImport: false },
   worker: {
     folders: ['core', 'shared'],
@@ -65,9 +66,18 @@ function configFor(folder, { folders, packages, forbiddenPackages, dynamicImport
       { paths: folder === 'preload' ? [PRELOAD_ELECTRON] : [], patterns }
     ]
   }
-  if (!dynamicImport) {
+  if (folder === 'preload' && !tests) {
     rules['no-restricted-syntax'] = [
       'error',
+      {
+        selector: "ImportDeclaration[importKind!='type'][source.value=/^\\.\\.\\u002Fshared/]",
+        message: 'TECH_SPEC §2: a sandboxed preload can import only types from shared/.'
+      }
+    ]
+  }
+  if (!dynamicImport) {
+    rules['no-restricted-syntax'] = [
+      ...(rules['no-restricted-syntax'] ?? ['error']),
       {
         selector: 'ImportExpression',
         message: `TECH_SPEC §2: import() is not allowed in ${folder}/, it bypasses the import rules.`

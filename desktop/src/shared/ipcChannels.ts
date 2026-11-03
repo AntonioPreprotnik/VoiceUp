@@ -14,7 +14,10 @@ export const Channels = {
   termMenuAction: 'term:menuAction',
   termFontSize: 'term:fontSize',
   settingsFontSize: 'settings:fontSize',
-  recorderPort: 'recorder:port'
+  recorderPort: 'recorder:port',
+  recorderStart: 'recorder:start',
+  recorderStop: 'recorder:stop',
+  recorderError: 'recorder:error'
 } as const
 
 /** RIS, the terminal's full reset, sent on its own as a session is replaced. */
@@ -32,6 +35,15 @@ export interface SessionExit {
   readonly command: string | null
   /** Null when Claude never started, so there is no code to show. */
   readonly exitCode: number | null
+}
+
+export type RecorderErrorCode = 'MIC_DENIED' | 'MIC_MISSING' | 'MIC_FAILED'
+
+/** What the recorder preload exposes as window.voiceupRecorder. */
+export interface RecorderApi {
+  onStart(listener: (start: { recordingId: string; deviceId: string | null }) => void): void
+  onStop(listener: (stop: { recordingId: string }) => void): void
+  reportError(recordingId: string, code: RecorderErrorCode): void
 }
 
 /** What the terminal preload exposes as window.voiceup. */

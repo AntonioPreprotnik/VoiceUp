@@ -163,6 +163,26 @@ describe('after a crash', () => {
   })
 })
 
+describe('crash reporting', () => {
+  it('reports every unexpected exit, even one it restarts from', () => {
+    const crashes: number[] = []
+    const supervisor = new SpeechSupervisor({
+      onEvent: () => undefined,
+      onGaveUp: () => undefined,
+      onCrash: (code) => crashes.push(code)
+    })
+    supervisor.start(init)
+    latest().emit('exit', 7)
+    expect(crashes).toEqual([7])
+  })
+
+  it('sends what the worker prints to the log, since a crash explains itself only there', () => {
+    create().start(init)
+    latest().stderr.emit('data', Buffer.from('TypeError: something broke'))
+    expect(JSON.stringify(fakeLog.messages('error'))).toContain('TypeError: something broke')
+  })
+})
+
 describe('connecting the recorder', () => {
   it('gives one end of a port to each, so audio skips main', () => {
     const supervisor = create()

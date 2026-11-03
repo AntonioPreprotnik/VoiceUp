@@ -64,7 +64,9 @@ describe('startup', () => {
       'permissions',
       'serveProtocol',
       'window',
+      'window',
       'speechWorker',
+      'load',
       'getPath:userData',
       'menu',
       'load',
@@ -106,14 +108,23 @@ describe('startup', () => {
     expect(window.focused).toBe(false)
   })
 
+  it('quits when the terminal closes, though the hidden recorder is still open', async () => {
+    startApp({ argv: [] })
+    await settle()
+    onlyWindow().emit('closed')
+    expect(app.quitCount).toBe(1)
+  })
+
   it('denies every permission (rule 6)', async () => {
     startApp({ argv: [] })
     await settle()
     const { requestHandler, checkHandler } = session.defaultSession
     const decisions: boolean[] = []
-    requestHandler?.(undefined, 'media', (allow) => decisions.push(allow))
+    requestHandler?.({ id: -1 }, 'media', (allow) => decisions.push(allow), {
+      mediaTypes: ['audio']
+    })
     expect(decisions).toEqual([false])
-    expect(checkHandler?.()).toBe(false)
+    expect(checkHandler?.(null, 'media')).toBe(false)
   })
 
   it('exits 1 when startup fails', async () => {
@@ -230,6 +241,44 @@ describe('the hotkey', () => {
       decodeMs: 1
     })
     expect(JSON.stringify(fakeLog.messages('info'))).not.toContain('private')
+  })
+})
+
+describe('the recorder window', () => {
+  function recorderWindow(): BrowserWindow {
+    const window = BrowserWindow.instances.at(1)
+    if (window === undefined) throw new Error('No recorder window')
+    return window
+  }
+
+  function portsSent(): number {
+    return recorderWindow().webContents.sent.filter(([channel]) => channel === 'recorder:port')
+      .length
+  }
+
+  it('gets its audio port only after its page has loaded, or the port would be lost', async () => {
+    startApp({ argv: [] })
+    await settle()
+    expect(portsSent()).toBe(0)
+    recorderWindow().webContents.emit('did-finish-load')
+    expect(portsSent()).toBe(1)
+  })
+
+  it('stays hidden', async () => {
+    startApp({ argv: [] })
+    await settle()
+    recorderWindow().emit('ready-to-show')
+    expect(recorderWindow().shown).toBe(false)
+  })
+
+  it('reports its problems to the log', async () => {
+    startApp({ argv: [] })
+    await settle()
+    recorderWindow().webContents.emit('console-message', {
+      level: 'warning',
+      message: 'Could not start recording'
+    })
+    expect(JSON.stringify(fakeLog.messages('warn'))).toContain('Could not start recording')
   })
 })
 

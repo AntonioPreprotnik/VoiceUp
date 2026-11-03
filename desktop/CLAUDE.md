@@ -29,10 +29,13 @@ Exact versions only. Confirmed with `npm view` on 2026-11-02: Electron 45.2.1, e
 - Log through `log` from `src/main/log.ts`, never `console`. A transcript goes through `logTranscript` only, so it stays at `debug`.
 - Dev and packaged builds share `%APPDATA%\VoiceUp` (the folder name is case-insensitive), so they share settings and logs.
 - `CLAUDECODE` and `CLAUDE_CODE_ENTRYPOINT` are removed from Claude's environment, because they are set when the app itself runs under Claude Code (TECH_SPEC §4.1). Other `CLAUDE_CODE_*` variables from such a session still pass through, so test a real session from a normal terminal.
-- A sandboxed preload can't load packages. Channel names live in `src/shared/ipcChannels.ts`, which imports nothing; `src/shared/ipc.ts` pulls in zod and is for main only.
+- A sandboxed preload must be a single file: no packages, and no code shared with another preload, or the bundler splits it into a chunk it can't load. Each preload lists its own channel names, checked by the compiler against `src/shared/ipcChannels.ts`, and lint rejects a value import from `shared/`. Only the packaged smoke test catches this at runtime.
 - Anything drawn over the terminal needs a `z-index` above xterm's layers, which go up to 11, or xterm takes its clicks. A script's `click()` won't show this: test with a real mouse, or `elementFromPoint` as the smoke test does.
 - Only the renderer's first size starts Claude. After that a session starts only on request, so resizing can't restart it.
 - The page can't reach the clipboard: `navigator.clipboard` is denied by the deny-all permission handler (security rule 6), so copy and paste go through main.
+- Frames from the recorder to the worker must be copied. A transferred `ArrayBuffer` reaches the `utilityProcess` as `null`. The smoke test sends frames from main, so it doesn't cover this path: test with the real hotkey and microphone.
+- The worker's stderr goes to the log, so a crash there explains itself.
+- A hidden recorder window is always open, so `window-all-closed` never fires: closing the terminal is what quits the app.
 - Only the speech worker may load `sherpa-onnx-node`, which lint enforces. To run the engine for real, on a real recording: `VOICEUP_TEST_MODELS=<folder> VOICEUP_TEST_RECORDINGS=<folder> npm test`; CI skips this.
 - Main-process tests use the fake in `test/fakes/electron.ts`, which records the order of effects. It proves ordering and policy, not that Electron behaves: the packaged smoke test covers that.
 - Same-origin Vite HMR works under `connect-src 'self'`; the CSP needs no `ws:` entry in dev.

@@ -13,11 +13,14 @@ import { log } from '../log'
 const MAX_CRASHES = 3
 const CRASH_WINDOW_MS = 60000
 const STOP_TIMEOUT_MS = 1000
+const MAX_STDERR_CHARS = 2000
 
 export interface SupervisorOptions {
   readonly onEvent: (event: WorkerEvent) => void
   /** The worker crashed too often and won't be restarted (WORKER_CRASHED). */
   readonly onGaveUp: () => void
+  /** Every unexpected exit, restarted or not. */
+  readonly onCrash?: (code: number) => void
   readonly now?: () => number
 }
 
@@ -78,9 +81,14 @@ export class SpeechSupervisor {
     const { init } = this
     if (init === undefined) return
     const child = utilityProcess.fork(join(__dirname, 'speechWorker.js'), [], {
-      serviceName: 'VoiceUp Speech'
+      serviceName: 'VoiceUp Speech',
+      stdio: ['ignore', 'ignore', 'pipe']
     })
     this.child = child
+    // A crash explains itself only here. The worker prints stack traces, never audio or text.
+    child.stderr?.on('data', (chunk: Buffer) => {
+      log.error(`Speech worker: ${chunk.toString().slice(0, MAX_STDERR_CHARS)}`)
+    })
     child.on('message', (raw: unknown) => {
       this.receive(raw)
     })
@@ -114,6 +122,7 @@ export class SpeechSupervisor {
     if (this.stopping) return
 
     log.error(`The speech worker exited with code ${String(code)}`)
+    this.options.onCrash?.(code)
     const now = this.now()
     this.crashes = [...this.crashes.filter((at) => now - at < CRASH_WINDOW_MS), now]
     if (this.crashes.length >= MAX_CRASHES) {

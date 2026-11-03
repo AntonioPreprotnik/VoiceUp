@@ -14,7 +14,7 @@ This spec turns `docs/PLAN.md` into implementable contracts: process layout, int
 
 | Metric | Budget | Verified in |
 | --- | --- | --- |
-| Hotkey press → "Listening" overlay | ≤ 150 ms; logged as `Listening N ms after the hotkey` | S3.4 |
+| Hotkey press → "Listening" overlay | ≤ 150 ms; logged as `Listening N ms after the hotkey`. Measured in S3.4: 101–119 ms once warm, but 170–192 ms on the first press after launch, which misses the target | S3.4 |
 | End of speech → preview shown, 5 s command, low-end CPU | ≤ 1.5 s after the silence window | S4.1 |
 | Cold start → usable terminal | ≤ 3 s; measured about 1.4 s to Claude's first text (S1.3), logged as `First Claude text` | S1.1 |
 | Idle CPU, app in tray, Claude idle | < 1% | S7.1 |

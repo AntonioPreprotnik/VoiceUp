@@ -281,6 +281,32 @@ describe('a recording', () => {
     expect(ofType('error')).toEqual([])
   })
 
+  it('still times out after a click or cough that the VAD rejects as too short', async () => {
+    const engine = await ready()
+    engine.start('r1')
+    currentVad().detected = true
+    engine.frame(FRAME)
+    expect(ofType('speechStart')).toHaveLength(1)
+    currentVad().detected = false
+    const framesInTimeout = Math.ceil((8 * 16000) / 512)
+    for (let i = 0; i < framesInTimeout; i++) engine.frame(FRAME)
+    expect(ofType('error')).toEqual([])
+    engine.frame(FRAME)
+    expect(ofType('error')[0]).toMatchObject({ code: 'NO_SPEECH', recordingId: 'r1' })
+  })
+
+  it('counts the timeout from the last speech heard, not from the start', async () => {
+    const engine = await ready()
+    engine.start('r1')
+    const framesInTimeout = Math.ceil((8 * 16000) / 512)
+    for (let i = 0; i < framesInTimeout - 5; i++) engine.frame(FRAME)
+    currentVad().detected = true
+    engine.frame(FRAME)
+    currentVad().detected = false
+    for (let i = 0; i < framesInTimeout; i++) engine.frame(FRAME)
+    expect(ofType('error')).toEqual([])
+  })
+
   it('reports a missing model once speech ends', async () => {
     const engine = await ready({ ...init, modelId: null, modelPaths: null })
     engine.start('r1')

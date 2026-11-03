@@ -248,7 +248,7 @@ while (!vad.isEmpty()) {
 }
 ```
 
-A "no speech" timer (default 8 s) cancels a recording that never starts; the frame loop also enforces the max length.
+A "no speech" timer (default 8 s) counts from the last speech heard and cancels a recording with nothing to transcribe, including one where a click started speech and the VAD then rejected it as too short (found in S3.3). End of speech is the VAD's minimum silence, which starts only after speech is detected; the VAD also enforces the max length. All of these come from `settings.json` and apply at the next launch, until S6.6 adds a settings screen.
 
 ### 5.3 Recognition (worker)
 

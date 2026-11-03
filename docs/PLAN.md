@@ -346,7 +346,7 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 - AC: end of speech comes from Silero VAD in the worker, using the S3.3 settings (the silence setting maps to the VAD's minimum silence duration).
 - AC: recording continues while the user is in another app.
 
-**[ ] S3.3 Endpointing settings.** As a user, I want to tune how patient the app is.
+**[x] S3.3 Endpointing settings.** As a user, I want to tune how patient the app is.
 
 - AC: settings for end-of-speech silence (default ~1.2 s), minimum speech length (drop clicks/coughs), maximum recording length (default 60 s), and "no speech heard" timeout (default 8 s, then cancel).
 - AC: the silence timer starts only after speech is detected.

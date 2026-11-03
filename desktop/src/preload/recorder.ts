@@ -7,7 +7,8 @@ const Channels = {
   recorderPort: 'recorder:port',
   recorderStart: 'recorder:start',
   recorderStop: 'recorder:stop',
-  recorderError: 'recorder:error'
+  recorderError: 'recorder:error',
+  recorderDevices: 'recorder:devices'
 } as const satisfies Partial<typeof SharedChannels>
 
 // Recorder window preload. Security rule 7: named functions only, and the IPC event never reaches
@@ -25,6 +26,9 @@ const api: RecorderApi = {
   },
   reportError: (recordingId, code) => {
     ipcRenderer.send(Channels.recorderError, { recordingId, code })
+  },
+  reportDevices: (devices) => {
+    ipcRenderer.send(Channels.recorderDevices, devices)
   }
 }
 

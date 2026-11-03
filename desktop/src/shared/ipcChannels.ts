@@ -18,6 +18,7 @@ export const Channels = {
   recorderStart: 'recorder:start',
   recorderStop: 'recorder:stop',
   recorderError: 'recorder:error',
+  recorderDevices: 'recorder:devices',
   overlayShow: 'overlay:show',
   overlaySound: 'overlay:sound'
 } as const
@@ -54,6 +55,11 @@ export interface OverlayApi {
   onSound(listener: (sound: OverlaySound) => void): void
 }
 
+export interface MicDevice {
+  readonly deviceId: string
+  readonly label: string
+}
+
 export type RecorderErrorCode = 'MIC_DENIED' | 'MIC_MISSING' | 'MIC_FAILED'
 
 /** What the recorder preload exposes as window.voiceupRecorder. */
@@ -61,6 +67,7 @@ export interface RecorderApi {
   onStart(listener: (start: { recordingId: string; deviceId: string | null }) => void): void
   onStop(listener: (stop: { recordingId: string }) => void): void
   reportError(recordingId: string, code: RecorderErrorCode): void
+  reportDevices(devices: readonly MicDevice[]): void
 }
 
 /** What the terminal preload exposes as window.voiceup. */

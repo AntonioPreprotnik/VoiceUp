@@ -16,6 +16,7 @@ let toRecorder: [string, unknown][]
 let destroyed: boolean
 let controller: RecordingController
 let next: number
+let micDevice: string | null
 let escape: { held: (() => void) | undefined; hold(onPress: () => void): void; release(): void }
 let overlay: {
   recordingStarted: Mock
@@ -39,6 +40,7 @@ beforeEach(() => {
   toRecorder = []
   destroyed = false
   next = 1
+  micDevice = null
   escape = {
     held: undefined,
     hold(onPress) {
@@ -66,7 +68,7 @@ beforeEach(() => {
     toggle: new RecordingToggle(() => `r${String(next++)}`),
     sendToWorker: (command) => toWorker.push(command),
     recorder,
-    deviceId: null,
+    getDeviceId: () => micDevice,
     overlay,
     escape
   })
@@ -77,6 +79,17 @@ describe('the hotkey', () => {
     controller.press()
     expect(toWorker).toEqual([{ type: 'start', recordingId: 'r1' }])
     expect(toRecorder).toEqual([[Channels.recorderStart, { recordingId: 'r1', deviceId: null }]])
+  })
+
+  it('uses the microphone chosen at the time of each recording', () => {
+    controller.press()
+    controller.press()
+    micDevice = 'usb-mic'
+    controller.press()
+    expect(toRecorder.at(-1)).toEqual([
+      Channels.recorderStart,
+      { recordingId: 'r2', deviceId: 'usb-mic' }
+    ])
   })
 
   it('cancels and closes the mic on the next press', () => {
@@ -283,6 +296,16 @@ describe('recorder errors', () => {
     expect(JSON.stringify(fakeLog.messages('warn'))).toContain('MIC_DENIED')
     controller.press()
     expect(toWorker.at(-1)).toEqual({ type: 'start', recordingId: 'r2' })
+  })
+
+  it('ends the recording when the microphone is unplugged', () => {
+    controller.press()
+    ipcMain.emit(Channels.recorderError, recorderEvent(), {
+      recordingId: 'r1',
+      code: 'MIC_MISSING'
+    })
+    expect(toWorker.at(-1)).toEqual({ type: 'cancel', recordingId: 'r1' })
+    expect(overlay.failed).toHaveBeenCalledWith('MIC_MISSING')
   })
 
   it('ignores an error from a recording already over', () => {

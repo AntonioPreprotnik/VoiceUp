@@ -361,10 +361,11 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 - AC: Esc while the overlay is visible (registered as a global shortcut only while recording or previewing, then released) or the hotkey again discards audio; nothing is sent.
 - Known limit, seen in S3.5: Esc can also reach the focused app while it cancels a recording. YouTube reacted to it during a test. The likely cause is browsers catching keys below the level of a global shortcut, which is not verified. The hotkey also cancels, and is the alternative to try, though it has not been tested against this.
 
-**[ ] S3.6 Microphone selection and errors.** As a user, I want the right mic and clear errors.
+**[x] S3.6 Microphone selection and errors.** As a user, I want the right mic and clear errors.
 
 - AC: input device dropdown with "System default"; handles device unplugged mid-recording.
 - AC: if Windows mic privacy blocks desktop apps, show the exact Settings path to fix it.
+- Not verified, S3.6: the Windows privacy block has not been tried for real, and which error Windows reports for it is unknown. Both messages it could map to give the Settings path. Check this on the manual test list (S7.3).
 
 ### E4 — Local transcription
 

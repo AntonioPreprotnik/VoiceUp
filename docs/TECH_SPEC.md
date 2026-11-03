@@ -341,7 +341,7 @@ Every boundary has one zod schema in `shared/`, imported by both sides; nothing 
 | `recorder:error` | renderer → main | `{ recordingId, code }`; `code` is `MIC_DENIED`, `MIC_MISSING` or `MIC_FAILED` | recorder |
 | `settings:get` / `settings:set` | invoke | → `Settings` / `Partial<Settings>` → `Result` | settings, wizard |
 | `models:status` / `models:download` | invoke + `models:progress` events | `{ id }` → status | settings, wizard |
-| `devices:list` | invoke | → `[{ deviceId, label }]` (the recorder enumerates) | settings |
+| `recorder:devices` | renderer → main | `[{ deviceId, label }]`; the recorder enumerates, at load and on a device change, and main fills the Microphone menu (S3.6). S6.6 moves this to the settings screen | recorder |
 | `app:openLogs` | invoke | none | settings |
 | `recorder:port` | main → renderer | a `MessagePort` for frames to the worker; sent again after a worker restart | recorder |
 | `state:rearm` | renderer → main | `{}`; ignored unless the state is `unknown` | terminal |
@@ -419,7 +419,7 @@ export const Settings = z.object({
 | Code | Trigger | User sees | Recovery |
 | --- | --- | --- | --- |
 | `MIC_DENIED` | `NotAllowedError` | "Windows is blocking the microphone" | button opens `ms-settings:privacy-microphone` |
-| `MIC_MISSING` | `NotFoundError`, device unplugged | "No microphone found" | device picker |
+| `MIC_MISSING` | `NotFoundError`, or the track ends mid-recording because the device was unplugged | "No microphone found" | device picker |
 | `HOTKEY_TAKEN` | `register()` returns false, or the combination is invalid | "Hotkey taken, pick another" | close the other app, or change `hotkey` in `settings.json` until S6.6 adds the setting |
 | `MODEL_MISSING`, `MODEL_CORRUPT` | file absent, hash mismatch | "Speech model needs downloading" | download button |
 | `WORKER_ERROR` | the worker reports a failure it survived, such as a failed decode | logged; S4.4 decides what the user sees | try again |

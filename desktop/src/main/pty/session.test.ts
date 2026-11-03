@@ -251,6 +251,38 @@ describe('when Claude Code is not installed', () => {
   })
 })
 
+describe('the microphone', () => {
+  function savedMic(): unknown {
+    const saved = JSON.parse(readFileSync(join(settingsDir, 'settings.json'), 'utf8')) as {
+      micDeviceId: unknown
+    }
+    return saved.micDeviceId
+  }
+
+  it('starts on the system default', () => {
+    expect(createSession().micDeviceId).toBeNull()
+  })
+
+  it('remembers a choice', () => {
+    const session = createSession()
+    session.setMicDevice('usb-mic')
+    expect(session.micDeviceId).toBe('usb-mic')
+    expect(savedMic()).toBe('usb-mic')
+  })
+
+  it('goes back to the system default', () => {
+    const session = createSession()
+    session.setMicDevice('usb-mic')
+    session.setMicDevice(null)
+    expect(savedMic()).toBeNull()
+  })
+
+  it('keeps the project folder when it saves', () => {
+    createSession(folderA).setMicDevice('usb-mic')
+    expect(savedFolder()).toBe(folderA)
+  })
+})
+
 describe('the font size', () => {
   function sizes(): unknown[] {
     return window.webContents.sent

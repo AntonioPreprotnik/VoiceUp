@@ -50,6 +50,16 @@ async function start(recordingId: string, deviceId: string | null): Promise<void
       autoGainControl: true
     }
   })
+  // A microphone unplugged mid-recording ends its track, with no other signal at all.
+  for (const track of stream.getAudioTracks()) {
+    track.addEventListener('ended', () => {
+      if (wanted === recordingId) {
+        console.warn('The microphone was disconnected during a recording')
+        stop(recordingId)
+        api.reportError(recordingId, 'MIC_MISSING')
+      }
+    })
+  }
   const context = new AudioContext({ sampleRate: 16000 })
   const active: Capture = { recordingId, stream, context }
   try {
@@ -90,6 +100,32 @@ api.onStart(({ recordingId, deviceId }) => {
     }
   })
 })
+
+// Windows lists its default and communications devices again under these ids. The menu already
+// has its own "System default".
+const ALIASES = new Set(['default', 'communications'])
+
+async function reportDevices(): Promise<void> {
+  const devices = await navigator.mediaDevices.enumerateDevices()
+  const microphones = devices.filter(
+    ({ kind, deviceId }) => kind === 'audioinput' && !ALIASES.has(deviceId)
+  )
+  api.reportDevices(
+    microphones.map(({ deviceId, label }, index) => ({
+      deviceId,
+      label: label === '' ? `Microphone ${String(index + 1)}` : label
+    }))
+  )
+}
+
+function refreshDevices(): void {
+  reportDevices().catch((error: unknown) => {
+    console.warn('Could not list the microphones', error)
+  })
+}
+
+navigator.mediaDevices.addEventListener('devicechange', refreshDevices)
+refreshDevices()
 
 api.onStop(({ recordingId }) => {
   stop(recordingId)

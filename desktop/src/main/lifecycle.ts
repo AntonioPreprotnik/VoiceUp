@@ -5,7 +5,7 @@ import { MESSAGES } from '../core/messages'
 import { RecordingToggle } from '../core/recordingToggle'
 import { runShutdown, type ShutdownSteps } from '../core/shutdown'
 import { parseSmokeTestPath } from '../core/smokeTest'
-import { registerHotkey, reportHotkeyTaken, unregisterHotkeys } from './hotkey'
+import { escapeKey, registerHotkey, reportHotkeyTaken, unregisterHotkeys } from './hotkey'
 import { registerTerminalIpc } from './ipc/terminal'
 import { registerTerminalUiIpc } from './ipc/terminalUi'
 import { initLogging, log, setLogLevel } from './log'
@@ -123,7 +123,8 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
         },
         recorder: recorderWindow.webContents,
         deviceId: settings.micDeviceId,
-        overlay
+        overlay,
+        escape: escapeKey
       })
       const speech = new SpeechSupervisor({
         onEvent: (event) => {

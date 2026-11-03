@@ -33,6 +33,19 @@ export function reportHotkeyTaken(window: BrowserWindow, accelerator: string): v
     })
 }
 
+/**
+ * Esc is global only while there is something to cancel, because holding it takes it away from
+ * every other app. Failing to get it is not fatal: the hotkey still cancels.
+ */
+export const escapeKey = {
+  hold(onPress: () => void): void {
+    if (!registerHotkey('Escape', onPress)) log.warn('Could not hold Esc: another app owns it')
+  },
+  release(): void {
+    globalShortcut.unregister('Escape')
+  }
+}
+
 export function unregisterHotkeys(): void {
   globalShortcut.unregisterAll()
 }

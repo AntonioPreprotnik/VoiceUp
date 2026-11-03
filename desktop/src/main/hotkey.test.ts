@@ -2,7 +2,7 @@ import type { BrowserWindow as RealBrowserWindow } from 'electron'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { BrowserWindow, dialog, globalShortcut, resetFakes } from '../../test/fakes/electron'
 import fakeLog from '../../test/fakes/electronLog'
-import { registerHotkey, reportHotkeyTaken, unregisterHotkeys } from './hotkey'
+import { escapeKey, registerHotkey, reportHotkeyTaken, unregisterHotkeys } from './hotkey'
 
 vi.mock('electron', () => import('../../test/fakes/electron'))
 vi.mock('electron-log/main', () => import('../../test/fakes/electronLog'))
@@ -54,6 +54,30 @@ describe('reportHotkeyTaken', () => {
     await vi.waitFor(() => {
       expect(fakeLog.messages('error')).toHaveLength(1)
     })
+  })
+})
+
+describe('escapeKey', () => {
+  it('holds Esc, and gives it back', () => {
+    const onPress = vi.fn()
+    escapeKey.hold(onPress)
+    globalShortcut.press('Escape')
+    expect(onPress).toHaveBeenCalledOnce()
+    escapeKey.release()
+    expect(globalShortcut.registered.has('Escape')).toBe(false)
+  })
+
+  it('only warns when another app owns Esc, because the hotkey still cancels', () => {
+    globalShortcut.takenByAnotherApp = 'Escape'
+    escapeKey.hold(() => undefined)
+    expect(fakeLog.messages('warn')).toHaveLength(1)
+  })
+
+  it('leaves the main hotkey registered when it gives Esc back', () => {
+    registerHotkey('Control+Shift+Space', () => undefined)
+    escapeKey.hold(() => undefined)
+    escapeKey.release()
+    expect(globalShortcut.registered.has('Control+Shift+Space')).toBe(true)
   })
 })
 

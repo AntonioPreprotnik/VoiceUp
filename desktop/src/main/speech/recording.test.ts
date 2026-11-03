@@ -16,6 +16,7 @@ let toRecorder: [string, unknown][]
 let destroyed: boolean
 let controller: RecordingController
 let next: number
+let escape: { held: (() => void) | undefined; hold(onPress: () => void): void; release(): void }
 let overlay: {
   recordingStarted: Mock
   level: Mock
@@ -38,6 +39,15 @@ beforeEach(() => {
   toRecorder = []
   destroyed = false
   next = 1
+  escape = {
+    held: undefined,
+    hold(onPress) {
+      this.held = onPress
+    },
+    release() {
+      this.held = undefined
+    }
+  }
   overlay = {
     recordingStarted: vi.fn(),
     level: vi.fn(),
@@ -57,7 +67,8 @@ beforeEach(() => {
     sendToWorker: (command) => toWorker.push(command),
     recorder,
     deviceId: null,
-    overlay
+    overlay,
+    escape
   })
 })
 
@@ -122,6 +133,101 @@ describe('worker events', () => {
     const before = toRecorder.length
     controller.onWorkerEvent({ type: 'ready', modelId: null, loadMs: 1 })
     expect(toRecorder).toHaveLength(before)
+  })
+})
+
+describe('Esc', () => {
+  function pressEsc(): void {
+    if (escape.held === undefined) throw new Error('Esc is not held')
+    escape.held()
+  }
+
+  it('is free until a recording starts', () => {
+    expect(escape.held).toBeUndefined()
+  })
+
+  it('is held while recording', () => {
+    controller.press()
+    expect(escape.held).toBeDefined()
+  })
+
+  it('discards the recording: the worker drops it and the mic closes', () => {
+    controller.press()
+    pressEsc()
+    expect(toWorker.at(-1)).toEqual({ type: 'cancel', recordingId: 'r1' })
+    expect(toRecorder.at(-1)).toEqual([Channels.recorderStop, { recordingId: 'r1' }])
+    expect(overlay.cancelled).toHaveBeenCalledOnce()
+  })
+
+  it('discards while transcribing too, and a late transcript goes nowhere', () => {
+    controller.press()
+    controller.onWorkerEvent({ type: 'speechEnd', recordingId: 'r1', durationMs: 900 })
+    pressEsc()
+    expect(toWorker.at(-1)).toEqual({ type: 'cancel', recordingId: 'r1' })
+    controller.onWorkerEvent({ type: 'transcript', recordingId: 'r1', text: 'late', decodeMs: 1 })
+    expect(overlay.finished).not.toHaveBeenCalled()
+  })
+
+  it('never starts a recording', () => {
+    controller.press()
+    const held = escape.held
+    pressEsc()
+    const before = toWorker.length
+    held?.()
+    expect(toWorker).toHaveLength(before)
+  })
+
+  it.each([
+    [
+      'a cancel by hotkey',
+      () => {
+        controller.press()
+      }
+    ],
+    [
+      'a transcript',
+      () => {
+        controller.onWorkerEvent({ type: 'transcript', recordingId: 'r1', text: 'hi', decodeMs: 1 })
+      }
+    ],
+    [
+      'a worker error',
+      () => {
+        controller.onWorkerEvent({
+          type: 'error',
+          recordingId: 'r1',
+          code: 'NO_SPEECH',
+          message: 'x'
+        })
+      }
+    ],
+    [
+      'a mic error',
+      () => {
+        ipcMain.emit(Channels.recorderError, recorderEvent(), {
+          recordingId: 'r1',
+          code: 'MIC_DENIED'
+        })
+      }
+    ]
+  ])('is given back after %s, so other apps get it again', (_label, end) => {
+    controller.press()
+    end()
+    expect(escape.held).toBeUndefined()
+  })
+
+  it('stays held until the transcript, since speech ending can still be cancelled', () => {
+    controller.press()
+    controller.onWorkerEvent({ type: 'speechEnd', recordingId: 'r1', durationMs: 900 })
+    expect(escape.held).toBeDefined()
+  })
+
+  it('stays held when an event from an old recording arrives', () => {
+    controller.press()
+    controller.press()
+    controller.press()
+    controller.onWorkerEvent({ type: 'transcript', recordingId: 'r1', text: 'old', decodeMs: 1 })
+    expect(escape.held).toBeDefined()
   })
 })
 

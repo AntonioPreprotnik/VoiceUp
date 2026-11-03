@@ -365,6 +365,7 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 
 - AC: input device dropdown with "System default"; handles device unplugged mid-recording.
 - AC: if Windows mic privacy blocks desktop apps, show the exact Settings path to fix it.
+- Not verified, S3.6: the Windows privacy block has not been tried for real, and which error Windows reports for it is unknown. Both messages it could map to give the Settings path. Check this on the manual test list (S7.3).
 
 ### E4 — Local transcription
 

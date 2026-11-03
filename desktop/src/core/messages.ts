@@ -38,7 +38,8 @@ export const MESSAGES = {
   },
   MIC_FAILED: {
     title: 'The microphone could not start',
-    detail: 'Press the hotkey again. If it keeps happening, send the logs.'
+    detail:
+      'Check that "Allow desktop apps to access your microphone" is on in Settings > Privacy > Microphone, and press the hotkey again.'
   },
   WORKER_ERROR: {
     title: 'Speech engine had a problem',

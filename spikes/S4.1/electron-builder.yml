@@ -1,0 +1,22 @@
+# Same asar, unpack and fuse settings as desktop/electron-builder.yml.
+appId: app.voiceup.s41spike
+productName: S41Spike
+asar: true
+npmRebuild: false
+files:
+  - main.js
+  - worker.js
+  - worker-live.js
+  - preload.js
+  - recorder.html
+  - recorder.js
+  - recorder-worklet.js
+  - package.json
+asarUnpack:
+  - '**/node_modules/sherpa-onnx-*/**'
+electronFuses:
+  runAsNode: false
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true

@@ -43,7 +43,7 @@ Changing a default requires a benchmark run (below) and a note in the commit.
 ## Adding a model
 1. Add an entry to `resources/models.json` with `id`, `type`, pinned `url`, `sha256`, `bytes` and the file map.
 2. Compute `sha256` from the downloaded archive yourself; never copy it from a web page.
-3. Add the `id` to the `modelId` enum in `src/shared/settings.ts` (keep `auto` first: it resolves by reported RAM, ≥ 15 GiB → Parakeet, else Moonshine).
+3. Add the `id` to the `modelId` enum in `src/shared/settings.ts` (keep `auto` first: it resolves to Moonshine, per the S4.1 decision note).
 4. Map `type` → recognizer config in `src/worker/recognizer.ts`.
 5. Run the benchmark on both reference machines.
 

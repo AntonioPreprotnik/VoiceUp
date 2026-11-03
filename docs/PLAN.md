@@ -66,7 +66,7 @@ flowchart LR
     M["Main process<br/>global hotkey · state machine (from hooks)<br/>SEND GATE · PTY host (node-pty)<br/>hook receiver 127.0.0.1 · settings + logs"]
   end
   C["Claude Code<br/>claude.exe, interactive<br/>your own login"]
-  W["Speech worker<br/>utility process · sherpa-onnx<br/>Silero VAD + Parakeet"]
+  W["Speech worker<br/>utility process · sherpa-onnx<br/>Silero VAD + Moonshine"]
   M -- start / stop --> R
   R -- audio, direct port --> W
   M -- preview --> O
@@ -86,7 +86,7 @@ Audio frames go from the hidden recorder to the speech worker, which detects the
 | Terminal | `node-pty` (Windows ConPTY) + `@xterm/xterm` with fit, webgl and unicode11 addons | Renders Claude Code's full TUI correctly |
 | Global hotkey | Electron `globalShortcut` | Fires while another app has focus |
 | End-of-speech detection | Silero VAD inside the same sherpa-onnx worker; mic captured with `getUserMedia` + AudioWorklet in a hidden window | Real-time endpointing in the same engine; no WASM runtime to bundle |
-| Transcription | `sherpa-onnx-node` in an Electron utility process; Parakeet TDT 0.6B v2 (int8) by default, Moonshine as the light option | One native addon for VAD and speech-to-text; top local English accuracy; no extra server process or port |
+| Transcription | `sherpa-onnx-node` in an Electron utility process; Moonshine base by default (S4.1), Parakeet TDT 0.6B v2 (int8) as an option | One native addon for VAD and speech-to-text; top local English accuracy; no extra server process or port |
 | Claude state | Claude Code `http` hooks to a local receiver | Official and documented; no screen scraping |
 | Validation | zod | One schema per boundary |
 | Tests | Vitest | Fast unit tests for `src/core` |
@@ -369,12 +369,12 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 
 *Goal: accurate English text about a second after you stop talking, on a normal CPU, fully offline.*
 
-**[ ] S4.1 Speech engine spike (Spike, ≤ 3 h).** As the developer, I want proof the chosen engine works inside packaged Electron before building on it.
+**[x] S4.1 Speech engine spike (Spike, ≤ 3 h).** As the developer, I want proof the chosen engine works inside packaged Electron before building on it.
 
 - AC: `sherpa-onnx-node` (prebuilt Windows x64 addon) loads in an Electron `utilityProcess` in a packaged build and runs Silero VAD plus offline recognition on live mic frames.
 - AC: Electron forbids external buffers, so every sherpa-onnx call that can return one uses its copying variant (for example `vad.front(false)`); a test fails on any "External buffers are not allowed" error.
 - Head start (pre-verified 2026-10-26 on Linux x64, Electron 45.0.0, `sherpa-onnx-node` 2.0.0, inside a `utilityProcess`): config names, model file names, archive SHA-256 values and the external-buffer behavior are in TECH_SPEC §5.2–5.4. This spike only has to confirm them with the Windows prebuild in a packaged build and run the benchmark.
-- AC: benchmark end-of-speech-to-text latency and accuracy on 20 recorded commands for Parakeet TDT 0.6B v2 (int8), Moonshine base and Whisper base.en, on your PC and on the weakest friend's laptop.
+- AC: benchmark end-of-speech-to-text latency and accuracy on 20 recorded commands for Parakeet TDT 0.6B v2 (int8), Moonshine base and Whisper base.en, on your PC. The weakest friend's laptop moved to S7.5, at Antonio's choice.
 - AC: `npm run bench:speech` is kept as test tooling. It reads recordings from a folder path; recordings stay out of the public repo unless the speaker agrees.
 - AC: decision note with the numbers. Fallback if the addon can't work in Electron: whisper.cpp `whisper-server` on `127.0.0.1` plus `@ricky0123/vad-web` (the previous design).
 
@@ -509,6 +509,7 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 
 **[ ] S7.5 Friends beta.** As the developer, I want real feedback before calling it done.
 
+- AC: `npm run bench:speech` on the weakest friend's laptop, and the numbers added to `docs/decisions/S4.1-speech-engine.md`. If Moonshine is too slow or misses too much there, revisit the default model before release.
 - AC: README with install steps, privacy statement (audio stays local; no telemetry) and the one-account-per-person rule; a GitHub Issues template for bug reports that warns issues are public and accepts logs at the default level only, with `debug` lines removed, because they can contain transcripts and hook bodies; at least two friends complete setup unaided.
 
 ---
@@ -693,7 +694,7 @@ The biggest risk is outside your control: Anthropic's subscription-use policy an
 ### Open decisions
 
 - [x] Default hotkey: `Ctrl+Shift+Space`.
-- [x] Default speech model: picked by RAM. Parakeet TDT 0.6B v2 at 15 GiB or more of reported RAM, Moonshine base below; S4.1 confirms the threshold.
+- [x] Default speech model: Moonshine base for everyone, with Parakeet TDT 0.6B v2 as an option. Replaces the RAM-based pick; Antonio chose this on the S4.1 numbers.
 - [x] Repo: public on GitHub; auto-update via GitHub Releases.
 - [x] Platform: Windows only.
 - [x] Busy behavior default: queue.

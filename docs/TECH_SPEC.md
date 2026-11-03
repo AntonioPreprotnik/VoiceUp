@@ -18,7 +18,7 @@ This spec turns `docs/PLAN.md` into implementable contracts: process layout, int
 | End of speech → preview shown, 5 s command, low-end CPU | ≤ 1.5 s after the silence window | S4.1 |
 | Cold start → usable terminal | ≤ 3 s; measured about 1.4 s to Claude's first text (S1.3), logged as `First Claude text` | S1.1 |
 | Idle CPU, app in tray, Claude idle | < 1% | S7.1 |
-| Speech worker RAM, model loaded | ≤ 1.2 GB Parakeet, ≤ 600 MB Moonshine (measured on Linux, 16.7 s clip: 1.06 GB and 0.53 GB peak RSS; Windows confirmed in S4.1) | S4.1 |
+| Speech worker RAM, model loaded | ≤ 1.2 GB Parakeet, ≤ 600 MB Moonshine (S4.1, Windows, packaged, 6.6 s clip: 837 MB and 387 MB RSS) | S4.1 |
 | Installer size, no models | ≤ 150 MB | S6.1 |
 
 ## 2. Repository layout and module boundaries
@@ -281,7 +281,8 @@ modelConfig: {
 - Load the recognizer with `await sherpa.OfflineRecognizer.createAsync(config)` so the worker stays responsive to `cancel` while the 650 MB Parakeet encoder loads.
 - `decodeAsync` keeps the worker's event loop free, but the worker still lives in a `utilityProcess` (native crash isolation, memory). Main keeps a timeout of max(10 s, half the clip length) that kills and restarts a stuck worker; a flat 10 s could kill a legitimate 60 s Parakeet decode at the measured 1-thread speed (RTF 0.17).
 - External buffers: in Electron, `vad.front()` and `readWave(path)` with the default argument throw `External buffers are not allowed`; `front(false)` and `readWave(path, false)` work. Plain Node accepts both, so only an Electron test catches it.
-- Spike timings (2 vCPU Linux container, 5.9 s clip, `numThreads: 4`): Parakeet load 2.2 s, decode 1.8 s; Moonshine base load 1.3 s, decode 0.6–0.8 s. Both transcribed the clip correctly. Real numbers come from the S4.1 benchmark on the reference laptops.
+- Measured on the real target in S4.1 (Ryzen 5 3600, 4 threads, 2.4 s median spoken command): Moonshine 108 ms, Whisper base.en 286 ms, Parakeet 240 ms. Numbers are in `docs/decisions/S4.1-speech-engine.md`.
+- Earlier spike timings (2 vCPU Linux container, 5.9 s clip, `numThreads: 4`): Parakeet load 2.2 s, decode 1.8 s; Moonshine base load 1.3 s, decode 0.6–0.8 s. Both transcribed the clip correctly. Real numbers come from the S4.1 benchmark on the reference laptops.
 
 ### 5.4 Model manager (main)
 
@@ -313,7 +314,7 @@ Models are listed in a bundled `resources/models.json`, pinned per app version:
 Values measured 2026-10-26 from the downloaded archives. Unpacked: Parakeet about 661 MB (encoder 652 MB), Moonshine about 287 MB. Each archive extracts into the `dir` folder and also contains `test_wavs/`, which the extractor skips.
 
 - Download to `userData/models/<id>.partial` with HTTP `Range` resume; hash while streaming; on mismatch delete and report `MODEL_CORRUPT`.
-- Extract to `userData/models/<id>.tmp`, then rename atomically to `userData/models/<id>`. The `.tar.bz2` extractor library is chosen in S4.3.
+- Extract to `userData/models/<id>.tmp`, then rename atomically to `userData/models/<id>`. The `.tar.bz2` extractor library is chosen in S4.3. It can't be the system `tar.exe`: S4.1 measured it deadlocking, because it has no built-in bzip2 and shells out to one that a friend's PC may not have. Git's `tar` took 73 s for Moonshine and 158 s for Parakeet, so show progress.
 - On startup, check presence and size of each file only; the full hash runs once, at download.
 - `silero_vad.onnx` (643,854 bytes, sha256 `9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6`, from the same `asr-models` release) ships in `resources/` and is never downloaded.
 
@@ -383,7 +384,7 @@ export const Settings = z.object({
   hotkey: z.string().default('Control+Shift+Space'),  // Ctrl+Alt = AltGr on HR layouts
   micDeviceId: z.string().nullable().default(null),
   speech: z.object({
-    modelId: z.enum(['auto', 'parakeet-tdt-0.6b-v2-int8', 'moonshine-base-en']).default('auto'),  // auto: >= 15 GiB reported RAM -> Parakeet, else Moonshine
+    modelId: z.enum(['auto', 'parakeet-tdt-0.6b-v2-int8', 'moonshine-base-en']).default('auto'),  // auto: Moonshine (S4.1)
     endSilenceSec: z.number().min(0.5).max(3).default(1.2),
     minSpeechSec: z.number().min(0.1).max(1).default(0.25),
     maxRecordingSec: z.number().min(5).max(120).default(60),
@@ -605,7 +606,7 @@ Each question has an owner story; code that depends on the answer waits for it. 
 | ~~Hooks before workspace trust~~ Answered by the docs: in an interactive session the trust dialog appears before the session starts, so no hook (SessionStart included) fires until it is accepted; state stays `starting`. S2.1 still records it once with a fresh folder, and confirms our `--settings` hooks then fire normally. | S2.1 (confirm only) |
 | Does bracketed paste followed by `\r` submit reliably in Claude Code's prompt under ConPTY, and what delay is needed? | S5.3 |
 | ~~sherpa-onnx config names, model files, SHA-256~~ Answered (§5.2–5.4). Remaining: confirm the same on the Windows prebuild in the packaged smoke test. | S4.1 (confirm only) |
-| Parakeet RAM and decode time on an 8 GB, 4-core laptop; is 15 GiB of reported RAM the right threshold for the auto-pick? | S4.1 |
+| Is Moonshine fast and accurate enough on the weakest friend's laptop? Answered on Antonio's PC only (`docs/decisions/S4.1-speech-engine.md`). The RAM-based pick is gone. | S7.5 |
 | Does `globalShortcut` fire while a fullscreen exclusive game has focus? | S3.1, manual test |
 | ~~electron-builder `electronFuses`~~ Answered: supported natively (§7.2). | done |
 | Why don't Claude's long replies reach scrollback? Measured in S1.4 on Windows 10 19045 with Claude Code 2.1.316: of 300 printed numbers, about 36 arrive even reading `node-pty` directly, so the loss is below VoiceUp. 2,000 plain lines scroll fine. `WT_SESSION` and `TERM` make no difference. The same prompt scrolls in Windows Terminal, which ships a newer console layer, so the old system ConPTY is the likely cause, not proven. `useConptyDll` can't test this: its interactive output stalls on `node-pty` 1.2.0-beta.18. | no owner; not implemented |

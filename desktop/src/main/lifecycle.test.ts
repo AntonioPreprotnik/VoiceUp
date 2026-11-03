@@ -244,6 +244,44 @@ describe('the hotkey', () => {
   })
 })
 
+describe('the recorder window', () => {
+  function recorderWindow(): BrowserWindow {
+    const window = BrowserWindow.instances.at(1)
+    if (window === undefined) throw new Error('No recorder window')
+    return window
+  }
+
+  function portsSent(): number {
+    return recorderWindow().webContents.sent.filter(([channel]) => channel === 'recorder:port')
+      .length
+  }
+
+  it('gets its audio port only after its page has loaded, or the port would be lost', async () => {
+    startApp({ argv: [] })
+    await settle()
+    expect(portsSent()).toBe(0)
+    recorderWindow().webContents.emit('did-finish-load')
+    expect(portsSent()).toBe(1)
+  })
+
+  it('stays hidden', async () => {
+    startApp({ argv: [] })
+    await settle()
+    recorderWindow().emit('ready-to-show')
+    expect(recorderWindow().shown).toBe(false)
+  })
+
+  it('reports its problems to the log', async () => {
+    startApp({ argv: [] })
+    await settle()
+    recorderWindow().webContents.emit('console-message', {
+      level: 'warning',
+      message: 'Could not start recording'
+    })
+    expect(JSON.stringify(fakeLog.messages('warn'))).toContain('Could not start recording')
+  })
+})
+
 describe('the speech worker', () => {
   it('starts with the settings, and stops on quit', async () => {
     startApp({ argv: [] })

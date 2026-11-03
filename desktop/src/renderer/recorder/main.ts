@@ -63,8 +63,9 @@ async function start(recordingId: string, deviceId: string | null): Promise<void
     return
   }
   const node = new AudioWorkletNode(context, 'frames')
-  node.port.onmessage = ({ data }: MessageEvent<Float32Array<ArrayBuffer>>) => {
-    framePort?.postMessage(data, [data.buffer])
+  node.port.onmessage = ({ data }: MessageEvent<Float32Array>) => {
+    // A copy, not a transfer: a transferred buffer reaches a utilityProcess as null (found in S3.2).
+    framePort?.postMessage(data)
   }
   context.createMediaStreamSource(stream).connect(node)
   // A hidden window can start suspended, with no user gesture to wake it.
@@ -94,11 +95,12 @@ api.onStop(({ recordingId }) => {
   stop(recordingId)
 })
 
-// The port arrives as a window message, because contextBridge can't carry one. Only this window's
-// own preload can post here, since the page loads nothing else.
+// The port arrives as a window message, because contextBridge can't carry one. It's checked by
+// origin: event.source is no use, because the preload posts from its own isolated world. Only this
+// window's preload can post here anyway, since the page loads nothing else.
 window.addEventListener('message', (event) => {
   const port = event.ports.at(0)
-  if (event.source === window && event.data === 'recorder-port' && port !== undefined) {
+  if (event.origin === location.origin && event.data === 'recorder-port' && port !== undefined) {
     framePort = port
   }
 })

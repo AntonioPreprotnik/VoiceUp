@@ -175,6 +175,7 @@ export const shell = {
 class FakeUtilityProcess extends EventEmitter {
   messages: { message: unknown; ports: unknown[] | undefined }[] = []
   killed = false
+  readonly stderr = new EventEmitter()
   /** Like the real one, it exits when killed. Turn off to test a worker that hangs. */
   exitsWhenKilled = true
 

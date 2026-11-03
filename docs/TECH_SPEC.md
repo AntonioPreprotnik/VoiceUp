@@ -221,7 +221,7 @@ One hotkey press produces exactly one recording, one VAD segment and one transcr
 
 - `getUserMedia({ audio: { deviceId, channelCount: 1, echoCancellation: false, noiseSuppression: true, autoGainControl: true } })`. The mic opens only while recording, so the Windows mic indicator is honest.
 - `new AudioContext({ sampleRate: 16000 })` lets Chromium resample; an AudioWorklet emits `Float32Array` frames of 512 samples (32 ms, Silero's window at 16 kHz).
-- Frames go to the worker over a `MessagePort` as transferables. Main wires the port once: `MessageChannelMain` → `port1` to the recorder (`webContents.postMessage`), `port2` to the worker (`utilityProcess.postMessage`).
+- Frames go to the worker over a `MessagePort` as copies, not transferables: a transferred `ArrayBuffer` reaches a `utilityProcess` as `null` (measured in S3.2). The worker reports a frame it can't use, because a silent drop looks like a recording that never ends. Main wires the port once: `MessageChannelMain` → `port1` to the recorder (`webContents.postMessage`), `port2` to the worker (`utilityProcess.postMessage`).
 - The overlay shows "Listening" only after the first frame arrives, so the 150 ms budget is measured against real audio, not intent.
 
 ### 5.2 Voice activity detection (worker)

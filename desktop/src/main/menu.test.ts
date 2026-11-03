@@ -6,6 +6,9 @@ import { installAppMenu } from './menu'
 vi.mock('electron', () => import('../../test/fakes/electron'))
 vi.mock('electron-log/main', () => import('../../test/fakes/electronLog'))
 
+// Opening the logs folder really creates it, which can be slow on a busy machine.
+const REAL_DISK_MS = 5000
+
 interface TemplateItem {
   label?: string
   role?: string
@@ -76,9 +79,12 @@ describe('the app menu', () => {
   it('opens the logs folder', async () => {
     installAppMenu()
     clickOpenLogs()
-    await vi.waitFor(() => {
-      expect(shell.opened).toEqual([app.getPath('logs')])
-    })
+    await vi.waitFor(
+      () => {
+        expect(shell.opened).toEqual([app.getPath('logs')])
+      },
+      { timeout: REAL_DISK_MS }
+    )
     expect(fakeLog.messages('error')).toEqual([])
   })
 
@@ -86,8 +92,11 @@ describe('the app menu', () => {
     shell.failure = 'no handler'
     installAppMenu()
     clickOpenLogs()
-    await vi.waitFor(() => {
-      expect(fakeLog.messages('error')).toHaveLength(1)
-    })
+    await vi.waitFor(
+      () => {
+        expect(fakeLog.messages('error')).toHaveLength(1)
+      },
+      { timeout: REAL_DISK_MS }
+    )
   })
 })

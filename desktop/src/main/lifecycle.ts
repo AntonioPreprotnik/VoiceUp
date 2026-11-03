@@ -121,7 +121,8 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
       const speech = new SpeechSupervisor({
         onEvent: (event) => {
           if (event.type === 'ready') log.info(`Speech worker ready in ${String(event.loadMs)} ms`)
-          if (event.type === 'error') log.warn(`Speech worker error: ${event.code}`)
+          if (event.type === 'error')
+            log.warn(`Speech worker error: ${event.code}: ${event.message}`)
           recording.onWorkerEvent(event)
         },
         onGaveUp: () => {
@@ -131,7 +132,14 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
       speech.start(workerInit(settings.speech))
       steps.worker ??= () => speech.stop()
 
-      speech.connectRecorder(recorderWindow.webContents)
+      // After the load: a port sent earlier arrives before the preload listens, and is lost.
+      recorderWindow.webContents.once('did-finish-load', () => {
+        speech.connectRecorder(recorderWindow.webContents)
+      })
+      // The hidden window has nowhere else to report a problem. It never logs audio or text.
+      recorderWindow.webContents.on('console-message', ({ level, message }) => {
+        if (level === 'warning' || level === 'error') log.warn(`Recorder: ${message}`)
+      })
       loadRenderer(recorderWindow, 'recorder').catch((error: unknown) => {
         log.error('Could not load the recorder window', error)
       })

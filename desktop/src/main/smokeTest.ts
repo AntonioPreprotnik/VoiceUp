@@ -111,8 +111,11 @@ async function checkSpeech(): Promise<Check> {
         log.error(`Smoke test speech error: ${event.message}`)
       }
     },
+    // Any crash fails this: a restart would otherwise hide a worker that dies on its first frame.
+    onCrash: (code) => {
+      errors.push(`The speech worker exited with code ${String(code)}`)
+    },
     onGaveUp: () => {
-      errors.push('The speech worker kept crashing')
       markReady()
     }
   })

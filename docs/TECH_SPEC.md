@@ -55,7 +55,7 @@ Import rules are enforced by ESLint (`no-restricted-imports` per folder, in `des
 | `core/` | `core/`, `shared/` | `electron`, any `node:*`, `fs`, network |
 | `shared/` | `zod` | everything else |
 | `renderer/` | `shared/`, browser APIs, `@xterm/*` | `main/`, `worker/`, `node:*` |
-| `preload/` | `electron` (`contextBridge`, `ipcRenderer`), `shared/` | `main/`, `worker/` |
+| `preload/` | `electron` (`contextBridge`, `ipcRenderer`), types from `shared/` | `main/`, `worker/`, values from `shared/`: a sandboxed preload must be a single file, and two preloads sharing code would be split into a chunk it can't load (found in S3.2) |
 | `worker/` | `core/`, `shared/`, `sherpa-onnx-node`, `node:*` | `electron` main APIs other than `process.parentPort` |
 | `main/` | everything except `renderer/` and the `sherpa-onnx` packages | `renderer/`, `sherpa-onnx-*` |
 
@@ -337,7 +337,7 @@ Every boundary has one zod schema in `shared/`, imported by both sides; nothing 
 | `state:changed` | main → renderer | `{ state, reason?, queue: [{ id, preview }] }` | terminal, overlay, settings |
 | `overlay:show` | main → renderer | union on `phase`: `listening{level}`, `transcribing`, `preview{text, countdownMs}`, `blocked{reason}`, `error{code, message}`, `hidden` | overlay |
 | `recorder:start` / `recorder:stop` | main → renderer | `{ recordingId, deviceId }` / `{ recordingId }` | recorder |
-| `recorder:error` | renderer → main | `{ recordingId, code }` | recorder |
+| `recorder:error` | renderer → main | `{ recordingId, code }`; `code` is `MIC_DENIED`, `MIC_MISSING` or `MIC_FAILED` | recorder |
 | `settings:get` / `settings:set` | invoke | → `Settings` / `Partial<Settings>` → `Result` | settings, wizard |
 | `models:status` / `models:download` | invoke + `models:progress` events | `{ id }` → status | settings, wizard |
 | `devices:list` | invoke | → `[{ deviceId, label }]` (the recorder enumerates) | settings |

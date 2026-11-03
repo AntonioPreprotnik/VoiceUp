@@ -1,10 +1,28 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import {
-  Channels,
-  type SessionExit,
-  type TerminalApi,
-  type TerminalMenuAction
+import type {
+  Channels as SharedChannels,
+  SessionExit,
+  TerminalApi,
+  TerminalMenuAction
 } from '../shared/ipcChannels'
+
+// A sandboxed preload must be a single file, so it can't share code with another preload: the
+// bundler would split it into a chunk this can't load. These are checked against the shared list.
+const Channels = {
+  termData: 'term:data',
+  termInput: 'term:input',
+  termResize: 'term:resize',
+  termAck: 'term:ack',
+  sessionExited: 'session:exited',
+  sessionRestart: 'session:restart',
+  clipboardWrite: 'clipboard:write',
+  clipboardRead: 'clipboard:read',
+  linkOpen: 'link:open',
+  termContextMenu: 'term:contextMenu',
+  termMenuAction: 'term:menuAction',
+  termFontSize: 'term:fontSize',
+  settingsFontSize: 'settings:fontSize'
+} as const satisfies Partial<typeof SharedChannels>
 
 // Security rule 7: named functions through contextBridge, never ipcRenderer itself, and the IPC
 // event never reaches the page. Security rule 2: this preload serves the terminal window only.

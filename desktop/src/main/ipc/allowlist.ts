@@ -11,6 +11,7 @@ type RendererChannel =
   | typeof Channels.linkOpen
   | typeof Channels.termContextMenu
   | typeof Channels.settingsFontSize
+  | typeof Channels.recorderError
 
 /** The window kinds allowed to send each renderer-to-main channel (TECH_SPEC §6.1). */
 export const SENDERS: Readonly<Record<RendererChannel, readonly WindowKind[]>> = {
@@ -22,5 +23,6 @@ export const SENDERS: Readonly<Record<RendererChannel, readonly WindowKind[]>> =
   [Channels.clipboardRead]: ['terminal'],
   [Channels.linkOpen]: ['terminal'],
   [Channels.termContextMenu]: ['terminal'],
-  [Channels.settingsFontSize]: ['terminal']
+  [Channels.settingsFontSize]: ['terminal'],
+  [Channels.recorderError]: ['recorder']
 }

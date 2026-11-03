@@ -9,6 +9,10 @@ export const TermAck = z.number().int().nonnegative()
 export const TermResize = z.object({ cols: z.number().int(), rows: z.number().int() })
 export type TermResize = z.infer<typeof TermResize>
 export const SessionRestart = z.object({}).strict()
+export const RecorderError = z.object({
+  recordingId: z.string(),
+  code: z.enum(['MIC_DENIED', 'MIC_MISSING', 'MIC_FAILED'])
+})
 // Far above any real selection, while keeping a runaway page from filling the clipboard.
 export const ClipboardWrite = z.string().max(10 * 1024 * 1024)
 export const LinkOpen = z.object({ url: z.string().max(2048) })

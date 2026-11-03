@@ -10,16 +10,17 @@ import { registerTerminalIpc } from './ipc/terminal'
 import { registerTerminalUiIpc } from './ipc/terminalUi'
 import { initLogging, log, setLogLevel } from './log'
 import { installAppMenu } from './menu'
-import { denyAllPermissions } from './permissions'
+import { installPermissions } from './permissions'
 import { installProcessErrorLogging } from './processErrors'
 import { registerAppScheme, serveAppProtocol } from './protocol'
 import { resolveClaude } from './pty/resolveClaude'
 import { ClaudeSession } from './pty/session'
 import { loadSettings } from './settings/store'
+import { RecordingController } from './speech/recording'
 import { SpeechSupervisor } from './speech/supervisor'
 import { workerInit } from './speech/workerInit'
 import { runSmokeTest } from './smokeTest'
-import { createWindow, loadRenderer } from './windows/factory'
+import { createWindow, loadRenderer, windowKindOf } from './windows/factory'
 
 const SHUTDOWN_WATCHDOG_MS = 5000
 
@@ -97,7 +98,7 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
   app
     .whenReady()
     .then(async () => {
-      denyAllPermissions(session.defaultSession)
+      installPermissions(session.defaultSession, (id) => windowKindOf(id) === 'recorder')
       serveAppProtocol(join(__dirname, '../renderer'))
 
       if (settings === null) {
@@ -107,8 +108,16 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
       }
 
       mainWindow = createWindow('terminal')
-      // Step 5: the speech worker. Audio arrives with the recorder window in S3.2.
-      const recording = new RecordingToggle(randomUUID)
+      // Step 5: the hidden window that streams the mic, and the speech worker it streams to.
+      const recorderWindow = createWindow('recorder', { showWhenReady: false })
+      const recording = new RecordingController({
+        toggle: new RecordingToggle(randomUUID),
+        sendToWorker: (command) => {
+          speech.send(command)
+        },
+        recorder: recorderWindow.webContents,
+        deviceId: settings.micDeviceId
+      })
       const speech = new SpeechSupervisor({
         onEvent: (event) => {
           if (event.type === 'ready') log.info(`Speech worker ready in ${String(event.loadMs)} ms`)
@@ -121,6 +130,11 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
       })
       speech.start(workerInit(settings.speech))
       steps.worker ??= () => speech.stop()
+
+      speech.connectRecorder(recorderWindow.webContents)
+      loadRenderer(recorderWindow, 'recorder').catch((error: unknown) => {
+        log.error('Could not load the recorder window', error)
+      })
 
       // Step 6: Claude itself starts at the renderer's first size, so it never draws at a wrong one.
       const claude = new ClaudeSession({
@@ -138,8 +152,10 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
           claude.changeFontSize(change)
         }
       })
+      // Closing the terminal quits. window-all-closed can't do it: the hidden recorder stays open.
       mainWindow.once('closed', () => {
         mainWindow = undefined
+        app.quit()
       })
       await loadRenderer(mainWindow, 'terminal')
 
@@ -147,9 +163,7 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
       const { hotkey } = settings
       steps.shortcuts ??= unregisterHotkeys
       const registered = registerHotkey(hotkey, () => {
-        const command = recording.press()
-        log.info(`Hotkey: ${command.type} recording`)
-        speech.send(command)
+        recording.press()
       })
       if (!registered) reportHotkeyTaken(mainWindow, hotkey)
     })

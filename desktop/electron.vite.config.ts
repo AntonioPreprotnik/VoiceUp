@@ -19,14 +19,20 @@ export default defineConfig({
   preload: {
     build: {
       rollupOptions: {
-        input: { terminal: resolve(__dirname, 'src/preload/terminal.ts') }
+        input: {
+          terminal: resolve(__dirname, 'src/preload/terminal.ts'),
+          recorder: resolve(__dirname, 'src/preload/recorder.ts')
+        }
       }
     }
   },
   renderer: {
     build: {
       rollupOptions: {
-        input: { terminal: resolve(__dirname, 'src/renderer/terminal/index.html') }
+        input: {
+          terminal: resolve(__dirname, 'src/renderer/terminal/index.html'),
+          recorder: resolve(__dirname, 'src/renderer/recorder/index.html')
+        }
       }
     }
   }

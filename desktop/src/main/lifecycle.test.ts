@@ -64,7 +64,9 @@ describe('startup', () => {
       'permissions',
       'serveProtocol',
       'window',
+      'window',
       'speechWorker',
+      'load',
       'getPath:userData',
       'menu',
       'load',
@@ -106,14 +108,23 @@ describe('startup', () => {
     expect(window.focused).toBe(false)
   })
 
+  it('quits when the terminal closes, though the hidden recorder is still open', async () => {
+    startApp({ argv: [] })
+    await settle()
+    onlyWindow().emit('closed')
+    expect(app.quitCount).toBe(1)
+  })
+
   it('denies every permission (rule 6)', async () => {
     startApp({ argv: [] })
     await settle()
     const { requestHandler, checkHandler } = session.defaultSession
     const decisions: boolean[] = []
-    requestHandler?.(undefined, 'media', (allow) => decisions.push(allow))
+    requestHandler?.({ id: -1 }, 'media', (allow) => decisions.push(allow), {
+      mediaTypes: ['audio']
+    })
     expect(decisions).toEqual([false])
-    expect(checkHandler?.()).toBe(false)
+    expect(checkHandler?.(null, 'media')).toBe(false)
   })
 
   it('exits 1 when startup fails', async () => {

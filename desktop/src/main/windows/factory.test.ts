@@ -29,6 +29,11 @@ describe.each(WINDOW_KINDS)('the %s window', (kind) => {
     expect(preferences?.webviewTag).toBeUndefined()
   })
 
+  it('cannot have the security options overridden by its own settings', () => {
+    expect(windowOptions(kind).webPreferences?.sandbox).toBe(true)
+    expect(windowOptions(kind).webPreferences?.contextIsolation).toBe(true)
+  })
+
   it('passes those options to BrowserWindow unchanged', () => {
     createWindow(kind)
     expect(lastWindow().options).toEqual(windowOptions(kind))
@@ -67,6 +72,12 @@ describe.each(WINDOW_KINDS)('the %s window', (kind) => {
     expect(windowKindOf(window.webContents.id)).toBe(kind)
     window.emit('closed')
     expect(windowKindOf(window.webContents.id)).toBeUndefined()
+  })
+})
+
+describe('the recorder window', () => {
+  it('keeps capturing while hidden', () => {
+    expect(windowOptions('recorder').webPreferences?.backgroundThrottling).toBe(false)
   })
 })
 

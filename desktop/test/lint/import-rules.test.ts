@@ -39,7 +39,7 @@ const table: [string, string[], string[]][] = [
   ],
   [
     'src/preload/a.ts',
-    ['../shared/ipc'],
+    [],
     ['node:fs', 'fs', '../main/x', '../worker/x', '../renderer/x', '../core/x']
   ],
   [
@@ -82,6 +82,18 @@ describe('import forms', () => {
       expect(ids).toContain('no-restricted-syntax')
     }
   )
+})
+
+describe('shared code in preloads', () => {
+  it('allows types', async () => {
+    const code = "import type { X } from '../shared/ipcChannels'\nexport type { X }\n"
+    expect(await ruleIds('src/preload/a.ts', code)).toEqual([])
+  })
+
+  it('rejects values, which would split the preload into a chunk it cannot load', async () => {
+    const code = "import { Channels } from '../shared/ipcChannels'\nexport { Channels }\n"
+    expect(await ruleIds('src/preload/a.ts', code)).toContain('no-restricted-syntax')
+  })
 })
 
 describe('electron in preloads', () => {

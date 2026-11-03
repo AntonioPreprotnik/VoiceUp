@@ -259,6 +259,9 @@ export const globalShortcut = {
     this.registered.set(accelerator, callback)
     return true
   },
+  unregister(accelerator: string): void {
+    this.registered.delete(accelerator)
+  },
   unregisterAll(): void {
     this.registered.clear()
   },

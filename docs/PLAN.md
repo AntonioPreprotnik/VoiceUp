@@ -356,7 +356,7 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 - AC: always-on-top, click-through overlay near the taskbar: "Listening…", live level meter, "Transcribing…".
 - AC: short start/stop sounds, toggleable.
 
-**[ ] S3.5 Cancel.** As a user, I want to abort a bad recording.
+**[x] S3.5 Cancel.** As a user, I want to abort a bad recording.
 
 - AC: Esc while the overlay is visible (registered as a global shortcut only while recording or previewing, then released) or the hotkey again discards audio; nothing is sent.
 

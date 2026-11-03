@@ -14,6 +14,8 @@ export interface RecordingOptions {
   readonly sendToWorker: (command: WorkerCommand) => void
   readonly recorder: WebContents
   readonly deviceId: string | null
+  /** Esc, held only while there is something to cancel (TECH_SPEC §4.4). */
+  readonly escape: { hold(onPress: () => void): void; release(): void }
   readonly overlay: Pick<
     Overlay,
     'recordingStarted' | 'level' | 'speechEnded' | 'finished' | 'cancelled' | 'failed'
@@ -35,7 +37,7 @@ export class RecordingController {
   }
 
   press(): void {
-    const { toggle, sendToWorker, deviceId, overlay } = this.options
+    const { toggle, sendToWorker, deviceId, overlay, escape } = this.options
     const command = toggle.press()
     log.info(`Hotkey: ${command.type} recording`)
     sendToWorker(command)
@@ -43,10 +45,19 @@ export class RecordingController {
       // The worker first, so it has a VAD ready when the first frame arrives.
       this.toRecorder(Channels.recorderStart, { recordingId: command.recordingId, deviceId })
       overlay.recordingStarted()
+      escape.hold(() => {
+        this.cancel()
+      })
     } else {
       this.stopMic(command.recordingId)
       overlay.cancelled()
+      escape.release()
     }
+  }
+
+  /** Esc: the same as pressing the hotkey again, but only ever cancels. */
+  private cancel(): void {
+    if (this.options.toggle.phase !== 'idle') this.press()
   }
 
   /** The mic closes as soon as the speech ends, not when the transcript arrives. */
@@ -62,6 +73,7 @@ export class RecordingController {
     }
     if (event.type === 'transcript') overlay.finished()
     if (event.type === 'error') overlay.failed(event.code)
+    if (event.type === 'transcript' || event.type === 'error') this.options.escape.release()
     if (event.type === 'speechEnd' || event.type === 'error') this.stopMic(recordingId)
   }
 
@@ -72,6 +84,7 @@ export class RecordingController {
     if (toggle.onWorkerEvent({ type: 'error', recordingId })) {
       sendToWorker({ type: 'cancel', recordingId })
       this.options.overlay.failed(code)
+      this.options.escape.release()
     }
   }
 

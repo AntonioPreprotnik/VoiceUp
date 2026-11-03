@@ -1,7 +1,9 @@
-import { writeFile } from 'node:fs/promises'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { app, MessageChannelMain } from 'electron'
 import { FRAME_SAMPLES } from '../shared/worker'
 import { log } from './log'
+import { checkModelInstall } from './models/selfTest'
 import { cmdExePath } from './pty/resolveClaude'
 import { SpeechSupervisor } from './speech/supervisor'
 import { workerInit } from './speech/workerInit'
@@ -151,6 +153,19 @@ async function checkSpeech(): Promise<Check> {
   }
 }
 
+/** Installs a tiny archive with the real packages, which only a packaged build can prove. */
+async function checkModels(): Promise<Check> {
+  const root = await mkdtemp(join(app.getPath('temp'), 'voiceup-smoke-'))
+  try {
+    return (await checkModelInstall(root)) ? 'ok' : 'failed'
+  } catch (error: unknown) {
+    log.error('Smoke test could not install a model', error)
+    return 'failed'
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+}
+
 /**
  * Proves a packaged build starts, serves its renderer over app://, can run node-pty and can run the
  * speech worker (TECH_SPEC §7.2): writes a JSON result and exits 0, or exits 1. The result goes to a
@@ -161,8 +176,9 @@ export async function runSmokeTest(resultPath: string): Promise<void> {
     const renderer = await checkRenderer()
     const pty = await checkPty()
     const speech = await checkSpeech()
-    await writeFile(resultPath, JSON.stringify({ app: 'ok', renderer, pty, speech }))
-    app.exit(renderer === 'ok' && pty === 'ok' && speech === 'ok' ? 0 : 1)
+    const models = await checkModels()
+    await writeFile(resultPath, JSON.stringify({ app: 'ok', renderer, pty, speech, models }))
+    app.exit(renderer === 'ok' && pty === 'ok' && speech === 'ok' && models === 'ok' ? 0 : 1)
   } catch (error: unknown) {
     log.error(`Smoke test failed writing ${resultPath}`, error)
     app.exit(1)

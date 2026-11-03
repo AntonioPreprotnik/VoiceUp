@@ -386,7 +386,7 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 - AC: the recorder window streams frames to the worker over a `MessageChannelMain` port; the worker emits `speechStart`, `speechEnd`, `transcript` and `error` events, each schema-validated.
 - AC: `--smoke-test` also creates a VAD from the bundled Silero model.
 
-**[ ] S4.3 Model download.** As a user, I want a small installer and a one-time model download.
+**[x] S4.3 Model download.** As a user, I want a small installer and a one-time model download.
 
 - AC: recognition model chosen in settings; the first-run default is Moonshine base (S4.1), with Parakeet TDT 0.6B v2 as an option in settings, downloaded on first run from a pinned release URL with progress, resume and **SHA-256 verification** before use.
 - AC: the small Silero VAD model ships inside the app; works offline after download; disk usage shown in settings.

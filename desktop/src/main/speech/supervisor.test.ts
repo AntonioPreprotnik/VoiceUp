@@ -197,6 +197,22 @@ describe('connecting the recorder', () => {
   })
 })
 
+describe('restarting with a new model', () => {
+  it('sends the new init to a new worker, and the old exit is not a crash', () => {
+    const onCrash = vi.fn()
+    const supervisor = new SpeechSupervisor({ onEvent: vi.fn(), onGaveUp: vi.fn(), onCrash })
+    supervisor.start(init)
+    const old = latest()
+    const next = { ...init, modelId: 'moonshine-base-en' }
+    supervisor.restart(next)
+    expect(old.killed).toBe(true)
+    expect(latest()).not.toBe(old)
+    expect(latest().messages[0]?.message).toEqual(next)
+    expect(onCrash).not.toHaveBeenCalled()
+    expect(utilityProcess.children).toHaveLength(2)
+  })
+})
+
 describe('stopping', () => {
   it('kills the worker, and a stop is not a crash', async () => {
     const supervisor = create()

@@ -6,6 +6,7 @@ import { MESSAGES } from '../../core/messages'
 import { Channels, type SessionExit } from '../../shared/ipcChannels'
 import type { Settings } from '../../shared/settings'
 import { log } from '../log'
+import type { ModelId } from '../../shared/models'
 import { saveSettings } from '../settings/store'
 import { PtyHost } from './host'
 
@@ -60,6 +61,10 @@ export class ClaudeSession {
 
   get micDeviceId(): string | null {
     return this.settings.micDeviceId
+  }
+
+  setModel(modelId: ModelId): void {
+    this.save({ ...this.settings, speech: { ...this.settings.speech, modelId } })
   }
 
   /** Null is the system default. Applies from the next recording. */

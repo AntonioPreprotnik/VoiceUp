@@ -25,7 +25,18 @@ export const MESSAGES = {
   },
   MODEL_MISSING: {
     title: 'Speech model needs downloading',
-    detail: 'VoiceUp can hear you, but has no model to transcribe with yet.'
+    detail:
+      'It downloads once, and the VoiceUp title bar shows how far along it is. If it stopped, press Alt and choose Speech model > Retry download.'
+  },
+  MODEL_CORRUPT: {
+    title: 'Speech model needs downloading',
+    detail:
+      'The download could not be used, so it was deleted. Check you have 1 GB free, then press Alt and choose Speech model > Retry download.'
+  },
+  MODEL_DOWNLOAD_FAILED: {
+    title: 'Speech model download failed',
+    detail:
+      'Check your internet connection and free disk space, then press Alt and choose Speech model > Retry download.'
   },
   MIC_DENIED: {
     title: 'Windows is blocking the microphone',

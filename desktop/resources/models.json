@@ -1,0 +1,33 @@
+[
+  {
+    "id": "moonshine-base-en",
+    "label": "Moonshine (faster, smaller download)",
+    "type": "moonshine",
+    "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-moonshine-base-en-int8.tar.bz2",
+    "sha256": "21870cecaa2e44e4e2bf63e02d1072bed183ccd10284871353bd9d24dad14e5e",
+    "bytes": 250807309,
+    "dir": "sherpa-onnx-moonshine-base-en-int8",
+    "files": {
+      "preprocessor": "preprocess.onnx",
+      "encoder": "encode.int8.onnx",
+      "uncachedDecoder": "uncached_decode.int8.onnx",
+      "cachedDecoder": "cached_decode.int8.onnx",
+      "tokens": "tokens.txt"
+    }
+  },
+  {
+    "id": "parakeet-tdt-0.6b-v2-int8",
+    "label": "Parakeet (larger download)",
+    "type": "nemo_transducer",
+    "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8.tar.bz2",
+    "sha256": "157c157bc51155e03e37d2466522a3a737dd9c72bb25f36eb18912964161e1ad",
+    "bytes": 482468385,
+    "dir": "sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8",
+    "files": {
+      "encoder": "encoder.int8.onnx",
+      "decoder": "decoder.int8.onnx",
+      "joiner": "joiner.int8.onnx",
+      "tokens": "tokens.txt"
+    }
+  }
+]

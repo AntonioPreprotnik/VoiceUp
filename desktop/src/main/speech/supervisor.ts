@@ -45,6 +45,15 @@ export class SpeechSupervisor {
     this.spawn()
   }
 
+  /** Starts over with a new model. A deliberate restart, so it doesn't count as a crash. */
+  restart(init: WorkerInit): void {
+    this.init = init
+    const old = this.child
+    this.child = undefined
+    old?.kill()
+    this.spawn()
+  }
+
   send(command: WorkerCommand): void {
     this.child?.postMessage(command)
   }

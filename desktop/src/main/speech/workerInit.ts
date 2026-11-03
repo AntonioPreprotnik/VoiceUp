@@ -1,8 +1,9 @@
 import { availableParallelism } from 'node:os'
 import { join } from 'node:path'
 import { app } from 'electron'
+import type { ModelId } from '../../shared/models'
 import type { Settings } from '../../shared/settings'
-import type { WorkerInit } from '../../shared/worker'
+import type { ModelPaths, WorkerInit } from '../../shared/worker'
 
 /**
  * The bundled Silero model. In a packaged build it sits outside the asar (electron-builder.yml
@@ -15,12 +16,15 @@ export function sileroPath(): string {
   )
 }
 
-/** S4.3 adds the downloaded model. Until then the worker runs VAD only. */
-export function workerInit(speech: Settings['speech'] | undefined): WorkerInit {
+/** Without a model, which means none is downloaded yet, the worker runs VAD only. */
+export function workerInit(
+  speech: Settings['speech'] | undefined,
+  model: { readonly id: ModelId; readonly paths: ModelPaths } | null = null
+): WorkerInit {
   return {
     type: 'init',
-    modelId: null,
-    modelPaths: null,
+    modelId: model?.id ?? null,
+    modelPaths: model?.paths ?? null,
     sileroPath: sileroPath(),
     vad: {
       endSilenceSec: speech?.endSilenceSec ?? 1.2,

@@ -75,6 +75,7 @@ beforeEach(() => {
     restartWorker,
     recorder,
     getDeviceId: () => micDevice,
+    minWords: 1,
     overlay,
     escape
   })
@@ -315,6 +316,40 @@ describe('a transcript', () => {
     for (const spy of others) {
       expect(JSON.stringify(spy.mock.calls)).not.toContain('delete the database')
     }
+  })
+})
+
+describe('a transcript with nothing usable', () => {
+  function finishWith(text: string): void {
+    controller.press()
+    controller.onWorkerEvent({ type: 'speechEnd', recordingId: 'r1', durationMs: 11000 })
+    controller.onWorkerEvent({ type: 'transcript', recordingId: 'r1', text, decodeMs: 161 })
+  }
+
+  it.each(['', '[BLANK_AUDIO]', '(music)', '...'])('tells the user, for "%s"', (text) => {
+    finishWith(text)
+    expect(overlay.failed).toHaveBeenCalledWith('TRANSCRIPT_DROPPED')
+    expect(overlay.finished).not.toHaveBeenCalled()
+  })
+
+  it('finishes normally for usable text', () => {
+    finishWith('continue')
+    expect(overlay.finished).toHaveBeenCalledOnce()
+    expect(overlay.failed).not.toHaveBeenCalled()
+  })
+
+  it('lets the next recording start, and releases Esc', () => {
+    finishWith('')
+    expect(escape.held).toBeUndefined()
+    controller.press()
+    expect(toWorker.at(-1)).toEqual({ type: 'start', recordingId: 'r2' })
+  })
+
+  it('logs the drop at info without any of the text', () => {
+    const info = vi.spyOn(fakeLog, 'info')
+    finishWith('[secret words]')
+    expect(info).toHaveBeenCalledWith('TRANSCRIPT_DROPPED: nothing usable in the transcript')
+    expect(JSON.stringify(info.mock.calls)).not.toContain('secret')
   })
 })
 

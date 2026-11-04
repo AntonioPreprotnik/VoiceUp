@@ -322,7 +322,7 @@ Values measured 2026-10-26 from the downloaded archives. Unpacked: Parakeet abou
 
 ### 5.5 Text cleaning (core)
 
-A pure `clean(text, minWords) → string | null`: trim and collapse whitespace; strip control characters; remove bracketed tags (`[BLANK_AUDIO]`, `(music)`); collapse any token repeated 4 or more times in a row; return `null` below `minWords` (default 1). Fixture-tested.
+A pure `clean(text, minWords) → string | null`, in `core/text/clean.ts`: trim and collapse whitespace; strip control and format characters; remove bracketed tags (`[BLANK_AUDIO]`, `<unk>`, music notes, and up to three words in parentheses such as `(music)`, since a longer aside is speech); collapse any token repeated 4 or more times in a row, ignoring case and surrounding punctuation; return `null` below `minWords` (default 1), where only tokens with a letter or digit count as words. Fixture-tested. A repeated phrase isn't collapsed, so Moonshine's loops on clips near 60 s get through.
 
 ## 6. Interfaces
 

@@ -1,6 +1,7 @@
 import { ipcMain, type IpcMainEvent, type WebContents } from 'electron'
 import type { MessageCode } from '../../core/messages'
 import { transcribeTimeoutMs, type RecordingToggle } from '../../core/recordingToggle'
+import { clean } from '../../core/text/clean'
 import { RecorderError } from '../../shared/ipc'
 import { Channels } from '../../shared/ipcChannels'
 import type { WorkerCommand, WorkerEvent } from '../../shared/worker'
@@ -20,6 +21,8 @@ export interface RecordingOptions {
   readonly recorder: WebContents
   /** Read at each recording, so a new choice applies from the next one. */
   readonly getDeviceId: () => string | null
+  /** A transcript with fewer words than this is dropped. */
+  readonly minWords: number
   /** Esc, held only while there is something to cancel (TECH_SPEC §4.4). */
   readonly escape: { hold(onPress: () => void): void; release(): void }
   readonly overlay: Pick<
@@ -106,7 +109,12 @@ export class RecordingController {
       this.clearTimer()
       log.debug(`Transcribed ${String(this.clipMs)} ms of speech in ${String(event.decodeMs)} ms`)
       logTranscript(log, event.text)
-      overlay.finished()
+      if (clean(event.text, this.options.minWords) === null) {
+        log.info('TRANSCRIPT_DROPPED: nothing usable in the transcript')
+        overlay.failed('TRANSCRIPT_DROPPED')
+      } else {
+        overlay.finished()
+      }
     }
     if (event.type === 'error') {
       this.clearTimer()

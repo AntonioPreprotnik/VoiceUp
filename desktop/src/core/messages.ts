@@ -56,6 +56,10 @@ export const MESSAGES = {
     title: 'Speech engine had a problem',
     detail: 'Press the hotkey again. If it keeps happening, send the logs.'
   },
+  TRANSCRIPT_DROPPED: {
+    title: 'Nothing usable was heard',
+    detail: 'Press the hotkey and try again.'
+  },
   TRANSCRIBE_TIMEOUT: {
     title: 'Transcription took too long',
     detail: 'The speech engine restarted. Press the hotkey and try again.'

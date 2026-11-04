@@ -344,7 +344,7 @@ describe('a preview', () => {
 
   beforeEach(() => {
     vi.useFakeTimers()
-    previewSettings = { previewMs: 700, alwaysConfirm: false }
+    previewSettings = { previewMs: 300, alwaysConfirm: false }
   })
 
   afterEach(() => {

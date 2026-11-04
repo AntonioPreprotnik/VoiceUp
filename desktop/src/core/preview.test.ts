@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { LATE_PRESS_GUARD_MS, PreviewWindow } from './preview'
 
-const COUNTDOWN = { previewMs: 700, alwaysConfirm: false }
+const COUNTDOWN = { previewMs: 300, alwaysConfirm: false }
 const CONFIRM = { previewMs: 1000, alwaysConfirm: true }
 
 let preview: PreviewWindow
@@ -32,9 +32,19 @@ afterEach(() => {
 describe('the time to read it', () => {
   it.each([
     ['one word the 3.5 s minimum', 'continue', 3500],
-    ['five words the 3.5 s minimum', 'list the files in here', 3500],
-    ['six words 4.2 s', 'list the files in this folder', 4200],
-    ['words with more than one space between them 4.9 s', 'a  b\nc d e f g', 4900]
+    ['three words the 3.5 s minimum', 'run the tests', 3500],
+    ['five words 4 s', 'list the files in here', 4000],
+    ['six words 4.3 s', 'list the files in this folder', 4300],
+    ['words with more than one space between them 4.6 s', 'a  b\nc d e f g', 4600],
+    ['ten words 5.5 s', 'a b c d e f g h i j', 5500],
+    ['twenty words 8.5 s', Array.from({ length: 20 }, () => 'word').join(' '), 8500],
+    ['thirty-five words 13 s', Array.from({ length: 35 }, () => 'word').join(' '), 13000],
+    [
+      'forty-four words just under the 15 s limit',
+      Array.from({ length: 44 }, () => 'word').join(' '),
+      15000
+    ],
+    ['two hundred words the 15 s limit', Array.from({ length: 200 }, () => 'word').join(' '), 15000]
   ])('gives %s', (_label, text, expected) => {
     expect(preview.start(text, COUNTDOWN)).toEqual({ kind: 'showing', countdownMs: expected })
     vi.advanceTimersByTime(expected - 1)
@@ -45,15 +55,15 @@ describe('the time to read it', () => {
 
   it('uses the configured time for each word', () => {
     expect(
-      preview.start('a b c d e f g h i j k l', { previewMs: 500, alwaysConfirm: false })
+      preview.start('a b c d e f g h i j k l', { previewMs: 400, alwaysConfirm: false })
     ).toEqual({
       kind: 'showing',
-      countdownMs: 6000
+      countdownMs: 7300
     })
   })
 
   it('keeps the minimum with a shorter time for each word', () => {
-    expect(preview.start('run the tests', { previewMs: 500, alwaysConfirm: false })).toEqual({
+    expect(preview.start('run the tests', { previewMs: 100, alwaysConfirm: false })).toEqual({
       kind: 'showing',
       countdownMs: 3500
     })
@@ -81,7 +91,7 @@ describe('the countdown', () => {
 
   it('uses the configured length', () => {
     preview.start('continue', { previewMs: 5000, alwaysConfirm: false })
-    vi.advanceTimersByTime(4999)
+    vi.advanceTimersByTime(7499)
     expect(onSend).not.toHaveBeenCalled()
     vi.advanceTimersByTime(1)
     expect(onSend).toHaveBeenCalledOnce()

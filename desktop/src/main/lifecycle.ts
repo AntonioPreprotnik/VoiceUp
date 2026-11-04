@@ -131,6 +131,7 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
         },
         recorder: recorderWindow.webContents,
         getDeviceId: () => claude.micDeviceId,
+        minWords: settings.speech.minWords,
         overlay,
         escape: escapeKey
       })

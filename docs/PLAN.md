@@ -396,7 +396,7 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 - AC: speech segment → recognizer → text, with timing logged at `debug`.
 - AC: timeout of max(10 s, half the clip length) with a user-visible error; no hung states.
 
-**[ ] S4.5 Clean the text.** As a user, I don't want junk sent to Claude.
+**[x] S4.5 Clean the text.** As a user, I don't want junk sent to Claude.
 
 - AC: trim whitespace; drop empty results and known model artifacts (bracketed noise tags, repeated-token loops that small models produce on very short clips).
 - AC: drop results under a minimum word count (default 1, so "continue" and "yes" survive), configurable up to 5.

@@ -59,6 +59,8 @@ function show(state: OverlayState): void {
   } else if (state.phase === 'blocked') {
     text.textContent = state.reason
     hint.textContent = 'Not sent yet · Hotkey tries again · Esc discards'
+  } else if (state.phase === 'queued') {
+    text.textContent = `Queued (${String(state.position)}). It goes when Claude finishes.`
   } else if (state.phase === 'transcribing') {
     text.textContent = 'Transcribing…'
   } else if (state.phase === 'error') {

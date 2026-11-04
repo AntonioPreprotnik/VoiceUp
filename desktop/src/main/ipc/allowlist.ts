@@ -8,6 +8,7 @@ type RendererChannel =
   | typeof Channels.sessionRestart
   | typeof Channels.stateGet
   | typeof Channels.stateReArm
+  | typeof Channels.queueCancel
   | typeof Channels.clipboardWrite
   | typeof Channels.clipboardRead
   | typeof Channels.linkOpen
@@ -24,6 +25,7 @@ export const SENDERS: Readonly<Record<RendererChannel, readonly WindowKind[]>> =
   [Channels.sessionRestart]: ['terminal'],
   [Channels.stateGet]: ['terminal'],
   [Channels.stateReArm]: ['terminal'],
+  [Channels.queueCancel]: ['terminal'],
   [Channels.clipboardWrite]: ['terminal'],
   [Channels.clipboardRead]: ['terminal'],
   [Channels.linkOpen]: ['terminal'],

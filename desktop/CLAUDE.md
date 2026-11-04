@@ -38,6 +38,7 @@ Exact versions only. Confirmed with `npm view` on 2026-11-02: Electron 45.2.1, e
 - A hidden recorder window is always open, so `window-all-closed` never fires: closing the terminal is what quits the app.
 - A model install runs in main and uses the title bar for progress until S6.5 and S6.6 bring real screens. To unpack the real archive in a test: `VOICEUP_TEST_MODELS=<folder holding it> npm test`.
 - Voice text reaches Claude only through `core/delivery/delivery.ts`, which asks the gate before the paste and again before Enter, and writes directly to the PTY, not through `onInput`, so it can't look like the user typing. The limits in `sanitize.ts` were measured in S5.3 and aren't documented by Claude: re-measure them on a Claude upgrade.
+- Nothing typed by delivery counts as the user's typing, and queued text only goes when the gate says `send`, so the queue can never put text into a prompt.
 - `npm run build`, then `npm run test:e2e`: Playwright against the unpackaged app and the fake Claude. It needs no model, microphone or network.
 - State goes out through `core/state/status.ts` and `main/status.ts`, in one view with its text and color, so the status bar and tray can't disagree. A notification's wording is fixed there: nothing Claude or the user said reaches one.
 - A `.cmd` Claude goes through `ptyArgs` as one string, or a space in a path stops it starting. `test/integration/claude-launch.test.ts` proves it with real `cmd.exe`.

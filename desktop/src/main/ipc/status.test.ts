@@ -9,6 +9,7 @@ vi.mock('electron', () => import('../../../test/fakes/electron'))
 vi.mock('electron-log/main', () => import('../../../test/fakes/electronLog'))
 
 const reArm = vi.fn()
+const cancelQueued = vi.fn()
 const view = statusView('unknown', null)
 
 function eventFrom(kind: 'terminal' | 'recorder'): unknown {
@@ -24,7 +25,27 @@ function eventFrom(kind: 'terminal' | 'recorder'): unknown {
 beforeEach(() => {
   resetFakes()
   vi.clearAllMocks()
-  registerStatusIpc(() => view, reArm)
+  registerStatusIpc(() => view, reArm, cancelQueued)
+})
+
+describe('queue:cancel', () => {
+  it('cancels from the terminal window', () => {
+    ipcMain.emit(Channels.queueCancel, eventFrom('terminal'), { id: '3' })
+    expect(cancelQueued).toHaveBeenCalledWith('3')
+  })
+
+  it('ignores any other window', () => {
+    ipcMain.emit(Channels.queueCancel, eventFrom('recorder'), { id: '3' })
+    expect(cancelQueued).not.toHaveBeenCalled()
+  })
+
+  it.each([[{}], [{ id: 3 }], [{ id: 'x'.repeat(33) }], [{ id: '3', extra: true }]])(
+    'ignores a payload of the wrong shape: %j',
+    (payload) => {
+      ipcMain.emit(Channels.queueCancel, eventFrom('terminal'), payload)
+      expect(cancelQueued).not.toHaveBeenCalled()
+    }
+  )
 })
 
 describe('state:rearm', () => {

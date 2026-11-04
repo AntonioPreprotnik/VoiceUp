@@ -10,6 +10,7 @@ import { SENDERS } from '../ipc/allowlist'
 import { validateSender } from '../ipc/validateSender'
 import { log } from '../log'
 import { logTranscript } from '../logConfig'
+import { schedule } from '../schedule'
 import type { Overlay } from '../overlay'
 
 export interface RecordingOptions {
@@ -49,12 +50,7 @@ export class RecordingController {
 
   constructor(private readonly options: RecordingOptions) {
     this.preview = new PreviewWindow({
-      schedule: (callback, ms) => {
-        const timer = setTimeout(callback, ms)
-        return () => {
-          clearTimeout(timer)
-        }
-      },
+      schedule,
       now: () => Date.now(),
       onSend: (text) => {
         options.overlay.finished()

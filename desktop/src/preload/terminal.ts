@@ -19,6 +19,7 @@ const Channels = {
   stateChanged: 'state:changed',
   stateGet: 'state:get',
   stateReArm: 'state:rearm',
+  queueCancel: 'queue:cancel',
   clipboardWrite: 'clipboard:write',
   clipboardRead: 'clipboard:read',
   linkOpen: 'link:open',
@@ -74,6 +75,9 @@ const api: TerminalApi = {
   },
   reArm: () => {
     ipcRenderer.send(Channels.stateReArm, {})
+  },
+  cancelQueued: (id) => {
+    ipcRenderer.send(Channels.queueCancel, { id })
   },
   copy: (text) => {
     ipcRenderer.send(Channels.clipboardWrite, text)

@@ -13,6 +13,7 @@ import { Channels, type MicDevice } from '../shared/ipcChannels'
 import { HookLink } from './hooks/link'
 import { readHookPolicies } from './hooks/policy'
 import { escapeKey, registerHotkey, reportHotkeyTaken, unregisterHotkeys } from './hotkey'
+import { exposeForE2e } from './e2eHook'
 import { registerStatusIpc } from './ipc/status'
 import { on, registerTerminalIpc } from './ipc/terminal'
 import { registerTerminalUiIpc } from './ipc/terminalUi'
@@ -30,11 +31,13 @@ import { loadSettings } from './settings/store'
 import { RecordingController } from './speech/recording'
 import { SpeechSupervisor } from './speech/supervisor'
 import { workerInit } from './speech/workerInit'
+import { schedule } from './schedule'
 import { runSmokeTest } from './smokeTest'
 import { ClaudeStatus } from './status'
 import { createWindow, loadRenderer, windowKindOf } from './windows/factory'
 
 const SHUTDOWN_WATCHDOG_MS = 5000
+const QUEUE_PREVIEW_CHARS = 80
 
 function failStartup(error: unknown): void {
   log.error('Startup failed', error)
@@ -130,16 +133,12 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
         log.error('Could not load the overlay window', error)
       })
       const claudeState = new ClaudeStateTracker({
-        schedule: (callback, ms) => {
-          const timer = setTimeout(callback, ms)
-          return () => {
-            clearTimeout(timer)
-          }
-        },
+        schedule,
         onChange: (state, previous) => {
           log.debug(`Claude state: ${previous} -> ${state}`)
           publishStatus()
           claudeStatus.notify(previous, state)
+          delivery.kick()
         },
         onEffect: (effect) => {
           // Only a short code from Claude. Anything else might quote more than it should.
@@ -164,12 +163,19 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
         claudeStatus.destroy()
       }
       const publishStatus = (): void => {
-        claudeStatus.show(statusView(claudeState.state, hooks.voiceBlock))
+        const queue = delivery.queued.map(({ id, text }) => ({
+          id,
+          preview: text.trim().slice(0, QUEUE_PREVIEW_CHARS)
+        }))
+        claudeStatus.show(statusView(claudeState.state, hooks.voiceBlock, queue))
       }
       registerStatusIpc(
         () => claudeStatus.current,
         () => {
           claudeState.reArm()
+        },
+        (id) => {
+          delivery.cancelQueued(id)
         }
       )
       // Step 4: stale files go, then the hook server and this launch's hook files.
@@ -207,7 +213,6 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
       steps.hookFiles ??= () => {
         hooks.removeFiles()
       }
-      publishStatus()
       // Step 5: the speech worker that the hidden window streams to.
       const recording = new RecordingController({
         toggle: new RecordingToggle(randomUUID),
@@ -243,15 +248,18 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
           // Never through onInput: this isn't the user's typing.
           claude.host.write(data)
         },
-        schedule: (callback, ms) => {
-          const timer = setTimeout(callback, ms)
-          return () => {
-            clearTimeout(timer)
-          }
-        },
+        schedule,
         overlay,
-        escape: escapeKey
+        escape: escapeKey,
+        settings: () => ({
+          queueEnabled: settings.delivery.queue,
+          maxQueue: settings.delivery.maxQueue
+        }),
+        onQueueChange: () => {
+          publishStatus()
+        }
       })
+      publishStatus()
       const speech = new SpeechSupervisor({
         onEvent: (event) => {
           if (event.type === 'ready') log.info(`Speech worker ready in ${String(event.loadMs)} ms`)
@@ -319,7 +327,7 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
         hooks: {
           prepareLaunch: (cwd) => hooks.prepareLaunch(cwd),
           launched: () => {
-            delivery.sessionEnded()
+            delivery.sessionRestarted()
             claudeState.sessionRestart()
             hooks.launched()
             publishStatus()
@@ -333,6 +341,8 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
       })
       registerTerminalIpc(claude.host, (data) => {
         claudeState.onInput(data)
+        // Ctrl+C can clear the prompt with no change of state, which may free the queue.
+        delivery.kick()
       })
       steps.pty ??= () => claude.host.stop()
       registerTerminalUiIpc(mainWindow, () => claude.fontSize)
@@ -373,29 +383,8 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
         app.quit()
       })
       await loadRenderer(mainWindow, 'terminal')
-      // Dev and test builds only: the e2e test has no model and no network, and reaches delivery
-      // directly, since it has no microphone. A packaged build never takes this path.
-      if (!app.isPackaged && process.env['VOICEUP_E2E'] === '1') {
-        Object.assign(globalThis, {
-          voiceupE2e: {
-            deliver: (text: string) => {
-              delivery.deliver(text)
-            },
-            retry: () => {
-              delivery.retry()
-            },
-            discard: () => {
-              delivery.discard()
-            },
-            status: () => ({
-              state: claudeState.state,
-              promptDirty: claudeState.promptDirty,
-              holding: delivery.holding
-            })
-          }
-        })
-        return
-      }
+      // The e2e tests have no model and no network, so nothing downloads for them.
+      if (exposeForE2e(delivery, claudeState)) return
       // After the load, which would otherwise replace the title showing the progress.
       models.ensure()
 

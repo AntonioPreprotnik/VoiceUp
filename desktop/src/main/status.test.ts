@@ -89,6 +89,27 @@ describe('showing a state', () => {
   })
 })
 
+describe('the queue', () => {
+  const queue = [{ id: '1', preview: 'run the tests' }]
+
+  it('tells the terminal window when only the queue changed', () => {
+    const status = create()
+    status.show(statusView('busy', null))
+    status.show(statusView('busy', null, queue))
+    expect(window.webContents.sent.at(-1)).toEqual([
+      Channels.stateChanged,
+      statusView('busy', null, queue)
+    ])
+    expect(window.webContents.sent).toHaveLength(2)
+  })
+
+  it('counts it in the tray, without its text', () => {
+    const status = create()
+    status.show(statusView('busy', null, queue))
+    expect(tray().tooltip).toBe('VoiceUp: Working (1 queued)')
+  })
+})
+
 describe('the tray menu', () => {
   it('offers re-arm only while unknown', () => {
     const status = create()

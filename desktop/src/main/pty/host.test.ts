@@ -3,9 +3,15 @@ import { PAUSE_ABOVE_CHARS } from '../../core/terminalFlow'
 import { TERMINAL_RESET } from '../../shared/ipcChannels'
 import fakeLog from '../../../test/fakes/electronLog'
 import { FakePty, lastPty, resetFakePty, spawned } from '../../../test/fakes/nodePty'
+import type { ClaudeCommand } from '../../core/claudeCommand'
 import { PtyHost } from './host'
 
 vi.mock('electron', () => import('../../../test/fakes/electron'))
+const NO_HOOKS = {
+  prepareLaunch: () => Promise.resolve({ args: [], env: {} }),
+  onLaunched: () => undefined
+}
+
 vi.mock('electron-log/main', () => import('../../../test/fakes/electronLog'))
 vi.mock('node-pty', () => import('../../../test/fakes/nodePty'))
 
@@ -19,6 +25,7 @@ function createHost(command: typeof claude | null = claude): {
   const sent: string[] = []
   const exits: (number | null)[] = []
   const host = new PtyHost({
+    ...NO_HOOKS,
     send: (data) => sent.push(data),
     onExit: (exitCode) => exits.push(exitCode),
     onNotFound: () => undefined,
@@ -46,6 +53,46 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers()
   vi.unstubAllEnvs()
+})
+
+describe('the hooks', () => {
+  const extras = {
+    args: ['--settings', 'C:\\run\\hooks-1.json'],
+    env: { VOICEUP_HOOK_TOKEN: 'tok' }
+  }
+
+  function hostWith(command: ClaudeCommand, onLaunched = vi.fn()): PtyHost {
+    return new PtyHost({
+      send: () => undefined,
+      onExit: () => undefined,
+      onNotFound: () => undefined,
+      resolveCommand: () => Promise.resolve(command),
+      resolveCwd: () => Promise.resolve('C:\\work'),
+      prepareLaunch: () => Promise.resolve(extras),
+      onLaunched
+    })
+  }
+
+  it('adds the arguments and token for this launch', async () => {
+    const pty = await started(hostWith({ file: 'claude.exe', args: [] }))
+    expect(pty.args).toEqual(['--settings', 'C:\\run\\hooks-1.json'])
+    expect(pty.options['env']).toMatchObject({ VOICEUP_HOOK_TOKEN: 'tok' })
+  })
+
+  it('passes a .cmd as one quoted line', async () => {
+    const pty = await started(
+      hostWith({ file: 'C:\\cmd.exe', args: [], cmdShim: 'C:\\Ana Maria\\claude.cmd' })
+    )
+    expect(pty.args).toBe(
+      '/d /s /c ""C:\\Ana Maria\\claude.cmd" "--settings" "C:\\run\\hooks-1.json""'
+    )
+  })
+
+  it('reports the launch, so the slow start timer can begin', async () => {
+    const onLaunched = vi.fn()
+    await started(hostWith({ file: 'claude.exe', args: [] }, onLaunched))
+    expect(onLaunched).toHaveBeenCalledOnce()
+  })
 })
 
 describe('starting', () => {
@@ -91,6 +138,7 @@ describe('starting', () => {
   it('reports when Claude is not installed, and spawns nothing', async () => {
     const onNotFound = vi.fn()
     const host = new PtyHost({
+      ...NO_HOOKS,
       send: () => undefined,
       onExit: () => undefined,
       onNotFound,
@@ -108,6 +156,7 @@ describe('starting', () => {
   it('reports an exit with no code when the spawn fails', async () => {
     const exits: (number | null)[] = []
     const host = new PtyHost({
+      ...NO_HOOKS,
       send: () => undefined,
       onExit: (exitCode) => exits.push(exitCode),
       onNotFound: () => undefined,
@@ -332,6 +381,7 @@ describe('only the first size starts Claude', () => {
   it('does not ask for a folder again on resize after the picker was cancelled', async () => {
     const resolveCwd = vi.fn(() => Promise.resolve(null))
     const host = new PtyHost({
+      ...NO_HOOKS,
       send: () => undefined,
       onExit: () => undefined,
       onNotFound: () => undefined,
@@ -351,6 +401,7 @@ describe('only the first size starts Claude', () => {
   it('does not look for Claude again on resize when it is not installed', async () => {
     const resolveCommand = vi.fn(() => Promise.resolve(null))
     const host = new PtyHost({
+      ...NO_HOOKS,
       send: () => undefined,
       onExit: () => undefined,
       onNotFound: () => undefined,

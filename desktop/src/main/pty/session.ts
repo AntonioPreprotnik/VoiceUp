@@ -7,6 +7,7 @@ import { Channels, type SessionExit } from '../../shared/ipcChannels'
 import type { Settings } from '../../shared/settings'
 import { log } from '../log'
 import type { ModelId } from '../../shared/models'
+import type { LaunchExtras } from '../hooks/link'
 import { saveSettings } from '../settings/store'
 import { PtyHost } from './host'
 
@@ -16,6 +17,11 @@ export interface ClaudeSessionOptions {
   /** Where settings.json lives. */
   readonly settingsDir: string
   readonly resolveCommand: () => Promise<ClaudeCommand | null>
+  readonly hooks: {
+    prepareLaunch(cwd: string): Promise<LaunchExtras>
+    launched(): void
+    exited(): void
+  }
 }
 
 function isDirectory(path: string): boolean {
@@ -34,12 +40,17 @@ export class ClaudeSession {
 
   constructor(private readonly options: ClaudeSessionOptions) {
     this.settings = options.settings
-    const { window } = options
+    const { window, hooks } = options
     this.host = new PtyHost({
       send: (data) => {
         if (!window.isDestroyed()) window.webContents.send(Channels.termData, data)
       },
+      prepareLaunch: (cwd) => hooks.prepareLaunch(cwd),
+      onLaunched: () => {
+        hooks.launched()
+      },
       onExit: (exitCode) => {
+        hooks.exited()
         this.report({ ...MESSAGES.CLAUDE_EXITED, command: null, exitCode })
       },
       onNotFound: () => {

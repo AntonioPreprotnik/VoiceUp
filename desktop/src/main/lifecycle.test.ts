@@ -117,6 +117,8 @@ describe('startup', () => {
       'window',
       'window',
       'load',
+      // Step 4: the hook files.
+      'getPath:userData',
       'getPath:userData',
       'speechWorker',
       'load',

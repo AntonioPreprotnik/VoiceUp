@@ -23,6 +23,8 @@ export interface RecordingOptions {
   readonly getDeviceId: () => string | null
   /** A transcript with fewer words than this is dropped. */
   readonly minWords: number
+  /** Why voice is off right now, or null. */
+  readonly voiceBlock: () => MessageCode | null
   /** Esc, held only while there is something to cancel (TECH_SPEC §4.4). */
   readonly escape: { hold(onPress: () => void): void; release(): void }
   readonly overlay: Pick<
@@ -54,6 +56,12 @@ export class RecordingController {
     if (toggle.phase === 'idle' && !workerRunning()) {
       log.warn('Hotkey: no speech worker to record with')
       overlay.failed('WORKER_CRASHED')
+      return
+    }
+    const block = toggle.phase === 'idle' ? this.options.voiceBlock() : null
+    if (block !== null) {
+      log.warn(`Hotkey: voice is off, ${block}`)
+      overlay.failed(block)
       return
     }
     const command = toggle.press()

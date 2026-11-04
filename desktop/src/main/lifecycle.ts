@@ -1,12 +1,14 @@
 import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
-import { app, net, session, type BrowserWindow } from 'electron'
+import { app, dialog, net, session, type BrowserWindow } from 'electron'
 import { MESSAGES } from '../core/messages'
 import { RecordingToggle } from '../core/recordingToggle'
 import { runShutdown, type ShutdownSteps } from '../core/shutdown'
 import { parseSmokeTestPath } from '../core/smokeTest'
 import { RecorderDevices } from '../shared/ipc'
 import { Channels, type MicDevice } from '../shared/ipcChannels'
+import { HookLink } from './hooks/link'
+import { readHookPolicies } from './hooks/policy'
 import { escapeKey, registerHotkey, reportHotkeyTaken, unregisterHotkeys } from './hotkey'
 import { on, registerTerminalIpc } from './ipc/terminal'
 import { registerTerminalUiIpc } from './ipc/terminalUi'
@@ -18,7 +20,7 @@ import { Overlay } from './overlay'
 import { installPermissions } from './permissions'
 import { installProcessErrorLogging } from './processErrors'
 import { registerAppScheme, serveAppProtocol } from './protocol'
-import { resolveClaude } from './pty/resolveClaude'
+import { resolveClaude, system32Path } from './pty/resolveClaude'
 import { ClaudeSession } from './pty/session'
 import { loadSettings } from './settings/store'
 import { RecordingController } from './speech/recording'
@@ -69,7 +71,7 @@ export interface StartOptions {
   readonly shutdownSteps?: ShutdownSteps
 }
 
-/** The startup order from TECH_SPEC §3. Step 4 arrives with its story. */
+/** The startup order from TECH_SPEC §3. */
 export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptions = {}): void {
   const smokeTestPath = parseSmokeTestPath(argv)
 
@@ -113,13 +115,46 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
       }
 
       mainWindow = createWindow('terminal')
-      // Step 5: the hidden window that streams the mic, and the speech worker it streams to.
       const recorderWindow = createWindow('recorder', { showWhenReady: false })
       const overlayWindow = createWindow('overlay', { showWhenReady: false })
       const overlay = new Overlay({ window: overlayWindow, sounds: settings.ui.sounds })
       loadRenderer(overlayWindow, 'overlay').catch((error: unknown) => {
         log.error('Could not load the overlay window', error)
       })
+      // Step 4: stale files go, then the hook server and this launch's hook files.
+      const hooks = new HookLink({
+        runDir: join(app.getPath('userData'), 'run'),
+        curlPath: system32Path('curl.exe'),
+        readPolicies: (projectDir) => readHookPolicies({ projectDir }),
+        onMessage: (message) => {
+          // The state machine takes these from S2.4.
+          if (message.kind === 'hook' && message.hook.hook_event_name === 'SessionStart') {
+            log.info('Claude session started')
+          }
+        },
+        onUnavailable: (code, setting) => {
+          const { title, detail } = MESSAGES[code]
+          if (mainWindow === undefined) return
+          dialog
+            .showMessageBox(mainWindow, {
+              type: 'warning',
+              title: 'VoiceUp',
+              message: title,
+              detail: setting === null ? detail : `Setting: ${setting}. ${detail}`
+            })
+            .catch((error: unknown) => {
+              log.error('Could not show the hooks message', error)
+            })
+        },
+        onStartingSlow: () => {
+          overlay.failed('STARTING_SLOW')
+        }
+      })
+      steps.hookServer ??= () => hooks.stopServer()
+      steps.hookFiles ??= () => {
+        hooks.removeFiles()
+      }
+      // Step 5: the speech worker that the hidden window streams to.
       const recording = new RecordingController({
         toggle: new RecordingToggle(randomUUID),
         sendToWorker: (command) => {
@@ -132,6 +167,7 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
         recorder: recorderWindow.webContents,
         getDeviceId: () => claude.micDeviceId,
         minWords: settings.speech.minWords,
+        voiceBlock: () => hooks.voiceBlock,
         overlay,
         escape: escapeKey
       })
@@ -198,7 +234,8 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
         window: mainWindow,
         settings,
         settingsDir: app.getPath('userData'),
-        resolveCommand: () => resolveClaude(app.isPackaged)
+        resolveCommand: () => resolveClaude(app.isPackaged),
+        hooks
       })
       registerTerminalIpc(claude.host)
       steps.pty ??= () => claude.host.stop()

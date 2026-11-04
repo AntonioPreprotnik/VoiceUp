@@ -37,6 +37,8 @@ Exact versions only. Confirmed with `npm view` on 2026-11-02: Electron 45.2.1, e
 - The worker's stderr goes to the log, so a crash there explains itself.
 - A hidden recorder window is always open, so `window-all-closed` never fires: closing the terminal is what quits the app.
 - A model install runs in main and uses the title bar for progress until S6.5 and S6.6 bring real screens. To unpack the real archive in a test: `VOICEUP_TEST_MODELS=<folder holding it> npm test`.
+- A `.cmd` Claude goes through `ptyArgs` as one string, or a space in a path stops it starting. `test/integration/claude-launch.test.ts` proves it with real `cmd.exe`.
+- Hooks reach Claude only through the per-launch file in `userData/run`, which `HookLink` writes. It reads Claude's settings only for the three keys in `ClaudeHookPolicy`, and never logs a value or a parse error from them.
 - The hook server logs event names only, never a body, which can hold a prompt. To replay a recorded session without Claude: `VOICEUP_CLAUDE_CMD='["node","test/fake-claude.mjs"]'`, with `VOICEUP_FAKE_SCENARIO=<name in test/scenarios>`.
 - Only the speech worker may load `sherpa-onnx-node`, which lint enforces. To run the engine for real, on a real recording: `VOICEUP_TEST_MODELS=<folder> VOICEUP_TEST_RECORDINGS=<folder> npm test`; CI skips this.
 - Main-process tests use the fake in `test/fakes/electron.ts`, which records the order of effects. It proves ordering and policy, not that Electron behaves: the packaged smoke test covers that.

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { LATE_PRESS_GUARD_MS, PreviewWindow } from './preview'
 
-const COUNTDOWN = { previewMs: 1000, alwaysConfirm: false }
+const COUNTDOWN = { previewMs: 700, alwaysConfirm: false }
 const CONFIRM = { previewMs: 1000, alwaysConfirm: true }
 
 let preview: PreviewWindow
@@ -31,10 +31,10 @@ afterEach(() => {
 
 describe('the time to read it', () => {
   it.each([
-    ['one word the 5 s minimum', 'continue', 5000],
-    ['five words the 5 s minimum', 'list the files in here', 5000],
-    ['six words 6 s', 'list the files in this folder', 6000],
-    ['words with more than one space between them 7 s', 'a  b\nc d e f g', 7000]
+    ['one word the 3.5 s minimum', 'continue', 3500],
+    ['five words the 3.5 s minimum', 'list the files in here', 3500],
+    ['six words 4.2 s', 'list the files in this folder', 4200],
+    ['words with more than one space between them 4.9 s', 'a  b\nc d e f g', 4900]
   ])('gives %s', (_label, text, expected) => {
     expect(preview.start(text, COUNTDOWN)).toEqual({ kind: 'showing', countdownMs: expected })
     vi.advanceTimersByTime(expected - 1)
@@ -55,15 +55,15 @@ describe('the time to read it', () => {
   it('keeps the minimum with a shorter time for each word', () => {
     expect(preview.start('run the tests', { previewMs: 500, alwaysConfirm: false })).toEqual({
       kind: 'showing',
-      countdownMs: 5000
+      countdownMs: 3500
     })
   })
 })
 
 describe('the countdown', () => {
   it('sends when it runs out, and not before', () => {
-    expect(preview.start('continue', COUNTDOWN)).toEqual({ kind: 'showing', countdownMs: 5000 })
-    vi.advanceTimersByTime(4999)
+    expect(preview.start('continue', COUNTDOWN)).toEqual({ kind: 'showing', countdownMs: 3500 })
+    vi.advanceTimersByTime(3499)
     expect(onSend).not.toHaveBeenCalled()
     expect(preview.active).toBe(true)
     vi.advanceTimersByTime(1)
@@ -180,7 +180,7 @@ describe('a new preview', () => {
     preview.start('old', COUNTDOWN)
     vi.advanceTimersByTime(500)
     preview.start('new', COUNTDOWN)
-    vi.advanceTimersByTime(4999)
+    vi.advanceTimersByTime(3499)
     expect(onSend).not.toHaveBeenCalled()
     vi.advanceTimersByTime(1)
     expect(onSend.mock.calls).toEqual([['new']])

@@ -20,7 +20,7 @@ export const Settings = z.object({
   delivery: z
     .object({
       /** For each word of the preview. */
-      previewMs: z.number().int().min(0).max(5000).default(1000),
+      previewMs: z.number().int().min(0).max(5000).default(700),
       alwaysConfirm: z.boolean().default(false),
       queue: z.boolean().default(true),
       maxQueue: z.number().int().min(1).max(5).default(3)

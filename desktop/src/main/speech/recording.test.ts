@@ -344,7 +344,7 @@ describe('a preview', () => {
 
   beforeEach(() => {
     vi.useFakeTimers()
-    previewSettings = { previewMs: 1000, alwaysConfirm: false }
+    previewSettings = { previewMs: 700, alwaysConfirm: false }
   })
 
   afterEach(() => {
@@ -353,14 +353,14 @@ describe('a preview', () => {
 
   it('shows the cleaned text with its countdown, and holds Esc', () => {
     transcript()
-    expect(overlay.preview).toHaveBeenCalledWith('run the tests', 5000)
+    expect(overlay.preview).toHaveBeenCalledWith('run the tests', 3500)
     expect(escape.held).toBeDefined()
     expect(deliver).not.toHaveBeenCalled()
   })
 
   it('delivers the cleaned text when the countdown ends', () => {
     transcript()
-    vi.advanceTimersByTime(4999)
+    vi.advanceTimersByTime(3499)
     expect(deliver).not.toHaveBeenCalled()
     vi.advanceTimersByTime(1)
     expect(deliver).toHaveBeenCalledWith('run the tests')

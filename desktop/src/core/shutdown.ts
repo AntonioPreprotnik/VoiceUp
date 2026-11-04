@@ -1,6 +1,7 @@
 // Shutdown order from TECH_SPEC §3. Later stories fill in the steps they own.
 export const SHUTDOWN_ORDER = [
   'shortcuts',
+  'tray',
   'recording',
   'pty',
   'worker',

@@ -81,6 +81,21 @@ describe('the state', () => {
   })
 })
 
+describe('re-arm', () => {
+  it.each<[string, () => void, ClaudeState]>([
+    ['idle', () => undefined, 'idle'],
+    ['busy', prompt, 'busy']
+  ])(
+    'does nothing while %s: a click can arrive after the state moved on',
+    (_label, setUp, expected) => {
+      started()
+      setUp()
+      tracker.reArm()
+      expect(tracker.state).toBe(expected)
+    }
+  )
+})
+
 describe('keys', () => {
   it('sees Esc and Ctrl+C', () => {
     started()

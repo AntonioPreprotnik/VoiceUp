@@ -326,10 +326,10 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 - AC: a `Stop` never clears a background agent's pending permission, because voice text could then approve it (S2.1). A replay of `agent-permission-send` blocks at every step until that permission is answered.
 - AC: unit tests replay each recorded sequence from S2.1.
 
-**[ ] S2.5 Status indicator.** As a user, I want to see Claude's state at a glance.
+**[x] S2.5 Status indicator.** As a user, I want to see Claude's state at a glance.
 
 - AC: while the state is `unknown`, the status bar offers "Re-arm voice"; the user uses it to confirm that Claude's main prompt is ready.
-- AC: status bar shows state with distinct color and text; tray icon mirrors it; optional Windows notification when Claude finishes or needs permission while the app is not focused.
+- AC: status bar shows state with distinct color and text; tray icon mirrors it; optional Windows notification (`ui.notifications`, on by default) when Claude finishes or needs permission while the app is not focused.
 
 ### E3 — Voice capture
 

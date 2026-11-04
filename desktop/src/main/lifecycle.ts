@@ -5,12 +5,14 @@ import { MESSAGES } from '../core/messages'
 import { RecordingToggle } from '../core/recordingToggle'
 import { runShutdown, type ShutdownSteps } from '../core/shutdown'
 import { parseSmokeTestPath } from '../core/smokeTest'
+import { statusView } from '../core/state/status'
 import { ClaudeStateTracker } from '../core/state/tracker'
 import { RecorderDevices } from '../shared/ipc'
 import { Channels, type MicDevice } from '../shared/ipcChannels'
 import { HookLink } from './hooks/link'
 import { readHookPolicies } from './hooks/policy'
 import { escapeKey, registerHotkey, reportHotkeyTaken, unregisterHotkeys } from './hotkey'
+import { registerStatusIpc } from './ipc/status'
 import { on, registerTerminalIpc } from './ipc/terminal'
 import { registerTerminalUiIpc } from './ipc/terminalUi'
 import { initLogging, log, setLogLevel } from './log'
@@ -28,6 +30,7 @@ import { RecordingController } from './speech/recording'
 import { SpeechSupervisor } from './speech/supervisor'
 import { workerInit } from './speech/workerInit'
 import { runSmokeTest } from './smokeTest'
+import { ClaudeStatus } from './status'
 import { createWindow, loadRenderer, windowKindOf } from './windows/factory'
 
 const SHUTDOWN_WATCHDOG_MS = 5000
@@ -87,6 +90,8 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
   initLogging()
   installProcessErrorLogging()
   log.info(`VoiceUp ${app.getVersion()} starting`)
+  // Windows names the app in its notifications from this. Matches appId in electron-builder.yml.
+  app.setAppUserModelId('app.voiceup.desktop')
   const settings = smokeTestPath === undefined ? loadSettings(app.getPath('userData'), log) : null
   if (settings !== null) setLogLevel(settings.logLevel)
 
@@ -115,7 +120,8 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
         return
       }
 
-      mainWindow = createWindow('terminal')
+      const terminalWindow = createWindow('terminal')
+      mainWindow = terminalWindow
       const recorderWindow = createWindow('recorder', { showWhenReady: false })
       const overlayWindow = createWindow('overlay', { showWhenReady: false })
       const overlay = new Overlay({ window: overlayWindow, sounds: settings.ui.sounds })
@@ -131,6 +137,8 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
         },
         onChange: (state, previous) => {
           log.debug(`Claude state: ${previous} -> ${state}`)
+          publishStatus()
+          claudeStatus.notify(previous, state)
         },
         onEffect: (effect) => {
           // Only a short code from Claude. Anything else might quote more than it should.
@@ -138,6 +146,31 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
           log.warn(`Claude's turn failed: ${String(code)}`)
         }
       })
+      const claudeStatus = new ClaudeStatus({
+        window: terminalWindow,
+        notifications: settings.ui.notifications,
+        reArm: () => {
+          claudeState.reArm()
+        },
+        showWindow: () => {
+          focusWindow(terminalWindow)
+        },
+        quit: () => {
+          app.quit()
+        }
+      })
+      steps.tray ??= () => {
+        claudeStatus.destroy()
+      }
+      const publishStatus = (): void => {
+        claudeStatus.show(statusView(claudeState.state, hooks.voiceBlock))
+      }
+      registerStatusIpc(
+        () => claudeStatus.current,
+        () => {
+          claudeState.reArm()
+        }
+      )
       // Step 4: stale files go, then the hook server and this launch's hook files.
       const hooks = new HookLink({
         runDir: join(app.getPath('userData'), 'run'),
@@ -150,6 +183,7 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
           claudeState.onHook(message)
         },
         onUnavailable: (code, setting) => {
+          publishStatus()
           const { title, detail } = MESSAGES[code]
           if (mainWindow === undefined) return
           dialog
@@ -171,6 +205,7 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
       steps.hookFiles ??= () => {
         hooks.removeFiles()
       }
+      publishStatus()
       // Step 5: the speech worker that the hidden window streams to.
       const recording = new RecordingController({
         toggle: new RecordingToggle(randomUUID),
@@ -257,6 +292,7 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
           launched: () => {
             claudeState.sessionRestart()
             hooks.launched()
+            publishStatus()
           },
           exited: () => {
             claudeState.ptyExit()

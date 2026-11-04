@@ -5,6 +5,7 @@ describe('runShutdown', () => {
   it('follows the TECH_SPEC §3 order', () => {
     expect(SHUTDOWN_ORDER).toEqual([
       'shortcuts',
+      'tray',
       'recording',
       'pty',
       'worker',

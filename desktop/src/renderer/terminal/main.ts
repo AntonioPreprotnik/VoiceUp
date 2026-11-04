@@ -5,7 +5,7 @@ import { WebglAddon } from '@xterm/addon-webgl'
 import { Terminal } from '@xterm/xterm'
 import '@xterm/xterm/css/xterm.css'
 import { chunkInput } from '../../shared/chunkInput'
-import type { TerminalApi } from '../../shared/ipcChannels'
+import type { StatusView, TerminalApi } from '../../shared/ipcChannels'
 import { hasVisibleText } from '../../shared/terminalText'
 
 declare global {
@@ -116,6 +116,43 @@ api.onSessionExit(({ title, detail, action, command, exitCode }) => {
   exitBanner.hidden = false
   // Focused, so Enter restarts right away.
   restartButton.focus()
+})
+
+const statusDot = document.getElementById('status-dot')
+const statusLabel = document.getElementById('status-label')
+const statusDetail = document.getElementById('status-detail')
+const reArmButton = document.getElementById('re-arm')
+if (
+  statusDot === null ||
+  statusLabel === null ||
+  statusDetail === null ||
+  !(reArmButton instanceof HTMLButtonElement)
+) {
+  throw new Error('The terminal page is missing its status bar')
+}
+
+// The text comes from main and is shown with textContent, never as markup.
+const showStatus = ({ label, detail, color, canReArm }: StatusView): void => {
+  statusDot.style.background = color
+  statusLabel.textContent = label
+  statusDetail.textContent = detail
+  statusDetail.title = detail
+  reArmButton.hidden = !canReArm
+}
+
+api.onClaudeStatus(showStatus)
+api
+  .claudeStatus()
+  .then((view) => {
+    if (view !== null) showStatus(view)
+  })
+  .catch((error: unknown) => {
+    console.warn('Could not read the state', error)
+  })
+
+reArmButton.addEventListener('click', () => {
+  api.reArm()
+  terminal.focus()
 })
 
 copyCommand.addEventListener('click', () => {

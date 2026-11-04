@@ -43,7 +43,9 @@ export class ClaudeStateTracker {
     this.dispatch({ type: 'ptyExit' })
   }
 
+  /** Ignored unless unknown: a click on a stale button must not change anything. */
   reArm(): void {
+    if (this.context.state !== 'unknown') return
     this.stopWatching()
     this.dispatch({ type: 'reArm' })
   }

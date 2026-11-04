@@ -7,6 +7,9 @@ export const Channels = {
   termAck: 'term:ack',
   sessionExited: 'session:exited',
   sessionRestart: 'session:restart',
+  stateChanged: 'state:changed',
+  stateGet: 'state:get',
+  stateReArm: 'state:rearm',
   clipboardWrite: 'clipboard:write',
   clipboardRead: 'clipboard:read',
   linkOpen: 'link:open',
@@ -27,6 +30,16 @@ export const Channels = {
 export const TERMINAL_RESET = '\x1bc'
 
 export type TerminalMenuAction = 'copy' | 'paste'
+
+/** What Claude is doing, ready to show: the status bar and the tray both draw this. */
+export interface StatusView {
+  readonly state: string
+  readonly label: string
+  readonly detail: string
+  /** As #rrggbb. */
+  readonly color: string
+  readonly canReArm: boolean
+}
 
 /** Why no session is running, in words the terminal window can show as they are. */
 export interface SessionExit {
@@ -82,6 +95,11 @@ export interface TerminalApi {
   /** Returns the function that unsubscribes. */
   onSessionExit(listener: (exit: SessionExit) => void): () => void
   restartSession(): void
+  /** The state now. Null or a rejection when no session is running, as in a smoke test. */
+  claudeStatus(): Promise<StatusView | null>
+  /** Returns the function that unsubscribes. */
+  onClaudeStatus(listener: (view: StatusView) => void): () => void
+  reArm(): void
   copy(text: string): void
   readClipboard(): Promise<string>
   openLink(url: string): void

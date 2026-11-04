@@ -384,8 +384,8 @@ Rules for every handler: `validateSender(event)` checks that the sending frame's
 `POST /hooks/{EventName}` on `127.0.0.1:<random port>`, header `X-VoiceUp-Token`, body = Claude Code's hook JSON (limit 1 MB).
 
 - Token compared with `crypto.timingSafeEqual`; mismatch → 401 and a `warn` log.
-- After a valid token, **always 200 with an empty body**, even for an unparseable body or an unknown event. A non-2xx would show a hook-error notice inside Claude Code; the problem is logged on our side instead.
-- Parsed fields: `hook_event_name`, `session_id`, optional `agent_id`, `source` on `SessionStart`, `reason` on `SessionEnd`, plus `notification_type` (string), `message` (string) and optional `title` on `Notification`, per `NotificationHookInput` in the Agent SDK types. Treat `notification_type` as an open string, not an enum: values outside §4.3 and its allowlist move the state to `unknown`; other fields pass through untyped and are logged at `debug` only, because they can contain prompts and tool input.
+- After a valid token, **always 200 with an empty body**, even for an unparseable body, an unknown event, a wrong path or method, or a body over the limit. A non-2xx would show a hook-error notice inside Claude Code; the problem is logged on our side instead, and reaches the state machine as an unexpected message, which moves the state to `unknown`.
+- Parsed fields (`shared/hooks.ts`): `hook_event_name`, which must match the URL, optional `session_id` and `agent_id`, `source` on `SessionStart`, `reason` on `SessionEnd`, `notification_type` on `Notification`, optional `prompt` on `UserPromptSubmit` and optional `background_tasks` on `Stop`. Treat `notification_type` as an open string, not an enum: values outside §4.3 and its allowlist move the state to `unknown`. All other fields are dropped at the parse. Logs carry event names only, even at `debug`, because a body can contain prompts and tool input.
 
 ### 6.4 Settings schema
 
@@ -524,14 +524,14 @@ The safety-critical logic (reducer, gate, cleaner) is pure and gets near-complet
 | Layer | Tool | Covers | Location |
 | --- | --- | --- | --- |
 | Unit | Vitest | reducer, gate, prompt-dirty tracker, text cleaner, queue, settings migrate | `desktop/src/core/**/*.test.ts` |
-| Contract | Vitest + zod | IPC, worker and hook schemas accept every recorded fixture from S2.1 | `desktop/src/shared/**/*.test.ts` |
+| Contract | Vitest + zod | IPC, worker and hook schemas accept every recorded fixture from S2.1 | `desktop/src/shared/**/*.test.ts`; the fixtures themselves in `desktop/test/integration/hook-server.test.ts`, since `shared/` can't read files |
 | Integration | Vitest, Node environment | hook server + reducer driven by the fake Claude; model manager against a local HTTP server (resume, corrupt hash, 404) | `desktop/test/integration/` |
 | Speech regression | script, not CI-blocking | 20 recorded WAV commands → word error rate and decode time per model | script in `desktop/test/audio/`; recordings come from a folder path and stay out of this public repo unless the speaker agrees |
 | Packaged smoke | CI | `--smoke-test` on the built `.exe` | CI `package` job |
 | End to end | Playwright `_electron` (from S5.4), on the unpackaged build because the packaged fuses disable inspect flags | app launches with the fake Claude; injected WAV → text appears in the terminal | `desktop/test/e2e/` |
 | Manual | checklist | real mic, hotkey over a fullscreen game, installer on a clean Windows VM | `docs/manual-tests.md` |
 
-**Fake Claude** (`test/fake-claude.mjs`). Spawned through `VOICEUP_CLAUDE_CMD`; it reads the `--settings` file it receives, prints a prompt, echoes stdin, and POSTs the hook events of a scenario file (`test/scenarios/*.json`, recorded in S2.1) to the URLs and headers from that file. Scenarios: plain answer, auto-approved tool, permission approved, permission denied, Esc interrupt, crash mid-turn, `/clear`, `/compact`, `/resume`, MCP elicitation, subagent, background agent, local menu. Fixtures are public, so bodies are stripped of prompts, file contents, `cwd` and `transcript_path`.
+**Fake Claude** (`test/fake-claude.mjs`). Spawned through `VOICEUP_CLAUDE_CMD`; it reads the `--settings` file it receives, prints a prompt, echoes stdin, and replays the hook events of a scenario file (`test/scenarios/*.json`, recorded in S2.1) through that file's handlers, running `command` hooks in exec form and limiting `$VAR` headers to `allowedEnvVars`, as Claude does. `VOICEUP_FAKE_SCENARIO` names the scenario; `VOICEUP_FAKE_SPEED` set to `0` removes the recorded gaps. Scenarios: plain answer, auto-approved tool, permission approved, permission denied, Esc interrupt, crash mid-turn, `/clear`, `/compact`, `/resume`, MCP elicitation, subagent, background agent, local menu. Fixtures are public, so bodies are stripped of prompts, file contents, `cwd` and `transcript_path`.
 
 **Debug logs.** Debug logs can contain transcripts and hook bodies, so they must not reach public GitHub issues: the bug-report template warns about this and accepts default-level logs only (S7.5).
 

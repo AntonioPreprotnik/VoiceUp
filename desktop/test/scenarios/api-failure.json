@@ -1,0 +1,50 @@
+{
+  "name": "api-failure",
+  "events": [
+    {
+      "t": 947,
+      "event": "SessionStart",
+      "body": {
+        "hook_event_name": "SessionStart",
+        "source": "startup"
+      }
+    },
+    {
+      "t": 2460,
+      "input": "<prompt>"
+    },
+    {
+      "t": 2679,
+      "event": "UserPromptSubmit",
+      "body": {
+        "hook_event_name": "UserPromptSubmit",
+        "permission_mode": "default",
+        "prompt": "<prompt>"
+      }
+    },
+    {
+      "t": 2781,
+      "event": "StopFailure",
+      "body": {
+        "hook_event_name": "StopFailure",
+        "error": "server_error"
+      }
+    },
+    {
+      "t": 5796,
+      "input": "Ctrl+C twice"
+    },
+    {
+      "t": 7522,
+      "event": "SessionEnd",
+      "body": {
+        "hook_event_name": "SessionEnd",
+        "reason": "prompt_input_exit"
+      }
+    },
+    {
+      "t": 8114,
+      "ptyExit": -1073741510
+    }
+  ]
+}

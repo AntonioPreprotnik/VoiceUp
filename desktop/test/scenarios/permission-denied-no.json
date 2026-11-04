@@ -1,0 +1,71 @@
+{
+  "name": "permission-denied-no",
+  "events": [
+    {
+      "t": 1014,
+      "event": "SessionStart",
+      "body": {
+        "hook_event_name": "SessionStart",
+        "source": "startup"
+      }
+    },
+    {
+      "t": 2538,
+      "input": "<prompt>"
+    },
+    {
+      "t": 2763,
+      "event": "UserPromptSubmit",
+      "body": {
+        "hook_event_name": "UserPromptSubmit",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 5613,
+      "event": "PreToolUse",
+      "body": {
+        "hook_event_name": "PreToolUse",
+        "tool_name": "Write",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 5655,
+      "event": "PermissionRequest",
+      "body": {
+        "hook_event_name": "PermissionRequest",
+        "tool_name": "Write",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 6700,
+      "input": "Down"
+    },
+    {
+      "t": 6903,
+      "input": "Down"
+    },
+    {
+      "t": 7106,
+      "input": "Enter (No)"
+    },
+    {
+      "t": 30125,
+      "input": "Ctrl+C twice"
+    },
+    {
+      "t": 30473,
+      "event": "SessionEnd",
+      "body": {
+        "hook_event_name": "SessionEnd",
+        "reason": "prompt_input_exit"
+      }
+    },
+    {
+      "t": 31091,
+      "ptyExit": -1073741510
+    }
+  ]
+}

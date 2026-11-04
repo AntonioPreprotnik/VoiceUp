@@ -1,0 +1,82 @@
+{
+  "name": "permission-approved",
+  "events": [
+    {
+      "t": 872,
+      "event": "SessionStart",
+      "body": {
+        "hook_event_name": "SessionStart",
+        "source": "startup"
+      }
+    },
+    {
+      "t": 2409,
+      "input": "<prompt>"
+    },
+    {
+      "t": 2628,
+      "event": "UserPromptSubmit",
+      "body": {
+        "hook_event_name": "UserPromptSubmit",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 5867,
+      "event": "PreToolUse",
+      "body": {
+        "hook_event_name": "PreToolUse",
+        "tool_name": "Write",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 5980,
+      "event": "PermissionRequest",
+      "body": {
+        "hook_event_name": "PermissionRequest",
+        "tool_name": "Write",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 11998,
+      "event": "Notification",
+      "body": {
+        "hook_event_name": "Notification",
+        "notification_type": "permission_prompt",
+        "message": "Claude needs your permission"
+      }
+    },
+    {
+      "t": 14047,
+      "input": "Enter (Yes)"
+    },
+    {
+      "t": 14425,
+      "event": "PostToolUse",
+      "body": {
+        "hook_event_name": "PostToolUse",
+        "tool_name": "Write",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 15899,
+      "event": "Stop",
+      "body": {
+        "hook_event_name": "Stop",
+        "permission_mode": "default",
+        "stop_hook_active": false
+      }
+    },
+    {
+      "t": 15899,
+      "input": "Ctrl+C twice"
+    },
+    {
+      "t": 26816,
+      "ptyExit": -1073741510
+    }
+  ]
+}

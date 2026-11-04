@@ -1,0 +1,91 @@
+{
+  "name": "clear",
+  "events": [
+    {
+      "t": 1235,
+      "event": "SessionStart",
+      "body": {
+        "hook_event_name": "SessionStart",
+        "source": "startup"
+      }
+    },
+    {
+      "t": 2742,
+      "input": "<prompt>"
+    },
+    {
+      "t": 2970,
+      "event": "UserPromptSubmit",
+      "body": {
+        "hook_event_name": "UserPromptSubmit",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 6419,
+      "event": "Stop",
+      "body": {
+        "hook_event_name": "Stop",
+        "permission_mode": "default",
+        "stop_hook_active": false
+      }
+    },
+    {
+      "t": 6436,
+      "input": "/clear"
+    },
+    {
+      "t": 6605,
+      "event": "SessionEnd",
+      "body": {
+        "hook_event_name": "SessionEnd",
+        "reason": "clear"
+      }
+    },
+    {
+      "t": 6665,
+      "event": "SessionStart",
+      "body": {
+        "hook_event_name": "SessionStart",
+        "source": "clear"
+      }
+    },
+    {
+      "t": 10597,
+      "input": "<prompt>"
+    },
+    {
+      "t": 10797,
+      "event": "UserPromptSubmit",
+      "body": {
+        "hook_event_name": "UserPromptSubmit",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 17626,
+      "event": "Stop",
+      "body": {
+        "hook_event_name": "Stop",
+        "permission_mode": "default",
+        "stop_hook_active": false
+      }
+    },
+    {
+      "t": 17680,
+      "input": "Ctrl+C twice"
+    },
+    {
+      "t": 18025,
+      "event": "SessionEnd",
+      "body": {
+        "hook_event_name": "SessionEnd",
+        "reason": "prompt_input_exit"
+      }
+    },
+    {
+      "t": 18683,
+      "ptyExit": -1073741510
+    }
+  ]
+}

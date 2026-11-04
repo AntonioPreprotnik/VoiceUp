@@ -1,0 +1,58 @@
+{
+  "name": "login-menu",
+  "events": [
+    {
+      "t": 900,
+      "event": "SessionStart",
+      "body": {
+        "hook_event_name": "SessionStart",
+        "source": "startup"
+      }
+    },
+    {
+      "t": 2424,
+      "input": "/login"
+    },
+    {
+      "t": 5591,
+      "input": "Esc"
+    },
+    {
+      "t": 7604,
+      "input": "<prompt>"
+    },
+    {
+      "t": 7807,
+      "event": "UserPromptSubmit",
+      "body": {
+        "hook_event_name": "UserPromptSubmit",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 8888,
+      "event": "Stop",
+      "body": {
+        "hook_event_name": "Stop",
+        "permission_mode": "default",
+        "stop_hook_active": false
+      }
+    },
+    {
+      "t": 8929,
+      "input": "Ctrl+C twice"
+    },
+    {
+      "t": 11065,
+      "event": "SessionEnd",
+      "body": {
+        "hook_event_name": "SessionEnd",
+        "reason": "prompt_input_exit"
+      }
+    },
+    {
+      "t": 11742,
+      "ptyExit": -1073741510
+    }
+  ]
+}

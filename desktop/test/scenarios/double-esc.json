@@ -1,0 +1,74 @@
+{
+  "name": "double-esc",
+  "events": [
+    {
+      "t": 912,
+      "event": "SessionStart",
+      "body": {
+        "hook_event_name": "SessionStart",
+        "source": "startup"
+      }
+    },
+    {
+      "t": 2451,
+      "input": "<prompt>"
+    },
+    {
+      "t": 2687,
+      "event": "UserPromptSubmit",
+      "body": {
+        "hook_event_name": "UserPromptSubmit",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 4143,
+      "event": "Stop",
+      "body": {
+        "hook_event_name": "Stop",
+        "permission_mode": "default",
+        "stop_hook_active": false
+      }
+    },
+    {
+      "t": 4656,
+      "input": "Esc"
+    },
+    {
+      "t": 4815,
+      "input": "Esc"
+    },
+    {
+      "t": 7317,
+      "input": "typed hello"
+    },
+    {
+      "t": 8331,
+      "input": "Enter"
+    },
+    {
+      "t": 11338,
+      "input": "Esc"
+    },
+    {
+      "t": 12351,
+      "input": "Esc"
+    },
+    {
+      "t": 13362,
+      "input": "Ctrl+C twice"
+    },
+    {
+      "t": 13709,
+      "event": "SessionEnd",
+      "body": {
+        "hook_event_name": "SessionEnd",
+        "reason": "prompt_input_exit"
+      }
+    },
+    {
+      "t": 14374,
+      "ptyExit": -1073741510
+    }
+  ]
+}

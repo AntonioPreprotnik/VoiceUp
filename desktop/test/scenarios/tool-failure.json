@@ -1,0 +1,64 @@
+{
+  "name": "tool-failure",
+  "events": [
+    {
+      "t": 960,
+      "event": "SessionStart",
+      "body": {
+        "hook_event_name": "SessionStart",
+        "source": "startup"
+      }
+    },
+    {
+      "t": 2460,
+      "input": "<prompt>"
+    },
+    {
+      "t": 2686,
+      "event": "UserPromptSubmit",
+      "body": {
+        "hook_event_name": "UserPromptSubmit",
+        "permission_mode": "default",
+        "prompt": "<prompt>"
+      }
+    },
+    {
+      "t": 4089,
+      "event": "PreToolUse",
+      "body": {
+        "hook_event_name": "PreToolUse",
+        "tool_name": "Read",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 4148,
+      "event": "PostToolUseFailure",
+      "body": {
+        "hook_event_name": "PostToolUseFailure",
+        "tool_name": "Read",
+        "permission_mode": "default",
+        "is_interrupt": false,
+        "error": "File does not exist"
+      }
+    },
+    {
+      "t": 4776,
+      "event": "Stop",
+      "body": {
+        "hook_event_name": "Stop",
+        "permission_mode": "default",
+        "stop_hook_active": false,
+        "background_tasks": 0
+      }
+    },
+    {
+      "t": 4776,
+      "input": "Ctrl+C twice"
+    },
+    {
+      "t": 15748,
+      "ptyExit": -1073741510
+    }
+  ]
+}

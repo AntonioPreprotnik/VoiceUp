@@ -1,0 +1,84 @@
+{
+  "name": "permission-denied-esc",
+  "events": [
+    {
+      "t": 880,
+      "event": "SessionStart",
+      "body": {
+        "hook_event_name": "SessionStart",
+        "source": "startup"
+      }
+    },
+    {
+      "t": 2394,
+      "input": "<prompt>"
+    },
+    {
+      "t": 2615,
+      "event": "UserPromptSubmit",
+      "body": {
+        "hook_event_name": "UserPromptSubmit",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 4897,
+      "event": "PreToolUse",
+      "body": {
+        "hook_event_name": "PreToolUse",
+        "tool_name": "Write",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 4938,
+      "event": "PermissionRequest",
+      "body": {
+        "hook_event_name": "PermissionRequest",
+        "tool_name": "Write",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 5965,
+      "input": "Esc"
+    },
+    {
+      "t": 11972,
+      "input": "<prompt>"
+    },
+    {
+      "t": 12157,
+      "event": "UserPromptSubmit",
+      "body": {
+        "hook_event_name": "UserPromptSubmit",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 13199,
+      "event": "Stop",
+      "body": {
+        "hook_event_name": "Stop",
+        "permission_mode": "default",
+        "stop_hook_active": false
+      }
+    },
+    {
+      "t": 13240,
+      "input": "Ctrl+C twice"
+    },
+    {
+      "t": 13590,
+      "event": "SessionEnd",
+      "body": {
+        "hook_event_name": "SessionEnd",
+        "reason": "prompt_input_exit"
+      }
+    },
+    {
+      "t": 14212,
+      "ptyExit": -1073741510
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "name": "tool-auto",
+  "events": [
+    {
+      "t": 898,
+      "event": "SessionStart",
+      "body": {
+        "hook_event_name": "SessionStart",
+        "source": "startup"
+      }
+    },
+    {
+      "t": 2474,
+      "input": "<prompt>"
+    },
+    {
+      "t": 2691,
+      "event": "UserPromptSubmit",
+      "body": {
+        "hook_event_name": "UserPromptSubmit",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 4183,
+      "event": "PreToolUse",
+      "body": {
+        "hook_event_name": "PreToolUse",
+        "tool_name": "Read",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 4241,
+      "event": "PostToolUse",
+      "body": {
+        "hook_event_name": "PostToolUse",
+        "tool_name": "Read",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 5366,
+      "event": "Stop",
+      "body": {
+        "hook_event_name": "Stop",
+        "permission_mode": "default",
+        "stop_hook_active": false
+      }
+    },
+    {
+      "t": 5366,
+      "input": "Ctrl+C twice"
+    },
+    {
+      "t": 21264,
+      "ptyExit": -1073741510
+    }
+  ]
+}

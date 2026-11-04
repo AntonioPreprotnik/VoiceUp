@@ -1,0 +1,13 @@
+{
+  "name": "first-run",
+  "events": [
+    {
+      "t": 15097,
+      "input": "Ctrl+C twice"
+    },
+    {
+      "t": 21207,
+      "ptyExit": -1073741510
+    }
+  ]
+}

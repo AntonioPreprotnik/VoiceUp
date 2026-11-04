@@ -1,0 +1,151 @@
+{
+  "name": "background-agent",
+  "events": [
+    {
+      "t": 900,
+      "event": "SessionStart",
+      "body": {
+        "hook_event_name": "SessionStart",
+        "source": "startup"
+      }
+    },
+    {
+      "t": 2429,
+      "input": "<prompt>"
+    },
+    {
+      "t": 2653,
+      "event": "UserPromptSubmit",
+      "body": {
+        "hook_event_name": "UserPromptSubmit",
+        "permission_mode": "default",
+        "prompt": "<prompt>"
+      }
+    },
+    {
+      "t": 5111,
+      "event": "PreToolUse",
+      "body": {
+        "hook_event_name": "PreToolUse",
+        "tool_name": "Agent",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 5157,
+      "event": "PostToolUse",
+      "body": {
+        "hook_event_name": "PostToolUse",
+        "tool_name": "Agent",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 6151,
+      "event": "Stop",
+      "body": {
+        "hook_event_name": "Stop",
+        "permission_mode": "default",
+        "stop_hook_active": false,
+        "background_tasks": 1
+      }
+    },
+    {
+      "t": 6475,
+      "event": "PreToolUse",
+      "body": {
+        "hook_event_name": "PreToolUse",
+        "agent_id": "a0e8d30a0cff4132d",
+        "agent_type": "general-purpose",
+        "tool_name": "Glob",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 6566,
+      "event": "PostToolUse",
+      "body": {
+        "hook_event_name": "PostToolUse",
+        "agent_id": "a0e8d30a0cff4132d",
+        "agent_type": "general-purpose",
+        "tool_name": "Glob",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 7620,
+      "event": "PreToolUse",
+      "body": {
+        "hook_event_name": "PreToolUse",
+        "agent_id": "a0e8d30a0cff4132d",
+        "agent_type": "general-purpose",
+        "tool_name": "Glob",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 12076,
+      "event": "PostToolUse",
+      "body": {
+        "hook_event_name": "PostToolUse",
+        "agent_id": "a0e8d30a0cff4132d",
+        "agent_type": "general-purpose",
+        "tool_name": "Glob",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 13440,
+      "event": "PreToolUse",
+      "body": {
+        "hook_event_name": "PreToolUse",
+        "agent_id": "a0e8d30a0cff4132d",
+        "agent_type": "general-purpose",
+        "tool_name": "Read",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 13478,
+      "event": "PostToolUse",
+      "body": {
+        "hook_event_name": "PostToolUse",
+        "agent_id": "a0e8d30a0cff4132d",
+        "agent_type": "general-purpose",
+        "tool_name": "Read",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 14666,
+      "event": "UserPromptSubmit",
+      "body": {
+        "hook_event_name": "UserPromptSubmit",
+        "permission_mode": "default",
+        "prompt": "<task-notification>"
+      }
+    },
+    {
+      "t": 15761,
+      "event": "Stop",
+      "body": {
+        "hook_event_name": "Stop",
+        "permission_mode": "default",
+        "stop_hook_active": false,
+        "background_tasks": 0
+      }
+    },
+    {
+      "t": 36189,
+      "input": "Ctrl+C twice"
+    },
+    {
+      "t": 36538,
+      "event": "SessionEnd",
+      "body": {
+        "hook_event_name": "SessionEnd",
+        "reason": "prompt_input_exit"
+      }
+    }
+  ]
+}

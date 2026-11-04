@@ -157,7 +157,9 @@ The same `http` handler is registered for `PreToolUse`, `PermissionRequest`, `Po
 
 ### 4.3 State reducer
 
-A pure function in `core/state`: `reduce(state, event) → { state, effects }`. Events are hook events plus `ptyExit`, `userKey(kind)`, `sessionRestart`, `localUiSuspected`, `deliveryTimeout` and `reArm`. This table is provisional until the S2.1 recordings confirm it; anything not listed moves to `unknown`, which blocks sending.
+A pure function in `core/state`: `reduce(state, event) → { state, effects }`. Events are hook events plus `ptyExit`, `userKey(kind)`, `sessionRestart`, `localUiSuspected`, `deliveryTimeout` and `reArm`. This table comes from the S2.1 recordings (`docs/decisions/S2.1-hook-events.md`); anything not listed moves to `unknown`, which blocks sending.
+
+Beside the state, the reducer keeps two things. `turnActive` is true from `UserPromptSubmit` until `Stop`, `StopFailure` or an Esc. `pendingAgentPermissions` is the set of `agent_id`s with a `PermissionRequest` not yet answered; a `PermissionRequest` carries no `tool_use_id`, so `agent_id` is the key. It empties on `reArm`, `sessionRestart`, `ptyExit` and any `SessionStart` that sets `idle`.
 
 | From | Event | To |
 | --- | --- | --- |
@@ -166,10 +168,15 @@ A pure function in `core/state`: `reduce(state, event) → { state, effects }`. 
 | `idle` | `UserPromptSubmit` | `busy` |
 | `unknown` | `UserPromptSubmit` | `busy` |
 | `busy` | `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure` | `busy` (no change) |
-| `idle` | `PreToolUse`, `PostToolUse`, `PostToolUseFailure` carrying `agent_id` (subagent or background agent) | `idle` (no change) |
-| `busy`, `awaitingPermission` | `PermissionRequest`, `Notification` matcher `permission_prompt` | `awaitingPermission` |
-| `awaitingPermission` | `PostToolUse`, `PostToolUseFailure`, `PreToolUse` | `busy` |
-| `busy`, `awaitingPermission` | `Stop` | `idle` |
+| `idle`, `unknown` | `PreToolUse`, `PostToolUse`, `PostToolUseFailure` carrying `agent_id` (subagent or background agent) | unchanged |
+| `idle`, `busy`, `awaitingPermission`, `unknown` | `PermissionRequest`, `Notification` matcher `permission_prompt` | `awaitingPermission`; with `agent_id`, also add it to `pendingAgentPermissions` |
+| `awaitingPermission` | `PostToolUse`, `PostToolUseFailure` or `PreToolUse` with no `agent_id` | `busy` |
+| `awaitingPermission` | `PostToolUse` or `PostToolUseFailure` carrying a pending `agent_id` | remove it; if none are left, `busy` when `turnActive`, otherwise `idle`; if some are left, unchanged |
+| `awaitingPermission` | `PreToolUse` carrying `agent_id` | unchanged: another agent working doesn't answer the prompt |
+| `awaitingPermission` | `Stop` with `pendingAgentPermissions` not empty | unchanged: a background agent's prompt is still open. **Getting this wrong lets voice text approve it** (S2.1) |
+| `busy`, `awaitingPermission` | `Stop` with `pendingAgentPermissions` empty | `idle` |
+| `awaitingPermission` | `UserPromptSubmit` | `busy`, after a denial that fired no hook |
+| `awaitingPermission` | `localUiSuspected` (Enter with no hook within about 1 s) | `unknown`: it was a denial, or a slow tool, and no hook can say which |
 | `busy` | `StopFailure` | `idle` + error effect |
 | any live state | `Elicitation`, `Notification` matcher `elicitation_dialog` or `elicitation_url_dialog` | `awaitingInput` |
 | `awaitingInput` | `ElicitationResult` | `busy` |
@@ -187,7 +194,7 @@ A pure function in `core/state`: `reduce(state, event) → { state, effects }`. 
 
 **Allowlisted notification types:** `auth_success`, `agent_completed`, `elicitation_complete`, `elicitation_response`, `quota_auto_resume_fired`, `quota_auto_resume_stale`, `quota_auto_resume_disabled`, `plugin_notification`. Any other type not in the table, including `agent_needs_input` and future values, moves to `unknown`. `permission_prompt` only arrives after the prompt has waited about six seconds, so `PermissionRequest` is the primary signal.
 
-**Leaving `unknown`.** The hooks reference says `Stop` does not run after a user interrupt, so an Esc must not wait for it. `unknown` ends through `idle_prompt` (about 60 s after Claude finishes, and only if the user hasn't typed and no background agent is running), a later turn (`UserPromptSubmit`, then `Stop`) or the manual "Re-arm voice" action in the status bar, where the user confirms that the main prompt is ready. It never ends on a timer.
+**Leaving `unknown`.** `Stop` does not run after a user interrupt, and a denied permission fires nothing at all (S2.1), so an Esc must not wait for either. `unknown` ends through a later turn (`UserPromptSubmit`, then `Stop`) or the manual "Re-arm voice" action in the status bar, where the user confirms that the main prompt is ready, so re-arm is the normal way back after an Esc. `idle_prompt` also ends it, but S2.1 saw it only after a normal `Stop`, 60 s later, and not within 75 s of an Esc. It never ends on a timer. Manual `/compact` also lands here: it fires no `UserPromptSubmit` or `Stop`, its Enter raises `localUiSuspected`, and `SessionStart(compact)` leaves the state unchanged.
 
 ### 4.4 Send gate and prompt-dirty tracking
 
@@ -200,14 +207,14 @@ A pure function in `core/state`: `reduce(state, event) → { state, effects }`. 
 | `awaitingPermission`, `awaitingInput` | block: "Claude is waiting for you" | block |
 | `starting`, `exited`, `unknown` | block with the state name | block |
 
-`promptDirty` is an allowlist. While `idle`, terminal input leaves it unchanged only if it is a recognized harmless sequence (focus reports, mouse reports, scrolling). Everything else sets it, including printable keys, paste, Backspace, Delete, Up/Down history recall and any unrecognized escape sequence. It resets on `UserPromptSubmit`, a `SessionStart` that returns to `idle`, Ctrl+C and session restart. Enter alone does not reset it: Enter with no `UserPromptSubmit` or `SessionStart` within about 1 s raises `localUiSuspected`, because it may have opened a local menu that no hook reports (S2.1 confirms the timing). It is deliberately pessimistic: a false "dirty" only blocks a voice send, it never loses typed text.
+`promptDirty` is an allowlist. While `idle`, terminal input leaves it unchanged only if it is a recognized harmless sequence (focus reports, mouse reports, scrolling). Everything else sets it, including printable keys, paste, Backspace, Delete, Up/Down history recall and any unrecognized escape sequence. It resets on `UserPromptSubmit`, a `SessionStart` that returns to `idle`, Ctrl+C and session restart. Enter alone does not reset it: Enter with no `UserPromptSubmit` or `SessionStart` within about 1 s raises `localUiSuspected`, because it may have opened a local menu that no hook reports. S2.1 measured Enter to `UserPromptSubmit` at about 30–80 ms, and no menu fired a hook. Pasted text was harmless in every menu tried, but the Enter that follows it acts on the menu, which is why the gate must hold. It is deliberately pessimistic: a false "dirty" only blocks a voice send, it never loses typed text.
 
 ### 4.5 Input injection
 
 1. Sanitize: remove C0 control characters and ESC, collapse newlines to spaces, cap at 4,000 characters.
 2. Re-run the gate immediately before writing, because the state can change during the preview. Set `deliveryPending`.
 3. Write `ESC[200~` + text + `ESC[201~`, then `\r` after 30 ms (method and delay confirmed by S5.3).
-4. Expect `UserPromptSubmit` within 3 s, then clear `deliveryPending`. If it doesn't arrive, clear it, raise `deliveryTimeout` and show `DELIVERY_UNCONFIRMED`.
+4. Expect `UserPromptSubmit` within 3 s, then clear `deliveryPending`. If it doesn't arrive, clear it, raise `deliveryTimeout` and show `DELIVERY_UNCONFIRMED`. A prompt that is a Claude tag doesn't count: a finished background agent starts its own turn with `<task-notification>` (S2.1).
 
 **Preview controls.** The overlay is click-through and never takes focus, so it has no buttons. During a preview, Esc (a global shortcut held only while recording, previewing or holding a blocked transcript) cancels and the hotkey sends at once, except in the first 300 ms of the preview, when it is ignored so a late cancel press can't send. While transcribing, the hotkey cancels. In always-confirm mode the preview waits for one of those two keys; a global Enter shortcut is never registered, because it would steal Enter from every other app.
 
@@ -604,12 +611,12 @@ Each question has an owner story; code that depends on the answer waits for it. 
 
 | Question | Answered by |
 | --- | --- |
-| ~~Does `Stop` fire after an Esc interrupt?~~ Answered by the docs: no. S2.1 still records it once. | S2.1 (confirm only) |
-| Which events follow a denied permission? | S2.1 |
-| Which events fire for local UI (`/model`, `/resume`, double-Esc, login and first-run screens), and what does typed or pasted text do there? | S2.1 |
-| Does `SessionEnd` come before `SessionStart` on `/clear`? | S2.1 |
+| ~~Does `Stop` fire after an Esc interrupt?~~ Confirmed in S2.1: no. | done |
+| ~~Which events follow a denied permission?~~ None, by Esc or by "No" (S2.1). | done |
+| ~~Which events fire for local UI, and what does typed or pasted text do there?~~ No hooks. Results per screen are in `docs/decisions/S2.1-hook-events.md`. `/model` + Enter and the later login steps were left untested on purpose. | done |
+| ~~Does `SessionEnd` come before `SessionStart` on `/clear`?~~ Yes, 60 ms before (S2.1). | done |
 | ~~Notification type field~~ Answered: `notification_type` (string), plus `message`, `title?`. | done |
-| ~~Hooks before workspace trust~~ Answered by the docs: in an interactive session the trust dialog appears before the session starts, so no hook (SessionStart included) fires until it is accepted; state stays `starting`. S2.1 still records it once with a fresh folder, and confirms our `--settings` hooks then fire normally. | S2.1 (confirm only) |
+| ~~Hooks before workspace trust~~ Confirmed in S2.1: no hook fired in 31 minutes at the prompt, and `SessionStart` came once a person accepted it. Trust is inherited from a parent folder, so a folder under a trusted one shows no prompt. | done |
 | Does bracketed paste followed by `\r` submit reliably in Claude Code's prompt under ConPTY, and what delay is needed? | S5.3 |
 | ~~sherpa-onnx config names, model files, SHA-256~~ Answered (§5.2–5.4). Remaining: confirm the same on the Windows prebuild in the packaged smoke test. | S4.1 (confirm only) |
 | Is Moonshine fast and accurate enough on the weakest friend's laptop? Answered on Antonio's PC only (`docs/decisions/S4.1-speech-engine.md`). The RAM-based pick is gone. | S7.5 |

@@ -1,0 +1,126 @@
+{
+  "name": "elicitation",
+  "events": [
+    {
+      "t": 930,
+      "event": "SessionStart",
+      "body": {
+        "hook_event_name": "SessionStart",
+        "source": "startup"
+      }
+    },
+    {
+      "t": 2495,
+      "input": "<prompt>"
+    },
+    {
+      "t": 2717,
+      "event": "UserPromptSubmit",
+      "body": {
+        "hook_event_name": "UserPromptSubmit",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 4171,
+      "event": "PreToolUse",
+      "body": {
+        "hook_event_name": "PreToolUse",
+        "tool_name": "ToolSearch",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 4192,
+      "event": "PostToolUse",
+      "body": {
+        "hook_event_name": "PostToolUse",
+        "tool_name": "ToolSearch",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 6131,
+      "event": "PreToolUse",
+      "body": {
+        "hook_event_name": "PreToolUse",
+        "tool_name": "mcp__spike__ask",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 6152,
+      "event": "Elicitation",
+      "body": {
+        "hook_event_name": "Elicitation",
+        "mode": "form",
+        "mcp_server_name": "spike"
+      }
+    },
+    {
+      "t": 8217,
+      "input": "typed yes"
+    },
+    {
+      "t": 8717,
+      "input": "Enter"
+    },
+    {
+      "t": 9725,
+      "input": "Enter"
+    },
+    {
+      "t": 9731,
+      "event": "ElicitationResult",
+      "body": {
+        "hook_event_name": "ElicitationResult",
+        "mode": "form",
+        "action": "accept",
+        "mcp_server_name": "spike"
+      }
+    },
+    {
+      "t": 9755,
+      "event": "Notification",
+      "body": {
+        "hook_event_name": "Notification",
+        "notification_type": "elicitation_response",
+        "message": "Elicitation response for server \"spike\": accept"
+      }
+    },
+    {
+      "t": 9771,
+      "event": "PostToolUse",
+      "body": {
+        "hook_event_name": "PostToolUse",
+        "tool_name": "mcp__spike__ask",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 10677,
+      "event": "Stop",
+      "body": {
+        "hook_event_name": "Stop",
+        "permission_mode": "default",
+        "stop_hook_active": false
+      }
+    },
+    {
+      "t": 11728,
+      "input": "Ctrl+C twice"
+    },
+    {
+      "t": 13489,
+      "event": "SessionEnd",
+      "body": {
+        "hook_event_name": "SessionEnd",
+        "reason": "prompt_input_exit"
+      }
+    },
+    {
+      "t": 14275,
+      "ptyExit": -1073741510
+    }
+  ]
+}

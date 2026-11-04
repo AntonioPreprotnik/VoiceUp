@@ -1,0 +1,58 @@
+{
+  "name": "model-menu",
+  "events": [
+    {
+      "t": 910,
+      "event": "SessionStart",
+      "body": {
+        "hook_event_name": "SessionStart",
+        "source": "startup"
+      }
+    },
+    {
+      "t": 2476,
+      "input": "/model"
+    },
+    {
+      "t": 5644,
+      "input": "typed hello"
+    },
+    {
+      "t": 6645,
+      "input": "Esc"
+    },
+    {
+      "t": 8658,
+      "input": "<prompt>"
+    },
+    {
+      "t": 8857,
+      "event": "UserPromptSubmit",
+      "body": {
+        "hook_event_name": "UserPromptSubmit",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 9837,
+      "event": "Stop",
+      "body": {
+        "hook_event_name": "Stop",
+        "permission_mode": "default",
+        "stop_hook_active": false
+      }
+    },
+    {
+      "t": 9879,
+      "input": "Ctrl+C twice"
+    },
+    {
+      "t": 11457,
+      "event": "SessionEnd",
+      "body": {
+        "hook_event_name": "SessionEnd",
+        "reason": "prompt_input_exit"
+      }
+    }
+  ]
+}

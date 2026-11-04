@@ -1,10 +1,11 @@
 import type { IPty } from 'node-pty'
-import { childEnv, type ClaudeCommand } from '../../core/claudeCommand'
+import { childEnv, ptyArgs, type ClaudeCommand } from '../../core/claudeCommand'
 import { MESSAGES } from '../../core/messages'
 import { clampTermSize, FlowControl, OutputBatcher } from '../../core/terminalFlow'
 import type { TermResize } from '../../shared/ipc'
 import { TERMINAL_RESET } from '../../shared/ipcChannels'
 import { hasVisibleText } from '../../shared/terminalText'
+import type { LaunchExtras } from '../hooks/link'
 import { log } from '../log'
 
 const BATCH_MS = 16
@@ -21,6 +22,10 @@ export interface PtyHostOptions {
   readonly onNotFound: () => void
   /** The folder to run in, which may ask the user. Null means they declined. */
   readonly resolveCwd: () => Promise<string | null>
+  /** What this launch adds for the hooks, which depends on the folder. */
+  readonly prepareLaunch: (cwd: string) => Promise<LaunchExtras>
+  /** Claude was started. */
+  readonly onLaunched: () => void
 }
 
 /** Owns the Claude PTY (TECH_SPEC §4.1). Only the main process writes to it. */
@@ -147,10 +152,12 @@ export class PtyHost {
         this.options.onNotFound()
         return
       }
+      const extras = await this.options.prepareLaunch(cwd)
+      if (this.isStopping()) return
       // Loaded here so a native module failure is reported, not fatal at startup.
       const { spawn } = await import('node-pty')
       if (this.isStopping()) return
-      this.launch(spawn, command, size, cwd)
+      this.launch(spawn, command, size, cwd, extras)
     } catch (error: unknown) {
       log.error('Could not start Claude Code', error)
       this.options.onExit(null)
@@ -161,16 +168,18 @@ export class PtyHost {
     spawn: (typeof import('node-pty'))['spawn'],
     command: ClaudeCommand,
     size: TermResize,
-    cwd: string
+    cwd: string,
+    extras: LaunchExtras
   ): void {
-    const pty = spawn(command.file, [...command.args], {
+    const pty = spawn(command.file, ptyArgs(command, extras.args), {
       name: 'xterm-256color',
       cols: size.cols,
       rows: size.rows,
       cwd,
-      env: childEnv(process.env)
+      env: { ...childEnv(process.env), ...extras.env }
     })
     this.pty = pty
+    this.options.onLaunched()
 
     let sawText = false
     pty.onData((data) => {

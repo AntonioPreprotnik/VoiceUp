@@ -3,7 +3,8 @@ import {
   childEnv,
   chooseClaudeCommand,
   firstWhereResult,
-  parseClaudeOverride
+  parseClaudeOverride,
+  ptyArgs
 } from './claudeCommand'
 
 const CMD_EXE = 'C:\\Windows\\System32\\cmd.exe'
@@ -38,11 +39,31 @@ describe('chooseClaudeCommand', () => {
     // node-pty fails with an empty "File not found" on a relative name that exists in the current
     // folder, and an app launched from Explorer starts in System32.
     const command = chooseClaudeCommand({ ...none, whereCmd: 'C:\\npm\\claude.cmd' })
-    expect(command).toEqual({ file: CMD_EXE, args: ['/d', '/s', '/c', 'C:\\npm\\claude.cmd'] })
+    expect(command).toEqual({ file: CMD_EXE, args: [], cmdShim: 'C:\\npm\\claude.cmd' })
   })
 
   it('returns null when Claude is not installed', () => {
     expect(chooseClaudeCommand(none)).toBeNull()
+  })
+})
+
+describe('ptyArgs', () => {
+  it('adds to the arguments of an exe', () => {
+    expect(
+      ptyArgs({ file: 'claude.exe', args: ['--a'] }, ['--settings', 'C:\\A B\\x.json'])
+    ).toEqual(['--a', '--settings', 'C:\\A B\\x.json'])
+  })
+
+  it('gives a .cmd one line, with an outer pair of quotes for /s to remove', () => {
+    const command = { file: CMD_EXE, args: [], cmdShim: 'C:\\Ana Maria\\claude.cmd' }
+    expect(ptyArgs(command, ['--settings', 'C:\\Ana Maria\\x.json'])).toBe(
+      '/d /s /c ""C:\\Ana Maria\\claude.cmd" "--settings" "C:\\Ana Maria\\x.json""'
+    )
+  })
+
+  it('gives a .cmd with no extra arguments the same outer quotes', () => {
+    const command = { file: CMD_EXE, args: [], cmdShim: 'C:\\Ana Maria\\claude.cmd' }
+    expect(ptyArgs(command, [])).toBe('/d /s /c ""C:\\Ana Maria\\claude.cmd""')
   })
 })
 

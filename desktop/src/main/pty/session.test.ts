@@ -25,6 +25,11 @@ function createSession(projectDir: string | null = null): ClaudeSession {
     window: window as unknown as RealBrowserWindow,
     settings: { ...defaults, claude: { ...defaults.claude, projectDir } },
     settingsDir,
+    hooks: {
+      prepareLaunch: () => Promise.resolve({ args: [], env: {} }),
+      launched: () => undefined,
+      exited: () => undefined
+    },
     resolveCommand: () => Promise.resolve({ file: 'claude.exe', args: [] })
   })
 }
@@ -206,6 +211,11 @@ describe('when Claude Code is not installed', () => {
       window: window as unknown as RealBrowserWindow,
       settings: { ...defaults, claude: { ...defaults.claude, projectDir: folderA } },
       settingsDir,
+      hooks: {
+        prepareLaunch: () => Promise.resolve({ args: [], env: {} }),
+        launched: () => undefined,
+        exited: () => undefined
+      },
       resolveCommand: () =>
         Promise.resolve(claude.installed ? { file: 'claude.exe', args: [] } : null)
     })

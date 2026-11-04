@@ -1,11 +1,12 @@
 import { spawn } from 'node:child_process'
-import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer, request } from 'node:http'
 import { connect, type AddressInfo } from 'node:net'
 import { networkInterfaces, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { parseClaudeOverride } from '../../src/core/claudeCommand'
+import { buildHookSettings, REGISTERED_HOOKS } from '../../src/core/hookConfig'
 import { HookServer } from '../../src/main/hooks/server'
 import { HOOK_NAMES, parseHook, type HookMessage } from '../../src/shared/hooks'
 import fakeLog from '../fakes/electronLog'
@@ -16,6 +17,8 @@ vi.mock('electron-log/main', () => import('../fakes/electronLog'))
 const DESKTOP = join(__dirname, '../..')
 const SCENARIOS = join(DESKTOP, 'test/scenarios')
 const CURL = join(process.env['SystemRoot'] ?? 'C:/Windows', 'System32/curl.exe')
+const registered = (event: string): boolean =>
+  (REGISTERED_HOOKS as readonly string[]).includes(event)
 
 interface Step {
   event?: string
@@ -263,47 +266,14 @@ describe('the recorded fixtures', () => {
 })
 
 describe('the fake Claude, through VOICEUP_CLAUDE_CMD', () => {
-  // The hook config from TECH_SPEC §4.2. S2.3 generates the real one.
+  // The real generated config, with a space in its folder as on many PCs.
   function writeSettings(token: string): string {
-    const headerFile = join(dir, 'header.txt')
+    const folder = join(dir, 'Ana Maria')
+    mkdirSync(folder, { recursive: true })
+    const headerFile = join(folder, 'header.txt')
     writeFileSync(headerFile, `X-VoiceUp-Token: ${token}\n`)
-    const url = (event: string): string => `http://127.0.0.1:${String(port)}/hooks/${event}`
-    const hooks: Record<string, unknown> = {}
-    for (const event of HOOK_NAMES) {
-      const handler =
-        event === 'SessionStart'
-          ? {
-              type: 'command',
-              command: CURL,
-              args: [
-                '-s',
-                '-m',
-                '2',
-                '--noproxy',
-                '*',
-                '-X',
-                'POST',
-                '-H',
-                `@${headerFile}`,
-                '-H',
-                'Content-Type: application/json',
-                '--data-binary',
-                '@-',
-                url(event)
-              ],
-              timeout: 5
-            }
-          : {
-              type: 'http',
-              url: url(event),
-              headers: { 'X-VoiceUp-Token': '$VOICEUP_HOOK_TOKEN' },
-              allowedEnvVars: ['VOICEUP_HOOK_TOKEN'],
-              timeout: 5
-            }
-      hooks[event] = [{ hooks: [handler] }]
-    }
-    const path = join(dir, 'hooks.json')
-    writeFileSync(path, JSON.stringify({ hooks }))
+    const path = join(folder, 'hooks.json')
+    writeFileSync(path, JSON.stringify(buildHookSettings({ port, curlPath: CURL, headerFile })))
     return path
   }
 
@@ -345,7 +315,9 @@ describe('the fake Claude, through VOICEUP_CLAUDE_CMD', () => {
       const names = received.map((message) =>
         message.kind === 'hook' ? message.hook.hook_event_name : message
       )
-      expect(names).toEqual(steps.flatMap(({ event }) => (event === undefined ? [] : [event])))
+      expect(names).toEqual(
+        steps.flatMap(({ event }) => (event !== undefined && registered(event) ? [event] : []))
+      )
       const exit = steps.find((step) => step.ptyExit !== undefined)?.ptyExit
       if (name === 'crash-mid-turn') expect(code).toBe(exit)
     },

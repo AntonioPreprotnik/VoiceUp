@@ -541,6 +541,31 @@ const scenarios = {
     await sleep(6000)
     s.mark('14 s after Enter')
   },
+  'hooks-menu': async (s) => {
+    await s.ready()
+    await s.say('/hooks')
+    await sleep(3000)
+    s.mark('hooks menu open')
+    s.key(ESC, 'Esc')
+    await sleep(1500)
+    s.mark('after Esc')
+    await s.turn('Reply with only the word ok.')
+    await s.say('/hooks')
+    await sleep(3000)
+    s.mark('hooks menu after a turn')
+    s.key('\r', 'Enter (first entry)')
+    await sleep(1500)
+    s.mark('first entry')
+    s.key('\r', 'Enter (first event)')
+    await sleep(1500)
+    s.mark('first event')
+    s.key(ESC, 'Esc')
+    await sleep(800)
+    s.key(ESC, 'Esc')
+    await sleep(500)
+    s.key(ESC, 'Esc')
+    await sleep(500)
+  },
   'tool-failure': async (s) => {
     await s.ready()
     await s.turn(

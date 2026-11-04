@@ -3,6 +3,8 @@
 export interface ClaudeCommand {
   readonly file: string
   readonly args: readonly string[]
+  /** A .cmd to run through `file`, which is then cmd.exe. See ptyArgs. */
+  readonly cmdShim?: string
 }
 
 export interface ClaudeLocations {
@@ -22,9 +24,20 @@ export function chooseClaudeCommand(locations: ClaudeLocations): ClaudeCommand |
   const exe = locations.whereExe ?? locations.localBinExe
   if (exe !== undefined) return { file: exe, args: [] }
   if (locations.whereCmd !== undefined) {
-    return { file: locations.cmdExe, args: ['/d', '/s', '/c', locations.whereCmd] }
+    return { file: locations.cmdExe, args: [], cmdShim: locations.whereCmd }
   }
   return null
+}
+
+/**
+ * The arguments for node-pty, with `extra` added. A .cmd needs a single string: with /s, cmd.exe
+ * removes the first and last quote of what follows /c, so the whole line needs its own outer pair.
+ * As an array, each part gets separate quotes and a path with a space fails.
+ */
+export function ptyArgs(command: ClaudeCommand, extra: readonly string[]): string[] | string {
+  if (command.cmdShim === undefined) return [...command.args, ...extra]
+  const line = [command.cmdShim, ...extra].map((part) => `"${part}"`).join(' ')
+  return `/d /s /c "${line}"`
 }
 
 /** The first path `where.exe` printed, or undefined if it printed none. */

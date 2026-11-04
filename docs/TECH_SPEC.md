@@ -126,7 +126,7 @@ const claude = pty.spawn(claudePath, [
 });
 ```
 
-- **Resolve `claudePath`** in this order: `where.exe claude.exe`, `%USERPROFILE%\.local\bin\claude.exe`, then `where.exe claude.cmd`. Never use a bare `where.exe claude`: on an npm install its first hit is an extensionless shell shim that can't be spawned. A `.cmd` runs as `cmd.exe /d /s /c`, by cmd.exe's full path: `node-pty` fails with an empty "File not found" on a relative name that exists in the current folder, and an app launched from Explorer starts in System32 (found in S1.1). S1.1 checks Ctrl+C through it. Re-resolve after S6.3 installs Claude, checking the known install paths too, because the running app's PATH is stale. Dev and test builds also accept `VOICEUP_CLAUDE_CMD`, a JSON array such as `["node", "test/fake-claude.mjs"]`; packaged builds ignore it.
+- **Resolve `claudePath`** in this order: `where.exe claude.exe`, `%USERPROFILE%\.local\bin\claude.exe`, then `where.exe claude.cmd`. Never use a bare `where.exe claude`: on an npm install its first hit is an extensionless shell shim that can't be spawned. A `.cmd` runs as `cmd.exe /d /s /c "<quoted line>"`, passed to `node-pty` as one string: as an array, a path with a space fails, because `/s` strips the first and last quote (found in S2.3). It uses cmd.exe's full path: `node-pty` fails with an empty "File not found" on a relative name that exists in the current folder, and an app launched from Explorer starts in System32 (found in S1.1). S1.1 checks Ctrl+C through it. Re-resolve after S6.3 installs Claude, checking the known install paths too, because the running app's PATH is stale. Dev and test builds also accept `VOICEUP_CLAUDE_CMD`, a JSON array such as `["node", "test/fake-claude.mjs"]`; packaged builds ignore it.
 - **Output:** `onData` chunks are batched per 16 ms and sent to the terminal window. If the renderer reports more than 1 MB unacknowledged, call `pause()` until xterm's write callback drains it.
 - **Input:** every keystroke from xterm goes through main (`term:input`) before `write()`. That is what makes prompt-dirty tracking possible (4.4).
 - **Resize:** debounce 50 ms, clamp to 10–1000 columns, 5–500 rows.
@@ -151,9 +151,9 @@ Per launch, main writes `userData/run/hooks-<pid>.json` and passes it with `--se
 }
 ```
 
-The same `http` handler is registered for `PreToolUse`, `PermissionRequest`, `PostToolUse`, `PostToolUseFailure`, `Notification`, `Elicitation`, `ElicitationResult`, `Stop`, `StopFailure` and `SessionEnd`. `SessionStart` only supports command and MCP hooks, hence `curl.exe` in exec form. The token reaches curl through a header file (curl's `-H @file`), so it never appears in a process list; that file lives in the per-user %APPDATA% folder and is deleted on quit, or at the next startup after a crash. curl runs by absolute path, so PATH can't substitute it, and with `--noproxy`, so a user's proxy settings can't swallow a loopback call.
+The same `http` handler is registered for `PreToolUse`, `PermissionRequest`, `PostToolUse`, `PostToolUseFailure`, `Notification`, `Elicitation`, `ElicitationResult`, `Stop` and `StopFailure`. **`SessionEnd` is deliberately not registered.** Measured in S2.3 on the packaged app: with it, a close took 9.6 s, hit the shutdown watchdog and left the hook files behind; without it, 1.1–1.5 s and clean. The likely cause is that `pty.kill()` blocks the main process until Claude exits, while Claude waits for that same process to answer the hook. A PTY exit already means `exited`, and after `/clear` or `/resume` the next `SessionStart` decides. `SessionStart` only supports command and MCP hooks, hence `curl.exe` in exec form. The token reaches curl through a header file (curl's `-H @file`), so it never appears in a process list; that file lives in the per-user %APPDATA% folder and is deleted on quit, or at the next startup after a crash. curl runs by absolute path, so PATH can't substitute it, and with `--noproxy`, so a user's proxy settings can't swallow a loopback call.
 
-**Blocked hooks (S2.3).** At launch, main reads only these keys from the user, project, local and managed settings: `allowedHttpHookUrls` (merged across levels), `disableAllHooks` and managed `allowManagedHooksOnly`. If they stop our hooks running, show `HOOKS_BLOCKED`. After 30 s in `starting`, show the non-blocking `STARTING_SLOW` hint; a trust prompt or login can legitimately take longer, so voice just stays blocked.
+**Blocked hooks (S2.3).** At each launch, main reads only these keys from the user, project, local and managed settings: `allowedHttpHookUrls` (merged across levels; `*` is the wildcard), `disableAllHooks` (the highest level that sets it wins) and managed `allowManagedHooksOnly`. Managed means `%ProgramFiles%\ClaudeCode\managed-settings.json` and its `managed-settings.d` folder; registry policies aren't read. If they stop our hooks running, show `HOOKS_BLOCKED`, start Claude with no `--settings`, and turn voice off. Passing them anyway would be wrong: measured on Claude Code 2.1.318, `disableAllHooks` silences every hook, while an `allowedHttpHookUrls` that excludes us lets the `SessionStart` command hook run and prints an error on Claude's screen for each http hook. After 30 s with no `SessionStart`, show the non-blocking `STARTING_SLOW` hint on the overlay; a trust prompt or login can legitimately take longer, so voice just stays blocked.
 
 ### 4.3 State reducer
 
@@ -188,8 +188,7 @@ Beside the state, the reducer keeps two things. `turnActive` is true from `UserP
 | `idle` | `localUiSuspected` (§4.4) | `unknown` |
 | any | `deliveryTimeout` (§4.5) | `unknown` |
 | `unknown` | `reArm` | `idle` |
-| any | `SessionEnd` with reason `clear` or `resume` | unchanged: a new session follows, and its `SessionStart` decides |
-| any | any other `SessionEnd`, `ptyExit` | `exited` |
+| any | `ptyExit` | `exited`. `SessionEnd` isn't registered (§4.2), so it arrives only as an unexpected event |
 | any | `sessionRestart` | `starting` |
 
 **Allowlisted notification types:** `auth_success`, `agent_completed`, `elicitation_complete`, `elicitation_response`, `quota_auto_resume_fired`, `quota_auto_resume_stale`, `quota_auto_resume_disabled`, `plugin_notification`. Any other type not in the table, including `agent_needs_input` and future values, moves to `unknown`. `permission_prompt` only arrives after the prompt has waited about six seconds, so `PermissionRequest` is the primary signal.
@@ -438,7 +437,8 @@ export const Settings = z.object({
 | `NO_PROJECT_FOLDER` | the folder picker is cancelled with no saved folder | "No project folder chosen" | File > Change folder |
 | `CLAUDE_NOT_FOUND` | no binary | "Claude Code isn't installed" and the official install command (S1.5; S6.3 replaces it with the guided step) | copy the command, install, Check again |
 | `CLAUDE_EXITED` | PTY exit | exit code + "Restart session" | restart |
-| `HOOKS_BLOCKED` | `allowedHttpHookUrls` excludes us, `disableAllHooks` or `allowManagedHooksOnly` applies | "Your Claude settings block VoiceUp's status hooks" | docs link; voice disabled |
+| `HOOKS_BLOCKED` | `allowedHttpHookUrls` excludes us, `disableAllHooks` or `allowManagedHooksOnly` applies | "Your Claude settings block VoiceUp's status hooks", naming the setting | docs link; voice disabled, and a hotkey press repeats it without opening the mic |
+| `HOOKS_FAILED` | the hook server or its files can't be set up | "VoiceUp's status hooks could not start" | restart VoiceUp; voice disabled |
 | `STARTING_SLOW` | 30 s in `starting` | "Waiting for Claude to start" | finish any prompt in the terminal, otherwise check the hooks |
 | `CLAUDE_TOO_OLD` | `claude --version` below the minimum constant | "Claude Code needs updating" | shows the update command |
 | `CLAUDE_NOT_LOGGED_IN` | sign-in step incomplete, or `StopFailure` with an authentication error | "Claude isn't signed in" | sign in inside the terminal |

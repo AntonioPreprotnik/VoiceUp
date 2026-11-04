@@ -309,18 +309,18 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 - AC: `test/fake-claude.mjs` replays the S2.1 scenarios through `VOICEUP_CLAUDE_CMD` (TECH_SPEC §8).
 - AC: always responds 2xx with an empty body so hooks never block or alter Claude's behavior.
 
-**[ ] S2.3 Inject hooks without touching user settings.** As a user, I don't want the app editing my global Claude config.
+**[x] S2.3 Inject hooks without touching user settings.** As a user, I don't want the app editing my global Claude config.
 
 - AC: the app passes its hook config to the `claude` process at launch (via the `--settings` flag; the port is in that file and the token in an environment variable), using Claude Code's native `http` hook type for every event except `SessionStart`, which only supports command hooks, so it calls `curl.exe` (built into Windows 10+) in exec form.
-- AC: if `allowedHttpHookUrls` at any settings level excludes the app's URL, or `disableAllHooks` or managed `allowManagedHooksOnly` applies, show `HOOKS_BLOCKED` instead of running without state tracking.
+- AC: if `allowedHttpHookUrls` at any settings level excludes the app's URL, or `disableAllHooks` or managed `allowManagedHooksOnly` applies, show `HOOKS_BLOCKED` instead of running without state tracking. Claude still starts, with no hooks passed, since it would print an error for every blocked one; voice stays off.
 - AC: after 30 s in `starting`, show a non-blocking hint (`STARTING_SLOW`): finish any prompt in the terminal; otherwise check the hooks. Voice stays blocked.
 - AC: stale hook and token files from a crashed run are deleted at startup.
 - AC: `~/.claude/settings.json` is never modified; verified by file hash before/after.
-- AC: `/hooks` inside the session shows the app's hooks.
+- AC: the app's hooks reach the receiver from a real session, shown by the `debug` log's event names. `/hooks` can't show this: on Claude Code 2.1.318 it reports "0 with hooks" for hooks passed with `--settings`, even while they fire.
 
 **[ ] S2.4 State machine.** As the developer, I want one tested source of truth for Claude's state.
 
-- AC: pure module in `src/core` with states `starting`, `idle`, `busy`, `awaitingPermission`, `awaitingInput` (elicitation dialogs), `exited`, `unknown`.
+- AC: pure module in `src/core` with states `starting`, `idle`, `busy`, `awaitingPermission`, `awaitingInput` (elicitation dialogs), `exited`, `unknown`. `exited` comes from the PTY: `SessionEnd` isn't registered (TECH_SPEC §4.2).
 - AC: transitions derived from the S2.1 note; any unexpected event moves to `unknown` (fail safe). `SessionStart` with source `compact` or `fork` leaves the state unchanged, because auto-compaction can fire in the middle of a turn.
 - AC: `Stop` does not fire after a user interrupt, and a denied permission fires no hook at all, so `unknown` recovers only through a later turn, a manual re-arm or `idle_prompt` (TECH_SPEC §4.3), never on a timer.
 - AC: a `Stop` never clears a background agent's pending permission, because voice text could then approve it (S2.1). A replay of `agent-permission-send` blocks at every step until that permission is answered.

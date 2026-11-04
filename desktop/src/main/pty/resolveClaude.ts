@@ -13,9 +13,14 @@ import { log } from '../log'
 
 const run = promisify(execFile)
 
+/** A Windows tool by absolute path, so PATH can't substitute it. */
+export function system32Path(tool: string): string {
+  return join(process.env['SystemRoot'] ?? 'C:\\Windows', 'System32', tool)
+}
+
 /** The full path to cmd.exe, which node-pty needs (see chooseClaudeCommand). */
 export function cmdExePath(): string {
-  return join(process.env['SystemRoot'] ?? 'C:\\Windows', 'System32', 'cmd.exe')
+  return system32Path('cmd.exe')
 }
 
 async function where(name: string): Promise<string | undefined> {

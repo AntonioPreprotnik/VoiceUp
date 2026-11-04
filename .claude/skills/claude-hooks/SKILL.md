@@ -24,7 +24,7 @@ Spec: `docs/TECH_SPEC.md` §4. Ground truth for event order: `docs/decisions/S2.
 - A `Stop` must never clear a background agent's pending permission: its `PermissionRequest` can come just before the main turn's `Stop`, and voice text sent then approves it (S2.1).
 - `SessionStart` with `source` `compact` or `fork` must not change state (auto-compaction fires mid-turn); `startup`, `resume`, `clear` → `idle`.
 - In-turn events (`PreToolUse`, `PostToolUse`, `PostToolUseFailure`) keep `busy` as `busy`; they are not unknown. With `agent_id`, they also keep `idle` as `idle`.
-- `SessionEnd` with reason `clear` or `resume` does not mean `exited`; the next `SessionStart` decides.
+- Never register `SessionEnd`: with it, closing the packaged app took 9.6 s and was force-killed (TECH_SPEC §4.2). A PTY exit means `exited`; after `/clear` or `/resume` the next `SessionStart` decides.
 - Hooks don't report every local menu. Enter with no `UserPromptSubmit` or `SessionStart` within about 1 s raises `localUiSuspected` (TECH_SPEC §4.4).
 - `Notification` body: `notification_type` (string), `message`, optional `title` (SDK `NotificationHookInput`). Match the values in TECH_SPEC §4.3; allowlisted harmless values leave state unchanged, and any other value moves it to `unknown`.
 - Workspace trust: in an untrusted folder the trust dialog shows before the session starts and no hook fires until it is accepted, so state stays `starting` and the gate holds. Never auto-accept trust or write `hasTrustDialogAccepted`.
@@ -37,7 +37,7 @@ Spec: `docs/TECH_SPEC.md` §4. Ground truth for event order: `docs/decisions/S2.
 4. Re-run the gate tests: every state must map to exactly one gate decision (§4.4).
 
 ## Debugging
-- `/hooks` inside the embedded session lists the hooks Claude loaded.
+- `/hooks` does not help: on Claude Code 2.1.318 it says "no hooks yet" for hooks passed with `--settings`, even while they fire. At log level `debug`, `Hook: <event>` lines show what arrived.
 - `claude --debug` shows hook execution; a non-2xx from us appears as a hook error notice in Claude's transcript, which must never happen.
 - Logs: hook bodies only at `debug` (they may contain prompts and tool input).
 

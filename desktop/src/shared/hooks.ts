@@ -38,6 +38,17 @@ export type HookEvent = z.infer<typeof HookEvent>
 
 export type HookName = HookEvent['hook_event_name']
 
+/**
+ * The only keys ever read from Claude's settings (§4.2), so every other key is dropped here. A value
+ * of the wrong type counts as unset, since Claude can't be relying on it either.
+ */
+export const ClaudeHookPolicy = z.object({
+  disableAllHooks: z.boolean().optional().catch(undefined),
+  allowManagedHooksOnly: z.boolean().optional().catch(undefined),
+  allowedHttpHookUrls: z.array(z.string()).optional().catch(undefined)
+})
+export type ClaudeHookPolicy = z.infer<typeof ClaudeHookPolicy>
+
 export const HOOK_NAMES = [
   'SessionStart',
   'SessionEnd',

@@ -56,6 +56,19 @@ export const MESSAGES = {
     title: 'Speech engine had a problem',
     detail: 'Press the hotkey again. If it keeps happening, send the logs.'
   },
+  HOOKS_BLOCKED: {
+    title: "Your Claude settings block VoiceUp's status hooks",
+    detail:
+      'Voice is off, because VoiceUp cannot tell when Claude is ready. Change this setting, then restart the session. See https://code.claude.com/docs/en/hooks'
+  },
+  HOOKS_FAILED: {
+    title: "VoiceUp's status hooks could not start",
+    detail: 'Voice is off, because VoiceUp cannot tell when Claude is ready. Restart VoiceUp.'
+  },
+  STARTING_SLOW: {
+    title: 'Waiting for Claude to start',
+    detail: 'Finish any prompt in the terminal. If there is none, check your Claude hook settings.'
+  },
   TRANSCRIPT_DROPPED: {
     title: 'Nothing usable was heard',
     detail: 'Press the hotkey and try again.'

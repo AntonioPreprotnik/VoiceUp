@@ -18,6 +18,7 @@ let controller: RecordingController
 let next: number
 let micDevice: string | null
 let workerRunning: boolean
+let voiceBlock: 'HOOKS_BLOCKED' | null
 let restartWorker: Mock
 let escape: { held: (() => void) | undefined; hold(onPress: () => void): void; release(): void }
 let overlay: {
@@ -44,6 +45,7 @@ beforeEach(() => {
   next = 1
   micDevice = null
   workerRunning = true
+  voiceBlock = null
   restartWorker = vi.fn()
   escape = {
     held: undefined,
@@ -76,6 +78,7 @@ beforeEach(() => {
     recorder,
     getDeviceId: () => micDevice,
     minWords: 1,
+    voiceBlock: () => voiceBlock,
     overlay,
     escape
   })
@@ -316,6 +319,23 @@ describe('a transcript', () => {
     for (const spy of others) {
       expect(JSON.stringify(spy.mock.calls)).not.toContain('delete the database')
     }
+  })
+})
+
+describe('when voice is off', () => {
+  it('says why, without opening the mic', () => {
+    voiceBlock = 'HOOKS_BLOCKED'
+    controller.press()
+    expect(overlay.failed).toHaveBeenCalledWith('HOOKS_BLOCKED')
+    expect(toRecorder).toEqual([])
+    expect(toWorker).toEqual([])
+  })
+
+  it('still lets a recording already running be cancelled', () => {
+    controller.press()
+    voiceBlock = 'HOOKS_BLOCKED'
+    controller.press()
+    expect(toWorker.at(-1)).toEqual({ type: 'cancel', recordingId: 'r1' })
   })
 })
 

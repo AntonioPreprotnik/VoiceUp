@@ -4,7 +4,7 @@
 /** A press this soon after the preview appears was meant for what came before: it can't send. */
 export const LATE_PRESS_GUARD_MS = 300
 /** However short the text, there is time to read it and react. */
-export const MIN_COUNTDOWN_MS = 5000
+export const MIN_COUNTDOWN_MS = 3500
 
 export interface PreviewSettings {
   /** For each word, so there is time to read it. 0 sends at once, unless alwaysConfirm is on. */

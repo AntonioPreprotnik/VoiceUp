@@ -15,7 +15,7 @@ describe('defaultSettings', () => {
         noSpeechTimeoutSec: 8,
         minWords: 1
       },
-      delivery: { previewMs: 1000, alwaysConfirm: false, queue: true, maxQueue: 3 },
+      delivery: { previewMs: 700, alwaysConfirm: false, queue: true, maxQueue: 3 },
       claude: { projectDir: null, browserControl: false },
       ui: { fontSize: 14, sounds: true, notifications: true, startWithWindows: false },
       logLevel: 'info'

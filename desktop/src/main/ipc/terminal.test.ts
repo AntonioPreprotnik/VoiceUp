@@ -26,16 +26,32 @@ function terminalEvent(frameUrl = APP_PAGE): unknown {
   return { sender: { id: window.webContents.id }, senderFrame: { url: frameUrl } }
 }
 
+const onInput = vi.fn()
+
 beforeEach(() => {
   resetFakes()
   vi.clearAllMocks()
-  registerTerminalIpc(host as unknown as PtyHost)
+  registerTerminalIpc(host as unknown as PtyHost, onInput)
 })
 
 describe('terminal IPC', () => {
   it('passes valid input to the PTY', () => {
     ipcMain.emit(Channels.termInput, terminalEvent(), 'ls\r')
     expect(host.write).toHaveBeenCalledWith('ls\r')
+  })
+
+  it('shows each keystroke to the state tracker before Claude gets it', () => {
+    const order: string[] = []
+    onInput.mockImplementationOnce(() => order.push('tracker'))
+    host.write.mockImplementationOnce(() => order.push('claude'))
+    ipcMain.emit(Channels.termInput, terminalEvent(), '\x1b')
+    expect(onInput).toHaveBeenCalledWith('\x1b')
+    expect(order).toEqual(['tracker', 'claude'])
+  })
+
+  it('shows the tracker nothing from an invalid message', () => {
+    ipcMain.emit(Channels.termInput, terminalEvent(), 42)
+    expect(onInput).not.toHaveBeenCalled()
   })
 
   it('passes a valid resize', () => {

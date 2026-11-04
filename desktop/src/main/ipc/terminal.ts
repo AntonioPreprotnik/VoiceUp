@@ -27,8 +27,10 @@ export function on<T>(
   })
 }
 
-export function registerTerminalIpc(host: PtyHost): void {
+/** `onInput` sees each keystroke before Claude does, because the state depends on some of them. */
+export function registerTerminalIpc(host: PtyHost, onInput: (data: string) => void): void {
   on(Channels.termInput, TermInput, (data) => {
+    onInput(data)
     host.write(data)
   })
   on(Channels.termResize, TermResize, (size) => {

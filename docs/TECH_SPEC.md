@@ -159,7 +159,9 @@ The same `http` handler is registered for `PreToolUse`, `PermissionRequest`, `Po
 
 A pure function in `core/state`: `reduce(state, event) → { state, effects }`. Events are hook events plus `ptyExit`, `userKey(kind)`, `sessionRestart`, `localUiSuspected`, `deliveryTimeout` and `reArm`. This table comes from the S2.1 recordings (`docs/decisions/S2.1-hook-events.md`); anything not listed moves to `unknown`, which blocks sending.
 
-Beside the state, the reducer keeps two things. `turnActive` is true from `UserPromptSubmit` until `Stop`, `StopFailure` or an Esc. `pendingAgentPermissions` is the set of `agent_id`s with a `PermissionRequest` not yet answered; a `PermissionRequest` carries no `tool_use_id`, so `agent_id` is the key. It empties on `reArm`, `sessionRestart`, `ptyExit` and any `SessionStart` that sets `idle`.
+Beside the state, the reducer keeps two things. `turnActive` is true from `UserPromptSubmit` until `Stop`, `StopFailure` or an Esc. `pendingAgentPermissions` lists the background agents' `PermissionRequest`s not yet answered, oldest first. A `PermissionRequest` carries no `tool_use_id`, so the key is `agent_id` plus `tool_name`: a parallel auto-approved tool from the same agent finishing doesn't answer a prompt, unless it is the same tool, which remains possible. One entry goes on `PostToolUse` or `PostToolUseFailure` with that key, and the oldest goes on Esc, Ctrl+C or `localUiSuspected` at the prompt, since a denial fires no hook. It empties on `reArm`, `sessionRestart`, `ptyExit` and any `SessionStart` that sets `idle`.
+
+**The invariant: while `pendingAgentPermissions` is not empty, a hook can never produce `idle` or `busy`; the state stays or becomes `awaitingPermission`.** In the table below, every "`idle`" or "`busy`" reached by a hook is subject to this. Without it, `<task-notification>` from another agent finishing, or a `Stop` from `unknown`, would clear an open prompt. To get out of `awaitingPermission` with nothing on screen, such as after stopping an agent with its own keys, press Esc in the terminal, once per prompt, then re-arm.
 
 | From | Event | To |
 | --- | --- | --- |
@@ -168,11 +170,11 @@ Beside the state, the reducer keeps two things. `turnActive` is true from `UserP
 | `idle` | `UserPromptSubmit` | `busy` |
 | `unknown` | `UserPromptSubmit` | `busy` |
 | `busy` | `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure` | `busy` (no change) |
-| `idle`, `unknown` | `PreToolUse`, `PostToolUse`, `PostToolUseFailure` carrying `agent_id` (subagent or background agent) | unchanged |
+| `idle`, `unknown`, `awaitingInput` | `PreToolUse`, `PostToolUse`, `PostToolUseFailure` carrying `agent_id` (subagent or background agent) | unchanged |
 | `idle`, `busy`, `awaitingPermission`, `unknown` | `PermissionRequest`, `Notification` matcher `permission_prompt` | `awaitingPermission`; with `agent_id`, also add it to `pendingAgentPermissions` |
 | `awaitingPermission` | `PostToolUse`, `PostToolUseFailure` or `PreToolUse` with no `agent_id` | `busy` |
-| `awaitingPermission` | `PostToolUse` or `PostToolUseFailure` carrying a pending `agent_id` | remove it; if none are left, `busy` when `turnActive`, otherwise `idle`; if some are left, unchanged |
-| `awaitingPermission` | `PreToolUse` carrying `agent_id` | unchanged: another agent working doesn't answer the prompt |
+| `awaitingPermission` | `PostToolUse` or `PostToolUseFailure` matching a pending entry | remove it; if none are left, `busy` when `turnActive`, otherwise `idle`; if some are left, unchanged |
+| `awaitingPermission` | `PreToolUse` carrying `agent_id`, or a `PostToolUse` or `PostToolUseFailure` matching no pending entry | unchanged: an agent working doesn't answer the prompt |
 | `awaitingPermission` | `Stop` with `pendingAgentPermissions` not empty | unchanged: a background agent's prompt is still open. **Getting this wrong lets voice text approve it** (S2.1) |
 | `busy`, `awaitingPermission` | `Stop` with `pendingAgentPermissions` empty | `idle` |
 | `awaitingPermission` | `UserPromptSubmit` | `busy`, after a denial that fired no hook |
@@ -189,11 +191,14 @@ Beside the state, the reducer keeps two things. `turnActive` is true from `UserP
 | any | `deliveryTimeout` (§4.5) | `unknown` |
 | `unknown` | `reArm` | `idle` |
 | any | `ptyExit` | `exited`. `SessionEnd` isn't registered (§4.2), so it arrives only as an unexpected event |
+| `exited` | anything but `sessionRestart` | `exited`: a late hook must not offer "Re-arm voice" on a dead session |
 | any | `sessionRestart` | `starting` |
 
 **Allowlisted notification types:** `auth_success`, `agent_completed`, `elicitation_complete`, `elicitation_response`, `quota_auto_resume_fired`, `quota_auto_resume_stale`, `quota_auto_resume_disabled`, `plugin_notification`. Any other type not in the table, including `agent_needs_input` and future values, moves to `unknown`. `permission_prompt` only arrives after the prompt has waited about six seconds, so `PermissionRequest` is the primary signal.
 
-**Leaving `unknown`.** `Stop` does not run after a user interrupt, and a denied permission fires nothing at all (S2.1), so an Esc must not wait for either. `unknown` ends through a later turn (`UserPromptSubmit`, then `Stop`) or the manual "Re-arm voice" action in the status bar, where the user confirms that the main prompt is ready, so re-arm is the normal way back after an Esc. `idle_prompt` also ends it, but S2.1 saw it only after a normal `Stop`, 60 s later, and not within 75 s of an Esc. It never ends on a timer. Manual `/compact` also lands here: it fires no `UserPromptSubmit` or `Stop`, its Enter raises `localUiSuspected`, and `SessionStart(compact)` leaves the state unchanged.
+**Leaving `unknown`.** `Stop` does not run after a user interrupt, and a denied permission fires nothing at all (S2.1), so an Esc must not wait for either. `unknown` ends through a later turn (`UserPromptSubmit`, then `Stop`) or the manual "Re-arm voice" action in the status bar, where the user confirms that the main prompt is ready, so re-arm is the normal way back after an Esc. `idle_prompt` also ends it, but S2.1 saw it only after a normal `Stop`, 60 s later, and not within 75 s of an Esc. It never ends on a timer. Manual `/compact` also lands here: it fires no `UserPromptSubmit` or `Stop`, its Enter raises `localUiSuspected`, and `SessionStart(compact)` leaves the state unchanged. So does an Enter on an empty prompt, which is pessimistic by design (§4.4).
+
+The state lives in `core/state/tracker.ts`, which holds the reducer's context and raises `localUiSuspected`: an Enter while `idle` or `awaitingPermission` starts a 1 s wait that any change of state, or a `SessionStart`, answers.
 
 ### 4.4 Send gate and prompt-dirty tracking
 

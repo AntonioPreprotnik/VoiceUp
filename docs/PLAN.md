@@ -318,7 +318,7 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 - AC: `~/.claude/settings.json` is never modified; verified by file hash before/after.
 - AC: the app's hooks reach the receiver from a real session, shown by the `debug` log's event names. `/hooks` can't show this: on Claude Code 2.1.318 it reports "0 with hooks" for hooks passed with `--settings`, even while they fire.
 
-**[ ] S2.4 State machine.** As the developer, I want one tested source of truth for Claude's state.
+**[x] S2.4 State machine.** As the developer, I want one tested source of truth for Claude's state.
 
 - AC: pure module in `src/core` with states `starting`, `idle`, `busy`, `awaitingPermission`, `awaitingInput` (elicitation dialogs), `exited`, `unknown`. `exited` comes from the PTY: `SessionEnd` isn't registered (TECH_SPEC §4.2).
 - AC: transitions derived from the S2.1 note; any unexpected event moves to `unknown` (fail safe). `SessionStart` with source `compact` or `fork` leaves the state unchanged, because auto-compaction can fire in the middle of a turn.

@@ -21,7 +21,7 @@ Spec: `docs/TECH_SPEC.md` §4. Ground truth for event order: `docs/decisions/S2.
 - `SessionStart` supports only command/MCP hooks → `curl.exe` by absolute path in exec form (`command` + `args`) with `--noproxy "*"`, token via `-H @<headerfile>`, body via `--data-binary @-`. All other events use `type: "http"` with `headers` + `allowedEnvVars: ["VOICEUP_HOOK_TOKEN"]`.
 - Hook handler timeout 5 s; no `onFailure: "block"`.
 - Unknown or out-of-order events move state to `unknown` (fail safe). Never guess `idle`. `Stop` does not fire after a user interrupt and a denied permission fires nothing, so `unknown` ends only through a later turn, the manual re-arm or `idle_prompt`, never on a timer.
-- A `Stop` must never clear a background agent's pending permission: its `PermissionRequest` can come just before the main turn's `Stop`, and voice text sent then approves it (S2.1).
+- A `Stop` must never clear a background agent's pending permission: its `PermissionRequest` can come just before the main turn's `Stop`, and voice text sent then approves it (S2.1). Nor may anything else: in the reducer, a hook reaches `idle` or `busy` only through `settle()`, which holds `awaitingPermission` while any are pending.
 - `SessionStart` with `source` `compact` or `fork` must not change state (auto-compaction fires mid-turn); `startup`, `resume`, `clear` → `idle`.
 - In-turn events (`PreToolUse`, `PostToolUse`, `PostToolUseFailure`) keep `busy` as `busy`; they are not unknown. With `agent_id`, they also keep `idle` as `idle`.
 - Never register `SessionEnd`: with it, closing the packaged app took 9.6 s and was force-killed (TECH_SPEC §4.2). A PTY exit means `exited`; after `/clear` or `/resume` the next `SessionStart` decides.
@@ -33,7 +33,7 @@ Spec: `docs/TECH_SPEC.md` §4. Ground truth for event order: `docs/decisions/S2.
 ## Changing the reducer
 1. Record the real sequence first (run Claude with the debug receiver logging every body) and save it as a scenario JSON: `{ "name": "...", "events": [{ "event": "Stop", "body": {...} }] }`. Strip prompts, file contents, `cwd` and `transcript_path` from bodies: fixtures are public.
 2. Add the transition to `src/core/state/reducer.ts` and to the table in TECH_SPEC §4.3.
-3. Add a test that replays the scenario and asserts the state after each event.
+3. Add its expected states to `test/integration/state-replay.test.ts`, which replays every scenario at its recorded timing.
 4. Re-run the gate tests: every state must map to exactly one gate decision (§4.4).
 
 ## Debugging

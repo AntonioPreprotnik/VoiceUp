@@ -5,6 +5,7 @@ import { MESSAGES } from '../core/messages'
 import { RecordingToggle } from '../core/recordingToggle'
 import { runShutdown, type ShutdownSteps } from '../core/shutdown'
 import { parseSmokeTestPath } from '../core/smokeTest'
+import { ClaudeStateTracker } from '../core/state/tracker'
 import { RecorderDevices } from '../shared/ipc'
 import { Channels, type MicDevice } from '../shared/ipcChannels'
 import { HookLink } from './hooks/link'
@@ -121,16 +122,32 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
       loadRenderer(overlayWindow, 'overlay').catch((error: unknown) => {
         log.error('Could not load the overlay window', error)
       })
+      const claudeState = new ClaudeStateTracker({
+        schedule: (callback, ms) => {
+          const timer = setTimeout(callback, ms)
+          return () => {
+            clearTimeout(timer)
+          }
+        },
+        onChange: (state, previous) => {
+          log.debug(`Claude state: ${previous} -> ${state}`)
+        },
+        onEffect: (effect) => {
+          // Only a short code from Claude. Anything else might quote more than it should.
+          const code = /^[a-z_]{1,40}$/.test(effect.error ?? '') ? effect.error : 'other'
+          log.warn(`Claude's turn failed: ${String(code)}`)
+        }
+      })
       // Step 4: stale files go, then the hook server and this launch's hook files.
       const hooks = new HookLink({
         runDir: join(app.getPath('userData'), 'run'),
         curlPath: system32Path('curl.exe'),
         readPolicies: (projectDir) => readHookPolicies({ projectDir }),
         onMessage: (message) => {
-          // The state machine takes these from S2.4.
           if (message.kind === 'hook' && message.hook.hook_event_name === 'SessionStart') {
             log.info('Claude session started')
           }
+          claudeState.onHook(message)
         },
         onUnavailable: (code, setting) => {
           const { title, detail } = MESSAGES[code]
@@ -235,9 +252,21 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
         settings,
         settingsDir: app.getPath('userData'),
         resolveCommand: () => resolveClaude(app.isPackaged),
-        hooks
+        hooks: {
+          prepareLaunch: (cwd) => hooks.prepareLaunch(cwd),
+          launched: () => {
+            claudeState.sessionRestart()
+            hooks.launched()
+          },
+          exited: () => {
+            claudeState.ptyExit()
+            hooks.exited()
+          }
+        }
       })
-      registerTerminalIpc(claude.host)
+      registerTerminalIpc(claude.host, (data) => {
+        claudeState.onInput(data)
+      })
       steps.pty ??= () => claude.host.stop()
       registerTerminalUiIpc(mainWindow, () => claude.fontSize)
       let microphones: readonly MicDevice[] = []

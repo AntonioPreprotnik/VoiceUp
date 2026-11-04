@@ -4,7 +4,11 @@ import { z } from 'zod'
 // kept: zod drops the rest, so tool input and file contents go no further than the parse.
 
 const session = { session_id: z.string().optional() }
-const agent = { ...session, agent_id: z.string().optional() }
+const agent = {
+  ...session,
+  agent_id: z.string().optional(),
+  tool_name: z.string().optional()
+}
 
 const HookEvent = z.discriminatedUnion('hook_event_name', [
   z.object({ hook_event_name: z.literal('SessionStart'), ...session, source: z.string() }),
@@ -32,7 +36,11 @@ const HookEvent = z.discriminatedUnion('hook_event_name', [
     ...session,
     background_tasks: z.array(z.unknown()).optional()
   }),
-  z.object({ hook_event_name: z.literal('StopFailure'), ...session })
+  z.object({
+    hook_event_name: z.literal('StopFailure'),
+    ...session,
+    error: z.string().optional()
+  })
 ])
 export type HookEvent = z.infer<typeof HookEvent>
 

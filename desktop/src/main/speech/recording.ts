@@ -27,8 +27,12 @@ export interface RecordingOptions {
   /** Why voice is off right now, or null. */
   readonly voiceBlock: () => MessageCode | null
   readonly previewSettings: () => PreviewSettings
-  /** The user let the text through. */
-  readonly deliver: (text: string) => void
+  /** Takes the text once the user lets it through, and holds one that was blocked. */
+  readonly delivery: {
+    readonly holding: boolean
+    deliver(text: string): void
+    retry(): void
+  }
   /** Esc, held only while there is something to cancel (TECH_SPEC §4.4). */
   readonly escape: { hold(onPress: () => void): void; release(): void }
   readonly overlay: Pick<
@@ -55,7 +59,7 @@ export class RecordingController {
       onSend: (text) => {
         options.overlay.finished()
         options.escape.release()
-        options.deliver(text)
+        options.delivery.deliver(text)
       },
       onCancel: () => {
         log.info('Preview cancelled')
@@ -79,6 +83,12 @@ export class RecordingController {
     // Never a new recording while one waits to be sent. A press in the guard does nothing at all.
     if (this.preview.active) {
       if (this.preview.press()) log.info('Hotkey: send now')
+      return
+    }
+    // Never a new recording while one waits for a retry.
+    if (this.options.delivery.holding) {
+      log.info('Hotkey: retry')
+      this.options.delivery.retry()
       return
     }
     // Starting now would open the mic for a recording nothing can ever end.

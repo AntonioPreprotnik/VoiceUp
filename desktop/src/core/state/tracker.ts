@@ -1,4 +1,6 @@
-import type { HookMessage } from '../../shared/hooks'
+import type { HookEvent, HookMessage } from '../../shared/hooks'
+import { dirtyAfterInput } from './promptDirty'
+import { isClaudeOwnPrompt } from '../delivery/sanitize'
 import {
   INITIAL_STATE,
   reduce,
@@ -25,6 +27,7 @@ export interface TrackerOptions {
 export class ClaudeStateTracker {
   private context: StateContext = INITIAL_STATE
   private cancelWatch: (() => void) | undefined
+  private dirty = false
 
   constructor(private readonly options: TrackerOptions) {}
 
@@ -32,8 +35,19 @@ export class ClaudeStateTracker {
     return this.context.state
   }
 
+  /** The user may have unsent text in Claude's prompt, which a send would merge with. */
+  get promptDirty(): boolean {
+    return this.dirty
+  }
+
+  /** A delivery may have left its text there. */
+  markPromptDirty(): void {
+    this.dirty = true
+  }
+
   /** The new session's state, at each launch. */
   sessionRestart(): void {
+    this.dirty = false
     this.stopWatching()
     this.dispatch({ type: 'sessionRestart' })
   }
@@ -62,12 +76,30 @@ export class ClaudeStateTracker {
     // /clear stays idle throughout, so its Enter is answered only by this.
     if (message.hook.hook_event_name === 'SessionStart') this.stopWatching()
     this.dispatch({ type: 'hook', hook: message.hook })
+    this.updateDirty(message.hook)
+  }
+
+  /** Claude's own turns submit nothing from the prompt, so only the user's clear it. */
+  private updateDirty(hook: HookEvent): void {
+    if (hook.hook_event_name === 'UserPromptSubmit') {
+      if (hook.prompt === undefined || !isClaudeOwnPrompt(hook.prompt)) this.dirty = false
+    } else if (hook.hook_event_name === 'SessionStart' && this.context.state === 'idle') {
+      // Compaction leaves the prompt as it was.
+      if (hook.source !== 'compact' && hook.source !== 'fork') this.dirty = false
+    }
   }
 
   /** Every keystroke, before it reaches Claude. Never stored or logged. */
   onInput(data: string): void {
+    if (data === CTRL_C) {
+      // At the main prompt it clears the text. At anything else, the text is still there.
+      const { state } = this.context
+      if (state === 'idle' || state === 'unknown') this.dirty = false
+      this.dispatch({ type: 'userKey', key: 'ctrlC' })
+      return
+    }
+    this.dirty = dirtyAfterInput(this.dirty, data, this.context.state)
     if (data === ESC) this.dispatch({ type: 'userKey', key: 'esc' })
-    else if (data === CTRL_C) this.dispatch({ type: 'userKey', key: 'ctrlC' })
     else if (data === ENTER) this.watchEnter()
     else this.dispatch({ type: 'userKey', key: 'other' })
   }

@@ -162,6 +162,16 @@ describe('a preview', () => {
   })
 })
 
+describe('a blocked transcript', () => {
+  it('shows why, and stays until told otherwise', () => {
+    vi.useFakeTimers()
+    create().blocked('Claude is waiting for you')
+    vi.advanceTimersByTime(60000)
+    expect(states().at(-1)).toEqual({ phase: 'blocked', reason: 'Claude is waiting for you' })
+    expect(window.bounds).toMatchObject({ width: 560, height: 124 })
+  })
+})
+
 describe('the sounds', () => {
   it('plays start on the press and stop when speech ends', () => {
     const overlay = create()

@@ -21,6 +21,8 @@ let workerRunning: boolean
 let voiceBlock: 'HOOKS_BLOCKED' | null
 let previewSettings: { previewMs: number; alwaysConfirm: boolean }
 let deliver: Mock
+let retry: Mock
+let delivery: { holding: boolean; deliver: Mock; retry: Mock }
 let restartWorker: Mock
 let escape: { held: (() => void) | undefined; hold(onPress: () => void): void; release(): void }
 let overlay: {
@@ -52,6 +54,8 @@ beforeEach(() => {
   // No preview unless a test asks for one, which keeps the other tests about what they are about.
   previewSettings = { previewMs: 0, alwaysConfirm: false }
   deliver = vi.fn()
+  retry = vi.fn()
+  delivery = { holding: false, deliver, retry }
   restartWorker = vi.fn()
   escape = {
     held: undefined,
@@ -87,7 +91,7 @@ beforeEach(() => {
     minWords: 1,
     voiceBlock: () => voiceBlock,
     previewSettings: () => previewSettings,
-    deliver,
+    delivery,
     overlay,
     escape
   })
@@ -437,6 +441,16 @@ describe('a preview', () => {
     for (const spy of others) {
       expect(JSON.stringify(spy.mock.calls)).not.toContain('delete the database')
     }
+  })
+})
+
+describe('a blocked transcript waiting', () => {
+  it('takes the hotkey as a retry, and starts no new recording', () => {
+    delivery.holding = true
+    controller.press()
+    expect(retry).toHaveBeenCalledOnce()
+    expect(toWorker).toEqual([])
+    expect(toRecorder).toEqual([])
   })
 })
 

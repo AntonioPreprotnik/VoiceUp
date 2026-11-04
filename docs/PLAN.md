@@ -425,9 +425,9 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 - AC: confirm the prompt is empty before typing, and what happens when the user has half-typed text.
 - AC: decision note with the chosen method.
 
-**[ ] S5.4 Deliver.** As a user, I want the command submitted like I typed it.
+**[x] S5.4 Deliver.** As a user, I want the command submitted like I typed it.
 
-- AC: uses the S5.3 method (`docs/decisions/S5.3-input-injection.md`): sanitized, a space before a leading `/` or `!`, one paste, then Enter 250 ms later; re-checks the gate immediately before writing (state can change during the preview).
+- AC: uses the S5.3 method (`docs/decisions/S5.3-input-injection.md`): sanitized, a space before a leading `/` or `!`, one paste, then Enter 250 ms later; re-checks the gate immediately before writing (state can change during the preview), and again before Enter, which would otherwise answer a prompt that opened in the gap.
 - AC: text over 900 characters is blocked with `TRANSCRIPT_TOO_LONG`, never cut, because Claude's input loses the start of longer text and submits the rest.
 - AC: the submitted prompt is checked against the text. If it differs, Claude is interrupted and the user is told (`DELIVERY_GARBLED`).
 - AC: if the user has unsent text in the prompt, never overwrite it; block and notify instead. This needs the prompt-dirty tracker from TECH_SPEC §4.4: S5.3 found a paste merges with typed text and is sent, and nothing reports the prompt's contents.

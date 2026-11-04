@@ -69,6 +69,19 @@ export const MESSAGES = {
     title: 'Waiting for Claude to start',
     detail: 'Finish any prompt in the terminal. If there is none, check your Claude hook settings.'
   },
+  TRANSCRIPT_TOO_LONG: {
+    title: 'That was too long to send safely',
+    detail: 'Nothing was sent. Say it in shorter parts.'
+  },
+  DELIVERY_UNCONFIRMED: {
+    title: 'Your command may not have been sent',
+    detail:
+      "It may still be in Claude's prompt. Check the terminal: press Enter, or Ctrl+C to clear it."
+  },
+  DELIVERY_GARBLED: {
+    title: 'Claude received something different',
+    detail: 'Claude was interrupted. Check what it got in the terminal before going on.'
+  },
   TRANSCRIPT_DROPPED: {
     title: 'Nothing usable was heard',
     detail: 'Press the hotkey and try again.'

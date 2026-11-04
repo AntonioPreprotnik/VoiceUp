@@ -56,6 +56,12 @@ export class Overlay {
     this.show({ phase: 'preview', text, countdownMs })
   }
 
+  /** Stays until the hotkey sends it, Esc discards it, or its time runs out. */
+  blocked(reason: string): void {
+    this.pressedAt = undefined
+    this.show({ phase: 'blocked', reason })
+  }
+
   /** The transcript arrived or the recording was cancelled. */
   finished(): void {
     this.pressedAt = undefined
@@ -85,7 +91,7 @@ export class Overlay {
       window.hide()
       return
     }
-    const size = state.phase === 'preview' ? PREVIEW_SIZE : SIZE
+    const size = state.phase === 'preview' || state.phase === 'blocked' ? PREVIEW_SIZE : SIZE
     const visible = window.isVisible()
     if (!visible || size !== this.shownSize) {
       this.shownSize = size

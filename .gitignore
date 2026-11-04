@@ -7,3 +7,5 @@ desktop/resources/models/
 .claude/settings.local.json
 *.tsbuildinfo
 smoke.json
+test-results/
+playwright-report/

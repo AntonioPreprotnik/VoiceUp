@@ -47,11 +47,21 @@ export class BrowserWindow extends EventEmitter {
   focused = false
   visible = false
   destroyed = false
+  title = ''
+  progress: number | undefined
 
   constructor(readonly options: Record<string, unknown>) {
     super()
     calls.push('window')
     BrowserWindow.instances.push(this)
+  }
+
+  setTitle(title: string): void {
+    this.title = title
+  }
+
+  setProgressBar(progress: number): void {
+    this.progress = progress
   }
 
   loadURL(url: string): Promise<void> {

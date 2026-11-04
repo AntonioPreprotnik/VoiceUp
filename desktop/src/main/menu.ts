@@ -2,6 +2,7 @@ import { mkdir } from 'node:fs/promises'
 import { app, Menu, shell, type MenuItemConstructorOptions } from 'electron'
 import type { FontSizeChange } from '../core/fontSize'
 import type { MicDevice } from '../shared/ipcChannels'
+import type { ModelId } from '../shared/models'
 import { log, logsDirectory } from './log'
 
 async function openLogsFolder(): Promise<void> {
@@ -19,6 +20,45 @@ export interface SessionMenuActions {
   readonly selectedMicrophone: string | null
   /** Null is the system default. */
   readonly selectMicrophone: (deviceId: string | null) => void
+  readonly speechModel: SpeechModelMenu
+}
+
+/** A stand-in for the settings screen, S6.6. */
+export interface SpeechModelMenu {
+  readonly choices: readonly { id: ModelId; label: string; checked: boolean }[]
+  /** Shown greyed out, such as what's downloading and the disk usage. */
+  readonly notes: readonly string[]
+  readonly canRetry: boolean
+  readonly select: (id: ModelId) => void
+  readonly retry: () => void
+}
+
+function speechModelMenu(menu: SpeechModelMenu): MenuItemConstructorOptions {
+  return {
+    label: 'Speech model',
+    submenu: [
+      ...menu.choices.map(({ id, label, checked }): MenuItemConstructorOptions => ({
+        label,
+        type: 'radio',
+        checked,
+        click: () => {
+          menu.select(id)
+        }
+      })),
+      { type: 'separator' },
+      ...(menu.canRetry
+        ? [
+            {
+              label: 'Retry download',
+              click: () => {
+                menu.retry()
+              }
+            }
+          ]
+        : []),
+      ...menu.notes.map((label) => ({ label, enabled: false }))
+    ]
+  }
 }
 
 function microphoneMenu(actions: SessionMenuActions): MenuItemConstructorOptions {
@@ -115,6 +155,7 @@ export function installAppMenu(actions?: SessionMenuActions): void {
     ]
   }
   const microphone = actions === undefined ? undefined : microphoneMenu(actions)
-  const items = [file, view, microphone, help, app.isPackaged ? undefined : devTools]
+  const speechModel = actions === undefined ? undefined : speechModelMenu(actions.speechModel)
+  const items = [file, view, microphone, speechModel, help, app.isPackaged ? undefined : devTools]
   Menu.setApplicationMenu(Menu.buildFromTemplate(items.filter((item) => item !== undefined)))
 }

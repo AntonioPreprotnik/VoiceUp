@@ -26,6 +26,7 @@ function actions(
     changeFolder: () => Promise.resolve(),
     microphones: [],
     selectedMicrophone: null,
+    speechModel: { choices: [], notes: [], canRetry: false, select: vi.fn(), retry: vi.fn() },
     ...overrides,
     changeFontSize: vi.fn(),
     selectMicrophone: vi.fn()
@@ -53,7 +54,43 @@ describe('the app menu', () => {
 
   it('adds File and View only when there is a session to change', () => {
     installAppMenu(actions())
-    expect(template().map((item) => item.label)).toEqual(['File', 'View', 'Microphone', 'Help'])
+    expect(template().map((item) => item.label)).toEqual([
+      'File',
+      'View',
+      'Microphone',
+      'Speech model',
+      'Help'
+    ])
+  })
+
+  it('offers the speech models, and a retry only when one failed', () => {
+    const select = vi.fn()
+    const retry = vi.fn()
+    const speechModel = {
+      choices: [{ id: 'moonshine-base-en' as const, label: 'Moonshine', checked: true }],
+      notes: ['Models on disk: 287 MB'],
+      canRetry: false,
+      select,
+      retry
+    }
+    const items = (): TemplateItem[] =>
+      template().find((item) => item.label === 'Speech model')?.submenu ?? []
+
+    installAppMenu(actions({ speechModel }))
+    expect(items().map(({ label }) => label)).toEqual([
+      'Moonshine',
+      undefined,
+      'Models on disk: 287 MB'
+    ])
+    expect(items()[0]).toMatchObject({ type: 'radio', checked: true })
+    items()[0]?.click?.()
+    expect(select).toHaveBeenCalledWith('moonshine-base-en')
+
+    installAppMenu(actions({ speechModel: { ...speechModel, canRetry: true } }))
+    items()
+      .find((item) => item.label === 'Retry download')
+      ?.click?.()
+    expect(retry).toHaveBeenCalledOnce()
   })
 
   it.each([

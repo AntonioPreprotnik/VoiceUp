@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
-import { app, session, type BrowserWindow } from 'electron'
+import { app, net, session, type BrowserWindow } from 'electron'
 import { MESSAGES } from '../core/messages'
 import { RecordingToggle } from '../core/recordingToggle'
 import { runShutdown, type ShutdownSteps } from '../core/shutdown'
@@ -12,6 +12,8 @@ import { on, registerTerminalIpc } from './ipc/terminal'
 import { registerTerminalUiIpc } from './ipc/terminalUi'
 import { initLogging, log, setLogLevel } from './log'
 import { installAppMenu } from './menu'
+import { loadManifest, ModelController, modelTitle } from './models/controller'
+import { ModelManager } from './models/manager'
 import { Overlay } from './overlay'
 import { installPermissions } from './permissions'
 import { installProcessErrorLogging } from './processErrors'
@@ -139,7 +141,35 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
           log.error(MESSAGES.WORKER_CRASHED.title)
         }
       })
-      speech.start(workerInit(settings.speech))
+      let shownPhase = 'idle'
+      const models = new ModelController({
+        manifest: loadManifest(),
+        manager: new ModelManager({
+          root: join(app.getPath('userData'), 'models'),
+          fetch: (url, init) => net.fetch(url, init)
+        }),
+        modelId: settings.speech.modelId,
+        onStatus: (status) => {
+          if (mainWindow === undefined) return
+          mainWindow.setTitle(modelTitle(status))
+          mainWindow.setProgressBar(status.phase === 'installing' ? status.percent / 100 : -1)
+          // The menu has no percentage, so it changes only with the phase.
+          if (status.phase !== shownPhase) {
+            shownPhase = status.phase
+            rebuildMenu()
+          }
+        },
+        onReady: (model) => {
+          // Whatever is being recorded can't be finished by a worker about to go.
+          recording.cancel()
+          speech.restart(workerInit(settings.speech, model))
+          rebuildMenu()
+        },
+        onFailed: (code) => {
+          overlay.failed(code)
+        }
+      })
+      speech.start(workerInit(settings.speech, models.installedModel()))
       steps.worker ??= () => speech.stop()
 
       // After the load: a port sent earlier arrives before the preload listens, and is lost.
@@ -176,6 +206,17 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
           selectMicrophone: (deviceId) => {
             claude.setMicDevice(deviceId)
             rebuildMenu()
+          },
+          speechModel: {
+            ...models.menu(),
+            select: (id) => {
+              claude.setModel(id)
+              models.select(id)
+              rebuildMenu()
+            },
+            retry: () => {
+              models.ensure()
+            }
           }
         })
       }
@@ -190,6 +231,8 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
         app.quit()
       })
       await loadRenderer(mainWindow, 'terminal')
+      // After the load, which would otherwise replace the title showing the progress.
+      models.ensure()
 
       // Step 7: the global hotkey, last, so a press always finds everything running.
       const { hotkey } = settings

@@ -1,4 +1,4 @@
-import { readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -18,6 +18,51 @@ import {
 import { resetFakePty, spawned } from '../../test/fakes/nodePty'
 import fakeLog from '../../test/fakes/electronLog'
 import { startApp } from './lifecycle'
+import { ModelError, type ModelPhase } from './models/manager'
+
+// The model manager has its own integration test against a real server.
+const fakeModels = vi.hoisted(() => ({
+  installed: new Set<string>(),
+  installs: [] as {
+    id: string
+    progress: (phase: ModelPhase, fraction: number) => void
+    finish: (error?: Error) => void
+  }[]
+}))
+
+vi.mock('./models/manager', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./models/manager')>()),
+  ModelManager: class {
+    isInstalled(entry: { id: string }): boolean {
+      return fakeModels.installed.has(entry.id)
+    }
+    paths(entry: { id: string }): unknown {
+      return { type: 'moonshine', tokens: `${entry.id}/tokens.txt` }
+    }
+    diskUsageBytes(): number {
+      return 0
+    }
+    install(
+      entry: { id: string },
+      progress: (phase: ModelPhase, fraction: number) => void
+    ): Promise<void> {
+      return new Promise((resolve, reject) => {
+        fakeModels.installs.push({
+          id: entry.id,
+          progress,
+          finish: (error) => {
+            if (error !== undefined) {
+              reject(error)
+              return
+            }
+            fakeModels.installed.add(entry.id)
+            resolve()
+          }
+        })
+      })
+    }
+  }
+}))
 
 vi.mock('electron', () => import('../../test/fakes/electron'))
 vi.mock('electron-log/main', () => import('../../test/fakes/electronLog'))
@@ -43,6 +88,10 @@ beforeEach(() => {
   for (const file of readdirSync(userData)) {
     if (file.startsWith('settings.bad-')) rmSync(join(userData, file))
   }
+  mkdirSync(join(userData, 'resources'), { recursive: true })
+  cpSync(join(__dirname, '../../resources/models.json'), join(userData, 'resources/models.json'))
+  fakeModels.installed.clear()
+  fakeModels.installs.length = 0
   calls.length = 0
 })
 
@@ -68,11 +117,14 @@ describe('startup', () => {
       'window',
       'window',
       'load',
+      'getPath:userData',
       'speechWorker',
       'load',
       'getPath:userData',
       'menu',
       'load',
+      // The model download starting changes the menu.
+      'menu',
       'hotkey'
     ])
   })
@@ -308,6 +360,71 @@ describe('the recorder window', () => {
       message: 'Could not start recording'
     })
     expect(JSON.stringify(fakeLog.messages('warn'))).toContain('Could not start recording')
+  })
+})
+
+describe('the speech model', () => {
+  const MOONSHINE = 'moonshine-base-en'
+
+  async function installing(): Promise<NonNullable<(typeof fakeModels.installs)[number]>> {
+    startApp({ argv: [] })
+    await settle()
+    const install = fakeModels.installs.at(0)
+    if (install === undefined) throw new Error('Nothing is installing')
+    return install
+  }
+
+  it('downloads Moonshine on first run, showing progress in the title and taskbar', async () => {
+    const install = await installing()
+    expect(install.id).toBe(MOONSHINE)
+    install.progress('downloading', 0.5)
+    expect(onlyWindow().title).toBe('VoiceUp - Downloading speech model 50%')
+    expect(onlyWindow().progress).toBe(0.5)
+  })
+
+  it('gives the worker the model when it is ready, and clears the progress', async () => {
+    const install = await installing()
+    expect(utilityProcess.children.at(0)?.messages[0]?.message).toMatchObject({ modelId: null })
+    install.finish()
+    await vi.waitFor(() => {
+      expect(utilityProcess.children).toHaveLength(2)
+    })
+    expect(utilityProcess.children.at(0)?.killed).toBe(true)
+    expect(utilityProcess.children.at(1)?.messages[0]?.message).toMatchObject({
+      modelId: MOONSHINE,
+      modelPaths: { tokens: `${MOONSHINE}/tokens.txt` }
+    })
+    expect(onlyWindow().title).toBe('VoiceUp')
+    expect(onlyWindow().progress).toBe(-1)
+  })
+
+  it('starts the worker with a model already on disk, and downloads nothing', async () => {
+    fakeModels.installed.add(MOONSHINE)
+    startApp({ argv: [] })
+    await settle()
+    expect(fakeModels.installs).toEqual([])
+    expect(utilityProcess.children).toHaveLength(1)
+    expect(utilityProcess.children.at(0)?.messages[0]?.message).toMatchObject({
+      modelId: MOONSHINE
+    })
+  })
+
+  it('reports a failure in the title, and the menu retries it', async () => {
+    const install = await installing()
+    install.finish(new ModelError('MODEL_DOWNLOAD_FAILED', 'offline'))
+    await vi.waitFor(() => {
+      expect(onlyWindow().title).toBe('VoiceUp - Speech model download failed')
+    })
+    interface Item {
+      label?: string
+      click?: () => void
+      submenu?: Item[]
+    }
+    const retry = (Menu.installed as Item[])
+      .find((item) => item.label === 'Speech model')
+      ?.submenu?.find((item) => item.label === 'Retry download')
+    retry?.click?.()
+    expect(fakeModels.installs).toHaveLength(2)
   })
 })
 

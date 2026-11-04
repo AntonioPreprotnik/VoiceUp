@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { ModelId } from './models'
 
 // TECH_SPEC §6.4. `.prefault({})` makes zod 4 parse a missing section as {}, so its defaults apply.
 export const Settings = z.object({
@@ -8,7 +9,7 @@ export const Settings = z.object({
   speech: z
     .object({
       // auto: Moonshine (decision note S4.1)
-      modelId: z.enum(['auto', 'parakeet-tdt-0.6b-v2-int8', 'moonshine-base-en']).default('auto'),
+      modelId: z.enum(['auto', ...ModelId.options]).default('auto'),
       endSilenceSec: z.number().min(0.5).max(3).default(1.2),
       minSpeechSec: z.number().min(0.1).max(1).default(0.25),
       maxRecordingSec: z.number().min(5).max(120).default(60),

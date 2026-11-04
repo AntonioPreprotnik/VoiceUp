@@ -59,8 +59,8 @@ export class RecordingController {
     }
   }
 
-  /** Esc: the same as pressing the hotkey again, but only ever cancels. */
-  private cancel(): void {
+  /** Esc, or the worker restarting: like pressing the hotkey again, but only ever cancels. */
+  cancel(): void {
     if (this.options.toggle.phase !== 'idle') this.press()
   }
 

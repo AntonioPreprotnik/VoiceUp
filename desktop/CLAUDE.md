@@ -19,7 +19,7 @@ Electron app. Root `CLAUDE.md`, `docs/PLAN.md` and `docs/TECH_SPEC.md` hold the 
 
 ## Pinned versions
 
-Exact versions only. Confirmed with `npm view` on 2026-11-02: Electron 45.2.1, electron-vite 5.0.0, Vite 7.3.7, TypeScript 6.0.3, @types/node 24.19.2, ESLint 10.14.0, @eslint/js 10.0.1, typescript-eslint 8.72.1, Prettier 3.9.10, Vitest 5.0.5, electron-builder 26.18.1, @electron/fuses 2.1.3 (reads the wire only; electron-builder keeps its own 1.8.0 to write it), license-checker-rseidelsohn 5.0.1, zod 4.6.7, electron-log 5.4.4. node-pty 1.2.0-beta.18 (S0.6), @xterm/xterm 6.0.0, @xterm/addon-fit 0.11.0, @xterm/addon-webgl 0.19.0, @xterm/addon-unicode11 0.9.0, @xterm/addon-web-links 0.12.0. sherpa-onnx-node 2.0.0.
+Exact versions only. Confirmed with `npm view` on 2026-11-02: Electron 45.2.1, electron-vite 5.0.0, Vite 7.3.7, TypeScript 6.0.3, @types/node 24.19.2, ESLint 10.14.0, @eslint/js 10.0.1, typescript-eslint 8.72.1, Prettier 3.9.10, Vitest 5.0.5, electron-builder 26.18.1, @electron/fuses 2.1.3 (reads the wire only; electron-builder keeps its own 1.8.0 to write it), license-checker-rseidelsohn 5.0.1, zod 4.6.7, electron-log 5.4.4. node-pty 1.2.0-beta.18 (S0.6), @xterm/xterm 6.0.0, @xterm/addon-fit 0.11.0, @xterm/addon-webgl 0.19.0, @xterm/addon-unicode11 0.9.0, @xterm/addon-web-links 0.12.0. sherpa-onnx-node 2.0.0, unbzip2-stream 1.4.3, tar-stream 3.2.2.
 
 ## Gotchas
 
@@ -36,6 +36,7 @@ Exact versions only. Confirmed with `npm view` on 2026-11-02: Electron 45.2.1, e
 - Frames from the recorder to the worker must be copied. A transferred `ArrayBuffer` reaches the `utilityProcess` as `null`. The smoke test sends frames from main, so it doesn't cover this path: test with the real hotkey and microphone.
 - The worker's stderr goes to the log, so a crash there explains itself.
 - A hidden recorder window is always open, so `window-all-closed` never fires: closing the terminal is what quits the app.
+- A model install runs in main and uses the title bar for progress until S6.5 and S6.6 bring real screens. To unpack the real archive in a test: `VOICEUP_TEST_MODELS=<folder holding it> npm test`.
 - Only the speech worker may load `sherpa-onnx-node`, which lint enforces. To run the engine for real, on a real recording: `VOICEUP_TEST_MODELS=<folder> VOICEUP_TEST_RECORDINGS=<folder> npm test`; CI skips this.
 - Main-process tests use the fake in `test/fakes/electron.ts`, which records the order of effects. It proves ordering and policy, not that Electron behaves: the packaged smoke test covers that.
 - Same-origin Vite HMR works under `connect-src 'self'`; the CSP needs no `ws:` entry in dev.

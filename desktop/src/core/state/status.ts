@@ -1,10 +1,10 @@
 import { MESSAGES, type MessageCode } from '../messages'
-import type { StatusView } from '../../shared/ipcChannels'
+import type { QueuedPreview, StatusView } from '../../shared/ipcChannels'
 import type { ClaudeState } from './reducer'
 
 // What each state looks like, in one place, so the status bar and the tray can't disagree.
 
-const VIEWS: Readonly<Record<ClaudeState, Omit<StatusView, 'canReArm'>>> = {
+const VIEWS: Readonly<Record<ClaudeState, Omit<StatusView, 'canReArm' | 'queue'>>> = {
   starting: {
     state: 'starting',
     label: 'Starting',
@@ -50,17 +50,22 @@ const VIEWS: Readonly<Record<ClaudeState, Omit<StatusView, 'canReArm'>>> = {
 }
 
 /** A block on voice outranks the state, which would otherwise say Starting forever. */
-export function statusView(state: ClaudeState, voiceBlock: MessageCode | null): StatusView {
+export function statusView(
+  state: ClaudeState,
+  voiceBlock: MessageCode | null,
+  queue: readonly QueuedPreview[] = []
+): StatusView {
   if (voiceBlock !== null) {
     return {
       state: 'blocked',
       label: 'Voice off',
       detail: MESSAGES[voiceBlock].title,
       color: VIEWS.exited.color,
-      canReArm: false
+      canReArm: false,
+      queue
     }
   }
-  return { ...VIEWS[state], canReArm: state === 'unknown' }
+  return { ...VIEWS[state], canReArm: state === 'unknown', queue }
 }
 
 export interface StateNotice {

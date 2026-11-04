@@ -226,7 +226,9 @@ Every value here was measured in S5.3 (`docs/decisions/S5.3-input-injection.md`)
 
 **Preview controls.** The overlay is click-through and never takes focus, so it has no buttons. During a preview (`core/preview.ts`), Esc (a global shortcut held only while recording, previewing or holding a blocked transcript) cancels and the hotkey sends at once, except in the first 300 ms of the preview, when it is ignored so a late cancel press can't send. A press never starts a new recording while a preview shows. Esc works from the first moment. The countdown is `previewMs` for each word, 1 s by default, and at least 5 s, because a flat 1 s and 3 s were both too short to read. There is no upper limit, and the hotkey sends sooner. A `previewMs` of 0 sends with no preview, unless always-confirm is on. While transcribing, the hotkey cancels. In always-confirm mode the preview waits for one of those two keys; a global Enter shortcut is never registered, because it would steal Enter from every other app.
 
-**Blocked transcripts.** When the gate blocks, the last transcript stays in memory for up to 30 s, counted from when it was first blocked, and is never written to disk. The overlay shows the reason; the hotkey retries through the gate and Esc discards it. A hotkey press never starts a new recording while one is held. Until S5.5 brings the queue, text spoken while Claude works is held like this.
+**Blocked transcripts.** When the gate blocks, the last transcript stays in memory for up to 30 s, counted from when it was first blocked, and is never written to disk. The overlay shows the reason; the hotkey retries through the gate and Esc discards it. A hotkey press never starts a new recording while one is held. With queueing off or the queue full, text spoken while Claude works is held like this.
+
+**Queue.** Text spoken while Claude works waits in memory, up to `maxQueue` items, shown in the status bar with a button to remove each. Items count as a pending delivery, so new text can't overtake them. When Claude's state or the prompt changes, the next item goes if the gate says `send`, after 300 ms, since `Stop` fires while the turn is still ending on screen, and the gate is asked again at that point. One goes at a time: the next waits for the following `idle`. It stays put through `unknown`, a permission prompt or typed text, so a failed delivery stops the queue until the user deals with it. A new session clears it, because those commands were meant for the old one.
 
 ## 5. Speech pipeline
 
@@ -351,7 +353,8 @@ Every boundary has one zod schema in `shared/`, imported by both sides; nothing 
 | `term:input` | renderer → main | string, ≤ 64 KB | terminal |
 | `term:resize` | renderer → main | `{ cols, rows }`, clamped | terminal |
 | `term:ack` | renderer → main | bytes written (flow control) | terminal |
-| `state:changed` | main → renderer | `{ state, label, detail, color, canReArm }`, drawn as sent so the status bar and tray can't disagree; S5.5 adds `queue: [{ id, preview }]` | terminal; overlay and settings from their stories |
+| `state:changed` | main → renderer | `{ state, label, detail, color, canReArm, queue: [{ id, preview }] }`, drawn as sent so the status bar and tray can't disagree | terminal; overlay and settings from their stories |
+| `queue:cancel` | renderer → main | `{ id }`; an id already gone is ignored | terminal |
 | `state:get` | invoke | → the same, or `null`; for a page that loads after a change | terminal |
 | `overlay:show` | main → renderer | union on `phase`: `listening{level}`, `transcribing`, `preview{text, countdownMs}` (`countdownMs` is `null` in always-confirm mode), `blocked{reason}`, `error{code, message}`, `hidden` | overlay |
 | `overlay:sound` | main → renderer | `start` or `stop`; generated tones, off with `ui.sounds` | overlay |

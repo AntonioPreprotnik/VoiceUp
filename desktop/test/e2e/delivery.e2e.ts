@@ -13,6 +13,7 @@ interface E2eStatus {
   state: string
   promptDirty: boolean
   holding: boolean
+  queue: string[]
 }
 
 interface Session {
@@ -77,7 +78,7 @@ async function open(): Promise<Session> {
 function status(): Promise<E2eStatus> {
   return session.app.evaluate(() => {
     const api = (globalThis as unknown as { voiceupE2e?: { status(): E2eStatus } }).voiceupE2e
-    return api?.status() ?? { state: 'loading', promptDirty: false, holding: false }
+    return api?.status() ?? { state: 'loading', promptDirty: false, holding: false, queue: [] }
   })
 }
 
@@ -162,6 +163,48 @@ test('text is blocked over half-typed text, and sent once that is cleared', asyn
   await expect.poll(async () => (await status()).promptDirty).toBe(false)
   await act('retry')
   await expect.poll(session.received).toEqual(['run the tests'])
+})
+
+test('text said while Claude works waits, and goes in order, one turn at a time', async () => {
+  await act('deliver', 'first slow turn')
+  await stateIs('busy')
+  await act('deliver', 'second slow turn')
+  await act('deliver', 'third')
+  await expect(session.terminal.locator('.queued-item')).toHaveCount(2)
+  await expect(session.overlay.locator('#text')).toContainText('Queued')
+  expect(session.received()).toEqual(['first slow turn'])
+
+  await expect
+    .poll(session.received, { timeout: 15000 })
+    .toEqual(['first slow turn', 'second slow turn', 'third'])
+  await expect(session.terminal.locator('.queued-item')).toHaveCount(0)
+  await stateIs('idle')
+})
+
+test('a queued command can be removed from the status bar with a real click', async () => {
+  await act('deliver', 'first slow turn')
+  await stateIs('busy')
+  await act('deliver', 'remove me')
+  await act('deliver', 'keep me')
+  await expect(session.terminal.locator('.queued-item')).toHaveCount(2)
+
+  await session.terminal.locator('.queued-item', { hasText: 'remove me' }).locator('button').click()
+  await expect(session.terminal.locator('.queued-item')).toHaveCount(1)
+
+  await expect.poll(session.received, { timeout: 15000 }).toEqual(['first slow turn', 'keep me'])
+  await settle()
+  expect(session.received()).toEqual(['first slow turn', 'keep me'])
+})
+
+test('the queue never sends into a permission prompt', async () => {
+  await act('deliver', 'first slow turn')
+  await stateIs('busy')
+  await act('deliver', 'please ask permission')
+  await act('deliver', 'this must wait')
+  await stateIs('awaitingPermission')
+  await settle()
+  expect(session.received()).toEqual(['first slow turn', 'please ask permission'])
+  expect((await status()).queue).toEqual(['this must wait'])
 })
 
 test('text over the limit is not sent at all', async () => {

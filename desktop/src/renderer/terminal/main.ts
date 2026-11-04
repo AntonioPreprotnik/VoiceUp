@@ -122,17 +122,41 @@ const statusDot = document.getElementById('status-dot')
 const statusLabel = document.getElementById('status-label')
 const statusDetail = document.getElementById('status-detail')
 const reArmButton = document.getElementById('re-arm')
+const statusQueue = document.getElementById('status-queue')
 if (
   statusDot === null ||
   statusLabel === null ||
   statusDetail === null ||
+  statusQueue === null ||
   !(reArmButton instanceof HTMLButtonElement)
 ) {
   throw new Error('The terminal page is missing its status bar')
 }
 
 // The text comes from main and is shown with textContent, never as markup.
-const showStatus = ({ label, detail, color, canReArm }: StatusView): void => {
+const queuedItem = (id: string, preview: string): HTMLElement => {
+  const item = document.createElement('span')
+  item.className = 'queued-item'
+  const text = document.createElement('span')
+  text.className = 'queued-text'
+  // What the microphone heard, so textContent, never markup.
+  text.textContent = preview
+  item.title = preview
+  const cancel = document.createElement('button')
+  cancel.type = 'button'
+  cancel.className = 'queued-cancel'
+  cancel.textContent = '×'
+  cancel.title = 'Remove from the queue'
+  cancel.addEventListener('click', () => {
+    api.cancelQueued(id)
+    terminal.focus()
+  })
+  item.append(text, cancel)
+  return item
+}
+
+const showStatus = ({ label, detail, color, canReArm, queue }: StatusView): void => {
+  statusQueue.replaceChildren(...queue.map(({ id, preview }) => queuedItem(id, preview)))
   statusDot.style.background = color
   statusLabel.textContent = label
   statusDetail.textContent = detail

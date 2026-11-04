@@ -7,7 +7,8 @@
 //   VOICEUP_FAKE_SPEED     0 replays with no gaps; 1, the default, keeps the recorded timing
 //   VOICEUP_FAKE_LIVE      a file: instead of replaying, act like a session. Each submitted prompt
 //                          fires UserPromptSubmit and Stop, and is added to the file. A prompt
-//                          containing "ask permission" fires PermissionRequest instead of Stop.
+//                          containing "ask permission" fires PermissionRequest instead of Stop,
+//                          and one containing "slow turn" waits 2 s before its Stop.
 import { spawn } from 'node:child_process'
 import { appendFileSync, readFileSync } from 'node:fs'
 import { request } from 'node:http'
@@ -138,6 +139,7 @@ async function runLive(log) {
           tool_name: 'Write'
         })
       } else {
+        if (prompt.includes('slow turn')) await sleep(2000)
         await fire('Stop', { hook_event_name: 'Stop' })
       }
     })()

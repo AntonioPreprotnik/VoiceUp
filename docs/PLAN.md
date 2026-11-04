@@ -434,7 +434,7 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 - AC: a blocked transcript stays in memory only, for up to 30 s: the overlay offers the hotkey to retry through the gate and Esc to discard. It is never written to disk.
 - AC: Playwright `_electron` e2e with the fake Claude covers send and block (TECH_SPEC §8).
 
-**[ ] S5.5 Queue.** As a user, I want commands spoken while Claude works to run next.
+**[x] S5.5 Queue.** As a user, I want commands spoken while Claude works to run next.
 
 - AC: queue of up to `maxQueue` items (default 3, maximum 5), shown in the status bar, each cancellable; flushed one at a time on `idle`; cleared on session restart.
 - AC: a setting to disable queueing (block instead).

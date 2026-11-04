@@ -16,6 +16,8 @@ import {
 export const ENTER_DELAY_MS = 250
 export const CONFIRM_TIMEOUT_MS = 10000
 export const HOLD_MS = 30000
+/** After Claude goes idle: its Stop hook fires while the turn is still ending on screen. */
+export const FLUSH_SETTLE_MS = 300
 
 const PASTE_START = '\x1b[200~'
 const PASTE_END = '\x1b[201~'
@@ -39,9 +41,19 @@ export interface DeliveryOptions {
     blocked(reason: string): void
     failed(code: MessageCode): void
     finished(): void
+    /** Its place in the queue, from 1. */
+    queued(position: number): void
   }
   /** Esc, held only while there is a blocked transcript to discard. */
   readonly escape: { hold(onPress: () => void): void; release(): void }
+  readonly settings: () => { readonly queueEnabled: boolean; readonly maxQueue: number }
+  /** For the status bar. */
+  readonly onQueueChange: () => void
+}
+
+export interface QueuedItem {
+  readonly id: string
+  readonly text: string
 }
 
 export class Delivery {
@@ -52,11 +64,19 @@ export class Delivery {
   private cancelConfirm: (() => void) | undefined
   /** Set from the paste until Claude confirms. Counts as busy, so two sends can't overlap. */
   private sending: string | undefined
+  /** In memory only, like a held transcript. */
+  private queue: QueuedItem[] = []
+  private nextId = 1
+  private cancelFlush: (() => void) | undefined
 
   constructor(private readonly options: DeliveryOptions) {}
 
   get holding(): boolean {
     return this.held !== undefined
+  }
+
+  get queued(): readonly QueuedItem[] {
+    return this.queue
   }
 
   deliver(raw: string): void {
@@ -100,18 +120,73 @@ export class Delivery {
   /** The session went away, so nothing will ever confirm what was being sent. */
   sessionEnded(): void {
     this.finishSending()
+    this.stopFlush()
+  }
+
+  /** A new session: whatever was queued was meant for the old one. */
+  sessionRestarted(): void {
+    this.sessionEnded()
+    if (this.queue.length === 0) return
+    this.queue = []
+    this.options.onQueueChange()
+  }
+
+  cancelQueued(id: string): void {
+    const remaining = this.queue.filter((item) => item.id !== id)
+    if (remaining.length === this.queue.length) return
+    this.queue = remaining
+    this.options.onQueueChange()
+  }
+
+  /** Claude's state or the prompt changed, which may mean the next item can go. */
+  kick(): void {
+    if (this.cancelFlush !== undefined || !this.canFlush()) return
+    this.cancelFlush = this.options.schedule(() => {
+      this.cancelFlush = undefined
+      this.flush()
+    }, FLUSH_SETTLE_MS)
+  }
+
+  private stopFlush(): void {
+    this.cancelFlush?.()
+    this.cancelFlush = undefined
+  }
+
+  private canFlush(): boolean {
+    if (this.queue.length === 0 || this.sending !== undefined) return false
+    const { state, promptDirty } = this.options.claude
+    const decision = gate({
+      state,
+      promptDirty,
+      deliveryPending: false,
+      queueLength: 0,
+      queueEnabled: false,
+      maxQueue: 0
+    })
+    return decision.action === 'send'
+  }
+
+  /** Asked afresh: a prompt can have opened, or typing started, during the wait. */
+  private flush(): void {
+    if (!this.canFlush()) return
+    const next = this.queue.at(0)
+    if (next === undefined) return
+    this.queue = this.queue.slice(1)
+    this.options.onQueueChange()
+    this.send(next.text)
   }
 
   private decide(): GateDecision {
     const { state, promptDirty } = this.options.claude
+    const { queueEnabled, maxQueue } = this.options.settings()
     return gate({
       state,
       promptDirty,
-      deliveryPending: this.sending !== undefined,
-      queueLength: 0,
-      // S5.5 brings the queue. Until then, text spoken while Claude works is held for a retry.
-      queueEnabled: false,
-      maxQueue: 0
+      // Items still waiting count too, or new text would overtake them.
+      deliveryPending: this.sending !== undefined || this.queue.length > 0,
+      queueLength: this.queue.length,
+      queueEnabled,
+      maxQueue
     })
   }
 
@@ -121,8 +196,23 @@ export class Delivery {
       this.hold(text, BLOCK_MESSAGES[decision.reason])
       return
     }
+    const wasHeld = this.holding
     this.clearHold()
+    if (decision.action === 'queue') {
+      this.enqueue(text)
+      return
+    }
+    // Only for text the user just let through: a queued one goes while they may be doing else.
+    if (wasHeld) this.options.overlay.finished()
     this.send(text)
+  }
+
+  private enqueue(text: string): void {
+    const { overlay, onQueueChange } = this.options
+    this.queue.push({ id: String(this.nextId++), text })
+    overlay.queued(this.queue.length)
+    onQueueChange()
+    this.kick()
   }
 
   private hold(text: string, reason: string): void {
@@ -147,9 +237,8 @@ export class Delivery {
   }
 
   private send(text: string): void {
-    const { write, schedule, overlay } = this.options
+    const { write, schedule } = this.options
     this.sending = text
-    overlay.finished()
     write(`${PASTE_START}${text}${PASTE_END}`)
     this.cancelEnter = schedule(() => {
       this.cancelEnter = undefined

@@ -40,6 +40,22 @@ describe('statusView', () => {
   })
 })
 
+describe('the queue', () => {
+  const queue = [{ id: '1', preview: 'run the tests' }]
+
+  it('is empty by default', () => {
+    expect(statusView('busy', null).queue).toEqual([])
+  })
+
+  it('is carried through every state', () => {
+    for (const state of STATES) expect(statusView(state, null, queue).queue).toEqual(queue)
+  })
+
+  it('is carried through when voice is off too', () => {
+    expect(statusView('idle', 'HOOKS_BLOCKED', queue).queue).toEqual(queue)
+  })
+})
+
 describe('noticeFor', () => {
   it.each<[ClaudeState, ClaudeState, string | null]>([
     ['busy', 'idle', 'Claude finished'],

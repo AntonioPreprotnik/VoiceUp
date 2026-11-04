@@ -10,6 +10,7 @@ export const Channels = {
   stateChanged: 'state:changed',
   stateGet: 'state:get',
   stateReArm: 'state:rearm',
+  queueCancel: 'queue:cancel',
   clipboardWrite: 'clipboard:write',
   clipboardRead: 'clipboard:read',
   linkOpen: 'link:open',
@@ -39,6 +40,13 @@ export interface StatusView {
   /** As #rrggbb. */
   readonly color: string
   readonly canReArm: boolean
+  /** Waiting to be sent, oldest first. */
+  readonly queue: readonly QueuedPreview[]
+}
+
+export interface QueuedPreview {
+  readonly id: string
+  readonly preview: string
 }
 
 /** Why no session is running, in words the terminal window can show as they are. */
@@ -59,6 +67,7 @@ export type OverlayState =
   | { readonly phase: 'listening'; readonly level: number }
   | { readonly phase: 'transcribing' }
   | { readonly phase: 'blocked'; readonly reason: string }
+  | { readonly phase: 'queued'; readonly position: number }
   /** countdownMs is null in always-confirm mode, which waits for a key. */
   | { readonly phase: 'preview'; readonly text: string; readonly countdownMs: number | null }
   | { readonly phase: 'error'; readonly code: string; readonly message: string }
@@ -103,6 +112,7 @@ export interface TerminalApi {
   /** Returns the function that unsubscribes. */
   onClaudeStatus(listener: (view: StatusView) => void): () => void
   reArm(): void
+  cancelQueued(id: string): void
   copy(text: string): void
   readClipboard(): Promise<string>
   openLink(url: string): void

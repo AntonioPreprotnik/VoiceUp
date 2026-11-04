@@ -38,10 +38,16 @@ export class ClaudeStatus {
     const previous = this.view
     this.view = view
     if (previous?.color !== view.color) this.tray.setImage(this.icon(view.color))
-    if (previous?.label === view.label && previous.detail === view.detail) {
-      if (previous.canReArm === view.canReArm) return
+    if (
+      previous?.label === view.label &&
+      previous.detail === view.detail &&
+      previous.canReArm === view.canReArm &&
+      JSON.stringify(previous.queue) === JSON.stringify(view.queue)
+    ) {
+      return
     }
-    this.tray.setToolTip(`VoiceUp: ${view.label}`)
+    const waiting = view.queue.length === 0 ? '' : ` (${String(view.queue.length)} queued)`
+    this.tray.setToolTip(`VoiceUp: ${view.label}${waiting}`)
     this.tray.setContextMenu(this.menu(view))
     const { window } = this.options
     if (!window.isDestroyed()) window.webContents.send(Channels.stateChanged, view)

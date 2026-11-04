@@ -172,6 +172,16 @@ describe('a blocked transcript', () => {
   })
 })
 
+describe('a queued transcript', () => {
+  it('says so briefly, then hides', () => {
+    vi.useFakeTimers()
+    create().queued(2)
+    expect(states().at(-1)).toEqual({ phase: 'queued', position: 2 })
+    vi.advanceTimersByTime(2500)
+    expect(states().at(-1)).toEqual({ phase: 'hidden' })
+  })
+})
+
 describe('the sounds', () => {
   it('plays start on the press and stop when speech ends', () => {
     const overlay = create()

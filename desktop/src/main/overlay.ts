@@ -8,6 +8,7 @@ const SIZE = { width: 320, height: 64 }
 // Room for three lines of a spoken command, plus the keys and the countdown.
 const PREVIEW_SIZE = { width: 560, height: 124 }
 const ERROR_SHOW_MS = 4000
+const QUEUED_SHOW_MS = 2500
 
 export interface OverlayOptions {
   readonly window: BrowserWindow
@@ -60,6 +61,15 @@ export class Overlay {
   blocked(reason: string): void {
     this.pressedAt = undefined
     this.show({ phase: 'blocked', reason })
+  }
+
+  /** Brief, like an error: the status bar is where the queue lives. */
+  queued(position: number): void {
+    this.pressedAt = undefined
+    this.show({ phase: 'queued', position })
+    this.hideTimer = setTimeout(() => {
+      this.show({ phase: 'hidden' })
+    }, QUEUED_SHOW_MS)
   }
 
   /** The transcript arrived or the recording was cancelled. */

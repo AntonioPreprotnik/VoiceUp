@@ -13,7 +13,7 @@ let claude: {
   deliveryTimeout: Mock
   onInput: Mock
 }
-let overlay: { blocked: Mock; failed: Mock; finished: Mock }
+let overlay: { blocked: Mock; failed: Mock; finished: Mock; queued: Mock }
 let escape: { held: (() => void) | undefined; hold(onPress: () => void): void; release(): void }
 
 const TEXT = 'run the tests'
@@ -33,7 +33,7 @@ beforeEach(() => {
     deliveryTimeout: vi.fn(),
     onInput: vi.fn()
   }
-  overlay = { blocked: vi.fn(), failed: vi.fn(), finished: vi.fn() }
+  overlay = { blocked: vi.fn(), failed: vi.fn(), finished: vi.fn(), queued: vi.fn() }
   escape = {
     held: undefined,
     hold(onPress) {
@@ -53,7 +53,10 @@ beforeEach(() => {
       }
     },
     overlay,
-    escape
+    escape,
+    // Queueing is off here, which keeps these about sending and blocking. See queue.test.ts.
+    settings: () => ({ queueEnabled: false, maxQueue: 0 }),
+    onQueueChange: () => undefined
   })
 })
 
@@ -79,11 +82,6 @@ describe('sending', () => {
   it('puts a space before a command, so it stays text', () => {
     delivery.deliver('/clear')
     expect(written[0]).toBe('\x1b[200~ /clear\x1b[201~')
-  })
-
-  it('clears the overlay', () => {
-    delivery.deliver(TEXT)
-    expect(overlay.finished).toHaveBeenCalledOnce()
   })
 
   it('reports nothing once Claude confirms', () => {
@@ -183,6 +181,7 @@ describe('a blocked transcript', () => {
     expect(written).toEqual([PASTED])
     expect(delivery.holding).toBe(false)
     expect(escape.held).toBeUndefined()
+    expect(overlay.finished).toHaveBeenCalledOnce()
   })
 
   it('stays held on a retry that is still blocked, with the new reason', () => {

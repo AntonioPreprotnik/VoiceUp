@@ -57,6 +57,43 @@
         color: #b5b5b5;
         text-overflow: ellipsis;
       }
+      #status-queue {
+        display: flex;
+        flex: none;
+        gap: 6px;
+        max-width: 60%;
+        overflow: hidden;
+      }
+      .queued-item {
+        display: flex;
+        flex-shrink: 1;
+        align-items: center;
+        gap: 4px;
+        min-width: 0;
+        padding: 1px 2px 1px 8px;
+        border-radius: 3px;
+        background: #2d2d30;
+      }
+      .queued-text {
+        max-width: 140px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .queued-cancel {
+        flex: none;
+        padding: 0 5px;
+        border: 0;
+        border-radius: 3px;
+        background: transparent;
+        color: #b5b5b5;
+        font: inherit;
+        cursor: pointer;
+      }
+      .queued-cancel:hover,
+      .queued-cancel:focus-visible {
+        background: #4d4d50;
+        color: #fff;
+      }
       #re-arm {
         flex: none;
         padding: 1px 10px;
@@ -155,6 +192,7 @@
       <span id="status-dot"></span>
       <span id="status-label">Starting</span>
       <span id="status-detail"></span>
+      <div id="status-queue"></div>
       <button id="re-arm" type="button" title="Claude's main prompt is ready" hidden>
         Re-arm voice
       </button>

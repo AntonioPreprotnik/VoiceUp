@@ -40,7 +40,7 @@ describe('the time to read it', () => {
     ['twenty words 8.5 s', Array.from({ length: 20 }, () => 'word').join(' '), 8500],
     ['thirty-five words 13 s', Array.from({ length: 35 }, () => 'word').join(' '), 13000],
     [
-      'forty-four words just under the 15 s limit',
+      'forty-four words the 15 s limit, reached at about 42',
       Array.from({ length: 44 }, () => 'word').join(' '),
       15000
     ],

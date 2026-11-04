@@ -1,5 +1,6 @@
 import { ipcMain, type IpcMainEvent, type WebContents } from 'electron'
 import type { MessageCode } from '../../core/messages'
+import { PreviewWindow, type PreviewSettings } from '../../core/preview'
 import { transcribeTimeoutMs, type RecordingToggle } from '../../core/recordingToggle'
 import { clean } from '../../core/text/clean'
 import { RecorderError } from '../../shared/ipc'
@@ -25,11 +26,14 @@ export interface RecordingOptions {
   readonly minWords: number
   /** Why voice is off right now, or null. */
   readonly voiceBlock: () => MessageCode | null
+  readonly previewSettings: () => PreviewSettings
+  /** The user let the text through. */
+  readonly deliver: (text: string) => void
   /** Esc, held only while there is something to cancel (TECH_SPEC §4.4). */
   readonly escape: { hold(onPress: () => void): void; release(): void }
   readonly overlay: Pick<
     Overlay,
-    'recordingStarted' | 'level' | 'speechEnded' | 'finished' | 'cancelled' | 'failed'
+    'recordingStarted' | 'level' | 'speechEnded' | 'preview' | 'finished' | 'cancelled' | 'failed'
   >
 }
 
@@ -37,8 +41,28 @@ export interface RecordingOptions {
 export class RecordingController {
   private transcribeTimer: ReturnType<typeof setTimeout> | undefined
   private clipMs = 0
+  private readonly preview: PreviewWindow
 
   constructor(private readonly options: RecordingOptions) {
+    this.preview = new PreviewWindow({
+      schedule: (callback, ms) => {
+        const timer = setTimeout(callback, ms)
+        return () => {
+          clearTimeout(timer)
+        }
+      },
+      now: () => Date.now(),
+      onSend: (text) => {
+        options.overlay.finished()
+        options.escape.release()
+        options.deliver(text)
+      },
+      onCancel: () => {
+        log.info('Preview cancelled')
+        options.overlay.cancelled()
+        options.escape.release()
+      }
+    })
     ipcMain.on(Channels.recorderError, (event: IpcMainEvent, raw: unknown) => {
       if (!validateSender(event, ...SENDERS[Channels.recorderError])) return
       const parsed = RecorderError.safeParse(raw)
@@ -52,6 +76,11 @@ export class RecordingController {
 
   press(): void {
     const { toggle, sendToWorker, getDeviceId, overlay, escape, workerRunning } = this.options
+    // Never a new recording while one waits to be sent. A press in the guard does nothing at all.
+    if (this.preview.active) {
+      if (this.preview.press()) log.info('Hotkey: send now')
+      return
+    }
     // Starting now would open the mic for a recording nothing can ever end.
     if (toggle.phase === 'idle' && !workerRunning()) {
       log.warn('Hotkey: no speech worker to record with')
@@ -87,7 +116,8 @@ export class RecordingController {
 
   /** Esc, or the worker restarting: like pressing the hotkey again, but only ever cancels. */
   cancel(): void {
-    if (this.options.toggle.phase !== 'idle') this.press()
+    if (this.preview.active) this.preview.cancel()
+    else if (this.options.toggle.phase !== 'idle') this.press()
   }
 
   /** The worker died, so nothing it was doing will ever report back. */
@@ -117,19 +147,28 @@ export class RecordingController {
       this.clearTimer()
       log.debug(`Transcribed ${String(this.clipMs)} ms of speech in ${String(event.decodeMs)} ms`)
       logTranscript(log, event.text)
-      if (clean(event.text, this.options.minWords) === null) {
-        log.info('TRANSCRIPT_DROPPED: nothing usable in the transcript')
-        overlay.failed('TRANSCRIPT_DROPPED')
-      } else {
-        overlay.finished()
-      }
+      this.showPreview(event.text)
     }
     if (event.type === 'error') {
       this.clearTimer()
       overlay.failed(event.code)
+      this.options.escape.release()
     }
-    if (event.type === 'transcript' || event.type === 'error') this.options.escape.release()
     if (event.type === 'speechEnd' || event.type === 'error') this.stopMic(recordingId)
+  }
+
+  /** Esc stays held through a preview, since it is what cancels one. */
+  private showPreview(raw: string): void {
+    const { overlay, escape, minWords, previewSettings } = this.options
+    const text = clean(raw, minWords)
+    if (text === null) {
+      log.info('TRANSCRIPT_DROPPED: nothing usable in the transcript')
+      overlay.failed('TRANSCRIPT_DROPPED')
+      escape.release()
+      return
+    }
+    const started = this.preview.start(text, previewSettings())
+    if (started.kind === 'showing') overlay.preview(text, started.countdownMs)
   }
 
   /** Kills the worker if it never answers, since a stuck decode can't be cancelled (§5.3). */

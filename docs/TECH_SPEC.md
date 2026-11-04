@@ -220,7 +220,7 @@ The state lives in `core/state/tracker.ts`, which holds the reducer's context an
 3. Write `ESC[200~` + text + `ESC[201~`, then `\r` after 30 ms (method and delay confirmed by S5.3).
 4. Expect `UserPromptSubmit` within 3 s, then clear `deliveryPending`. If it doesn't arrive, clear it, raise `deliveryTimeout` and show `DELIVERY_UNCONFIRMED`. A prompt that is a Claude tag doesn't count: a finished background agent starts its own turn with `<task-notification>` (S2.1).
 
-**Preview controls.** The overlay is click-through and never takes focus, so it has no buttons. During a preview, Esc (a global shortcut held only while recording, previewing or holding a blocked transcript) cancels and the hotkey sends at once, except in the first 300 ms of the preview, when it is ignored so a late cancel press can't send. While transcribing, the hotkey cancels. In always-confirm mode the preview waits for one of those two keys; a global Enter shortcut is never registered, because it would steal Enter from every other app.
+**Preview controls.** The overlay is click-through and never takes focus, so it has no buttons. During a preview (`core/preview.ts`), Esc (a global shortcut held only while recording, previewing or holding a blocked transcript) cancels and the hotkey sends at once, except in the first 300 ms of the preview, when it is ignored so a late cancel press can't send. A press never starts a new recording while a preview shows. Esc works from the first moment. The countdown is `previewMs` for each word, 1 s by default, and at least 5 s, because a flat 1 s and 3 s were both too short to read. There is no upper limit, and the hotkey sends sooner. A `previewMs` of 0 sends with no preview, unless always-confirm is on. While transcribing, the hotkey cancels. In always-confirm mode the preview waits for one of those two keys; a global Enter shortcut is never registered, because it would steal Enter from every other app.
 
 **Blocked transcripts.** When the gate blocks, the last transcript stays in memory for up to 30 s and is never written to disk. The overlay shows the reason; the hotkey retries through the gate and Esc discards it.
 
@@ -349,7 +349,7 @@ Every boundary has one zod schema in `shared/`, imported by both sides; nothing 
 | `term:ack` | renderer → main | bytes written (flow control) | terminal |
 | `state:changed` | main → renderer | `{ state, label, detail, color, canReArm }`, drawn as sent so the status bar and tray can't disagree; S5.5 adds `queue: [{ id, preview }]` | terminal; overlay and settings from their stories |
 | `state:get` | invoke | → the same, or `null`; for a page that loads after a change | terminal |
-| `overlay:show` | main → renderer | union on `phase`: `listening{level}`, `transcribing`, `preview{text, countdownMs}`, `blocked{reason}`, `error{code, message}`, `hidden` | overlay |
+| `overlay:show` | main → renderer | union on `phase`: `listening{level}`, `transcribing`, `preview{text, countdownMs}` (`countdownMs` is `null` in always-confirm mode), `blocked{reason}`, `error{code, message}`, `hidden` | overlay |
 | `overlay:sound` | main → renderer | `start` or `stop`; generated tones, off with `ui.sounds` | overlay |
 | `recorder:start` / `recorder:stop` | main → renderer | `{ recordingId, deviceId }` / `{ recordingId }` | recorder |
 | `recorder:error` | renderer → main | `{ recordingId, code }`; `code` is `MIC_DENIED`, `MIC_MISSING` or `MIC_FAILED` | recorder |

@@ -19,6 +19,7 @@ export const Settings = z.object({
     .prefault({}),
   delivery: z
     .object({
+      /** For each word of the preview. */
       previewMs: z.number().int().min(0).max(5000).default(1000),
       alwaysConfirm: z.boolean().default(false),
       queue: z.boolean().default(true),

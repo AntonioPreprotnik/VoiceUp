@@ -42,6 +42,20 @@
         overflow: hidden;
         text-overflow: ellipsis;
       }
+      #pill[data-kind='preview'] #text {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 3;
+        white-space: normal;
+        overflow-wrap: anywhere;
+      }
+      #hint {
+        color: #b5b5b5;
+        font-size: 12px;
+      }
+      #hint[hidden] {
+        display: none;
+      }
       #meter {
         height: 4px;
         border-radius: 2px;
@@ -61,6 +75,7 @@
   <body>
     <div id="pill" hidden>
       <div id="text"></div>
+      <div id="hint" hidden></div>
       <div id="meter" hidden><div id="level"></div></div>
     </div>
     <script type="module" src="./main.ts"></script>

@@ -12,7 +12,8 @@ const pill = document.getElementById('pill')
 const text = document.getElementById('text')
 const meter = document.getElementById('meter')
 const level = document.getElementById('level')
-if (pill === null || text === null || meter === null || level === null) {
+const hint = document.getElementById('hint')
+if (pill === null || text === null || meter === null || level === null || hint === null) {
   throw new Error('The overlay page is missing an element')
 }
 
@@ -21,14 +22,36 @@ function meterPercent(rms: number): number {
   return Math.min(100, Math.sqrt(rms) * 200)
 }
 
+/** From full to empty over the countdown, which the compositor can run without any messages. */
+function runCountdown(bar: HTMLElement, ms: number): void {
+  bar.style.transition = 'none'
+  bar.style.width = '100%'
+  // Reading this applies the full width first, or the transition would have nothing to run from.
+  bar.getBoundingClientRect()
+  bar.style.transition = `width ${String(ms)}ms linear`
+  bar.style.width = '0%'
+}
+
 function show(state: OverlayState): void {
-  if (pill === null || text === null || meter === null || level === null) return
+  if (pill === null || text === null || meter === null || level === null || hint === null) return
   pill.hidden = state.phase === 'hidden'
-  pill.dataset['kind'] = state.phase === 'error' ? 'error' : 'info'
-  meter.hidden = state.phase !== 'listening'
+  pill.dataset['kind'] =
+    state.phase === 'error' ? 'error' : state.phase === 'preview' ? 'preview' : 'info'
+  const counting = state.phase === 'preview' && state.countdownMs !== null
+  meter.hidden = state.phase !== 'listening' && !counting
+  hint.hidden = state.phase !== 'preview'
   if (state.phase === 'listening') {
     text.textContent = 'Listening…'
+    level.style.transition = 'none'
     level.style.width = `${String(meterPercent(state.level))}%`
+  } else if (state.phase === 'preview') {
+    // Shown with textContent, never as markup: this is what the microphone heard.
+    text.textContent = state.text
+    hint.textContent =
+      state.countdownMs === null
+        ? 'Hotkey sends · Esc cancels'
+        : 'Sending soon · Hotkey sends now · Esc cancels'
+    if (state.countdownMs !== null) runCountdown(level, state.countdownMs)
   } else if (state.phase === 'transcribing') {
     text.textContent = 'Transcribing…'
   } else if (state.phase === 'error') {

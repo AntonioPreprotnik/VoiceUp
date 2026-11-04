@@ -220,6 +220,11 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
         getDeviceId: () => claude.micDeviceId,
         minWords: settings.speech.minWords,
         voiceBlock: () => hooks.voiceBlock,
+        previewSettings: () => settings.delivery,
+        deliver: () => {
+          // S5.4 sends it through the gate. Nothing is typed into Claude until then.
+          log.info('Preview finished: delivery arrives in S5.4')
+        },
         overlay,
         escape: escapeKey
       })

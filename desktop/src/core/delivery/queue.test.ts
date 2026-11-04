@@ -61,7 +61,8 @@ beforeEach(() => {
     overlay,
     escape: { hold: vi.fn(), release: vi.fn() },
     settings: () => settings,
-    onQueueChange
+    onQueueChange,
+    onBlocked: () => undefined
   })
 })
 

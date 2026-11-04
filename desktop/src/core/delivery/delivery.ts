@@ -1,5 +1,5 @@
 import type { HookMessage } from '../../shared/hooks'
-import { BLOCK_MESSAGES, gate, type GateDecision } from '../gate/gate'
+import { BLOCK_MESSAGES, gate, type BlockReason, type GateDecision } from '../gate/gate'
 import type { MessageCode } from '../messages'
 import type { ClaudeState } from '../state/reducer'
 import {
@@ -49,6 +49,8 @@ export interface DeliveryOptions {
   readonly settings: () => { readonly queueEnabled: boolean; readonly maxQueue: number }
   /** For the status bar. */
   readonly onQueueChange: () => void
+  /** For the log: a reason, and never the text. */
+  readonly onBlocked: (reason: BlockReason) => void
 }
 
 export interface QueuedItem {
@@ -193,6 +195,7 @@ export class Delivery {
   private attempt(text: string): void {
     const decision = this.decide()
     if (decision.action === 'block') {
+      this.options.onBlocked(decision.reason)
       this.hold(text, BLOCK_MESSAGES[decision.reason])
       return
     }

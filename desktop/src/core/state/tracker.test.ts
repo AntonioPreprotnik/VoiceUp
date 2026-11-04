@@ -166,14 +166,38 @@ describe('the prompt', () => {
     expect(tracker.promptDirty).toBe(true)
   })
 
-  it('stays dirty after Enter with no prompt, and after re-arm', () => {
+  it('stays dirty after Enter with no prompt, until the user says otherwise', () => {
     started()
     tracker.onInput('h')
     tracker.onInput('\r')
     vi.advanceTimersByTime(LOCAL_UI_WAIT_MS)
     expect(tracker.state).toBe('unknown')
+    expect(tracker.promptDirty).toBe(true)
+  })
+
+  // Found in daily use. /model and /login fire no hook, so nothing else would ever clear it.
+  it('is clean after re-arm: the user is saying the prompt is ready', () => {
+    started()
+    for (const char of '/model') tracker.onInput(char)
+    tracker.onInput('\r')
+    vi.advanceTimersByTime(LOCAL_UI_WAIT_MS)
+    tracker.reArm()
+    expect(tracker.state).toBe('idle')
+    expect(tracker.promptDirty).toBe(false)
+  })
+
+  it('stays dirty when re-arm is ignored, because nothing was unknown', () => {
+    started()
+    tracker.onInput('h')
     tracker.reArm()
     expect(tracker.promptDirty).toBe(true)
+  })
+
+  it('stays clean through Shift+Tab, with a suggestion showing or not', () => {
+    started()
+    tracker.onInput('\x1b[Z')
+    tracker.onInput('\x1b[Z')
+    expect(tracker.promptDirty).toBe(false)
   })
 
   it('can be marked by a delivery that may have left its text', () => {

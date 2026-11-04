@@ -9,6 +9,7 @@ describe('input at the main prompt', () => {
     ['Backspace, which may be editing text', '\x7f'],
     ['Delete', '\x1b[3~'],
     ['Up, which recalls history', '\x1b[A'],
+    ['Right, which can accept a suggestion into the prompt', '\x1b[C'],
     ['Down', '\x1b[B'],
     ['an escape sequence nobody knows', '\x1b[99;99~'],
     ['Tab', '\t'],
@@ -25,7 +26,11 @@ describe('input at the main prompt', () => {
     ['several mouse reports together', '\x1b[<64;1;1M\x1b[<64;1;1M'],
     ['a legacy mouse report', '\x1b[M !!'],
     ['Page Up', '\x1b[5~'],
-    ['Page Down', '\x1b[6~']
+    ['Page Down', '\x1b[6~'],
+    // Found in daily use: changing mode blocked voice with "You have unsent text".
+    ['Shift+Tab, which changes the mode', '\x1b[Z'],
+    ['Ctrl+O, which shows more detail', '\x0f'],
+    ['Ctrl+T, which shows the tasks', '\x14']
   ])('%s changes nothing', (_label, data) => {
     expect(dirtyAfterInput(false, data, 'idle')).toBe(false)
     expect(dirtyAfterInput(true, data, 'idle')).toBe(true)

@@ -419,7 +419,7 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 - AC: overlay shows the transcript with a countdown of one second per word, and at least 5 s (changed from a flat 1.0 s after Antonio tried it; `previewMs` is the time per word, configurable 0–5 s); Esc cancels; pressing the hotkey again sends at once, except in the first 300 ms of the preview, so a late cancel press can't send (the overlay is click-through, so it has no buttons).
 - AC: "Always confirm" mode waits for the hotkey (send) or Esc (cancel) instead of a countdown. No global Enter shortcut: it would steal Enter from every other app.
 
-**[ ] S5.3 Input injection spike (Spike, ≤ 2 h).** As the developer, I want to know the robust way to type into the Claude Code prompt.
+**[x] S5.3 Input injection spike (Spike, ≤ 2 h).** As the developer, I want to know the robust way to type into the Claude Code prompt.
 
 - AC: test writing text + `\r` directly vs bracketed paste (`ESC[200~ … ESC[201~`) to the PTY, with short, long, multi-line and special-character transcripts.
 - AC: confirm the prompt is empty before typing, and what happens when the user has half-typed text.
@@ -427,8 +427,10 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 
 **[ ] S5.4 Deliver.** As a user, I want the command submitted like I typed it.
 
-- AC: uses the S5.3 method; re-checks the gate immediately before writing (state can change during the preview).
-- AC: if the user has unsent text in the prompt, never overwrite it; block and notify instead.
+- AC: uses the S5.3 method (`docs/decisions/S5.3-input-injection.md`): sanitized, a space before a leading `/` or `!`, one paste, then Enter 250 ms later; re-checks the gate immediately before writing (state can change during the preview).
+- AC: text over 900 characters is blocked with `TRANSCRIPT_TOO_LONG`, never cut, because Claude's input loses the start of longer text and submits the rest.
+- AC: the submitted prompt is checked against the text. If it differs, Claude is interrupted and the user is told (`DELIVERY_GARBLED`).
+- AC: if the user has unsent text in the prompt, never overwrite it; block and notify instead. This needs the prompt-dirty tracker from TECH_SPEC §4.4: S5.3 found a paste merges with typed text and is sent, and nothing reports the prompt's contents.
 - AC: a blocked transcript stays in memory only, for up to 30 s: the overlay offers the hotkey to retry through the gate and Esc to discard. It is never written to disk.
 - AC: Playwright `_electron` e2e with the fake Claude covers send and block (TECH_SPEC §8).
 

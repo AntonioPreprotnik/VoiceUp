@@ -2,6 +2,10 @@
 
 Each Spike story writes one note here, `<story>-<slug>.md`, using the `/decision-note` template. Later stories read the notes they depend on.
 
+## Notes
+
+- `S0.6-node-pty-packaging.md`, `S2.1-hook-events.md`, `S4.1-speech-engine.md`, `S5.3-input-injection.md`.
+
 ## Pre-verification (2026-10-26)
 
 These items were checked before any code existed, so the spikes start from known answers and only have to confirm them on Windows. The values are already copied into TECH_SPEC.md; this section records where they came from.

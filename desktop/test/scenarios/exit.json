@@ -1,0 +1,29 @@
+{
+  "name": "exit",
+  "events": [
+    {
+      "t": 936,
+      "event": "SessionStart",
+      "body": {
+        "hook_event_name": "SessionStart",
+        "source": "startup"
+      }
+    },
+    {
+      "t": 2456,
+      "input": "/exit"
+    },
+    {
+      "t": 3146,
+      "event": "SessionEnd",
+      "body": {
+        "hook_event_name": "SessionEnd",
+        "reason": "prompt_input_exit"
+      }
+    },
+    {
+      "t": 4914,
+      "ptyExit": 0
+    }
+  ]
+}

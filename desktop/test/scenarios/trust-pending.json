@@ -1,0 +1,13 @@
+{
+  "name": "trust-pending",
+  "events": [
+    {
+      "t": 15118,
+      "input": "Ctrl+C twice"
+    },
+    {
+      "t": 16986,
+      "ptyExit": 1
+    }
+  ]
+}

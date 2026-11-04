@@ -20,7 +20,8 @@ Spec: `docs/TECH_SPEC.md` §4. Ground truth for event order: `docs/decisions/S2.
 - Hooks must never change Claude's behaviour: the receiver answers **200 with an empty body** after a valid token, always, even on bad JSON. No JSON decision output, ever.
 - `SessionStart` supports only command/MCP hooks → `curl.exe` by absolute path in exec form (`command` + `args`) with `--noproxy "*"`, token via `-H @<headerfile>`, body via `--data-binary @-`. All other events use `type: "http"` with `headers` + `allowedEnvVars: ["VOICEUP_HOOK_TOKEN"]`.
 - Hook handler timeout 5 s; no `onFailure: "block"`.
-- Unknown or out-of-order events move state to `unknown` (fail safe). Never guess `idle`. `Stop` does not fire after a user interrupt, so `unknown` ends only through `idle_prompt`, a later turn or the manual re-arm, never on a timer.
+- Unknown or out-of-order events move state to `unknown` (fail safe). Never guess `idle`. `Stop` does not fire after a user interrupt and a denied permission fires nothing, so `unknown` ends only through a later turn, the manual re-arm or `idle_prompt`, never on a timer.
+- A `Stop` must never clear a background agent's pending permission: its `PermissionRequest` can come just before the main turn's `Stop`, and voice text sent then approves it (S2.1).
 - `SessionStart` with `source` `compact` or `fork` must not change state (auto-compaction fires mid-turn); `startup`, `resume`, `clear` → `idle`.
 - In-turn events (`PreToolUse`, `PostToolUse`, `PostToolUseFailure`) keep `busy` as `busy`; they are not unknown. With `agent_id`, they also keep `idle` as `idle`.
 - `SessionEnd` with reason `clear` or `resume` does not mean `exited`; the next `SessionStart` decides.

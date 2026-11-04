@@ -1,0 +1,59 @@
+{
+  "name": "idle-wait",
+  "events": [
+    {
+      "t": 976,
+      "event": "SessionStart",
+      "body": {
+        "hook_event_name": "SessionStart",
+        "source": "startup"
+      }
+    },
+    {
+      "t": 2519,
+      "input": "<prompt>"
+    },
+    {
+      "t": 2747,
+      "event": "UserPromptSubmit",
+      "body": {
+        "hook_event_name": "UserPromptSubmit",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 3860,
+      "event": "Stop",
+      "body": {
+        "hook_event_name": "Stop",
+        "permission_mode": "default",
+        "stop_hook_active": false
+      }
+    },
+    {
+      "t": 63878,
+      "event": "Notification",
+      "body": {
+        "hook_event_name": "Notification",
+        "notification_type": "idle_prompt",
+        "message": "Claude is waiting for your input"
+      }
+    },
+    {
+      "t": 78921,
+      "input": "Ctrl+C twice"
+    },
+    {
+      "t": 79262,
+      "event": "SessionEnd",
+      "body": {
+        "hook_event_name": "SessionEnd",
+        "reason": "prompt_input_exit"
+      }
+    },
+    {
+      "t": 79885,
+      "ptyExit": -1073741510
+    }
+  ]
+}

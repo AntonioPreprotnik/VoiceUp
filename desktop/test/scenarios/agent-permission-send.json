@@ -1,0 +1,153 @@
+{
+  "name": "agent-permission-send",
+  "events": [
+    {
+      "t": 1392,
+      "event": "SessionStart",
+      "body": {
+        "hook_event_name": "SessionStart",
+        "source": "startup"
+      }
+    },
+    {
+      "t": 2941,
+      "input": "<prompt>"
+    },
+    {
+      "t": 3163,
+      "event": "UserPromptSubmit",
+      "body": {
+        "hook_event_name": "UserPromptSubmit",
+        "permission_mode": "default",
+        "prompt": "<prompt>"
+      }
+    },
+    {
+      "t": 6277,
+      "event": "PreToolUse",
+      "body": {
+        "hook_event_name": "PreToolUse",
+        "tool_name": "Agent",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 6322,
+      "event": "PostToolUse",
+      "body": {
+        "hook_event_name": "PostToolUse",
+        "tool_name": "Agent",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 8096,
+      "event": "PreToolUse",
+      "body": {
+        "hook_event_name": "PreToolUse",
+        "agent_id": "ac696a24c34f01e85",
+        "agent_type": "general-purpose",
+        "tool_name": "Write",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 8121,
+      "event": "PermissionRequest",
+      "body": {
+        "hook_event_name": "PermissionRequest",
+        "agent_id": "ac696a24c34f01e85",
+        "agent_type": "general-purpose",
+        "tool_name": "Write",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 8236,
+      "event": "Stop",
+      "body": {
+        "hook_event_name": "Stop",
+        "permission_mode": "default",
+        "stop_hook_active": false,
+        "background_tasks": 1
+      }
+    },
+    {
+      "t": 14149,
+      "event": "Notification",
+      "body": {
+        "hook_event_name": "Notification",
+        "notification_type": "permission_prompt",
+        "message": "Claude needs your permission"
+      }
+    },
+    {
+      "t": 18151,
+      "input": "pasted a prompt"
+    },
+    {
+      "t": 19655,
+      "input": "Enter"
+    },
+    {
+      "t": 19869,
+      "event": "PostToolUse",
+      "body": {
+        "hook_event_name": "PostToolUse",
+        "agent_id": "ac696a24c34f01e85",
+        "agent_type": "general-purpose",
+        "tool_name": "Write",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 21417,
+      "event": "UserPromptSubmit",
+      "body": {
+        "hook_event_name": "UserPromptSubmit",
+        "permission_mode": "default",
+        "prompt": "<task-notification>"
+      }
+    },
+    {
+      "t": 23392,
+      "event": "PreToolUse",
+      "body": {
+        "hook_event_name": "PreToolUse",
+        "tool_name": "Read",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 23437,
+      "event": "PostToolUse",
+      "body": {
+        "hook_event_name": "PostToolUse",
+        "tool_name": "Read",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 25057,
+      "event": "Stop",
+      "body": {
+        "hook_event_name": "Stop",
+        "permission_mode": "default",
+        "stop_hook_active": false,
+        "background_tasks": 0
+      }
+    },
+    {
+      "t": 33668,
+      "input": "Ctrl+C twice"
+    },
+    {
+      "t": 34016,
+      "event": "SessionEnd",
+      "body": {
+        "hook_event_name": "SessionEnd",
+        "reason": "prompt_input_exit"
+      }
+    }
+  ]
+}

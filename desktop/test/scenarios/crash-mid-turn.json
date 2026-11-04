@@ -1,0 +1,33 @@
+{
+  "name": "crash-mid-turn",
+  "events": [
+    {
+      "t": 1021,
+      "event": "SessionStart",
+      "body": {
+        "hook_event_name": "SessionStart",
+        "source": "startup"
+      }
+    },
+    {
+      "t": 2586,
+      "input": "<prompt>"
+    },
+    {
+      "t": 2810,
+      "event": "UserPromptSubmit",
+      "body": {
+        "hook_event_name": "UserPromptSubmit",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 4857,
+      "input": "taskkill"
+    },
+    {
+      "t": 5916,
+      "ptyExit": 1
+    }
+  ]
+}

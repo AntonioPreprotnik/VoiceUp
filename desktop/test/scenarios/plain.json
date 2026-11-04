@@ -1,0 +1,50 @@
+{
+  "name": "plain",
+  "events": [
+    {
+      "t": 933,
+      "event": "SessionStart",
+      "body": {
+        "hook_event_name": "SessionStart",
+        "source": "startup"
+      }
+    },
+    {
+      "t": 2475,
+      "input": "<prompt>"
+    },
+    {
+      "t": 2705,
+      "event": "UserPromptSubmit",
+      "body": {
+        "hook_event_name": "UserPromptSubmit",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 3713,
+      "event": "Stop",
+      "body": {
+        "hook_event_name": "Stop",
+        "permission_mode": "default",
+        "stop_hook_active": false
+      }
+    },
+    {
+      "t": 3738,
+      "input": "Ctrl+C twice"
+    },
+    {
+      "t": 4247,
+      "event": "SessionEnd",
+      "body": {
+        "hook_event_name": "SessionEnd",
+        "reason": "prompt_input_exit"
+      }
+    },
+    {
+      "t": 5010,
+      "ptyExit": -1073741510
+    }
+  ]
+}

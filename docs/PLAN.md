@@ -294,7 +294,7 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 
 *Goal: the app always knows whether Claude is idle, working, or waiting on the user, using Claude Code's official hooks.*
 
-**[ ] S2.1 Hook event spike (Spike, ≤ 2 h).** As the developer, I want the real event sequence recorded before writing the state machine.
+**[x] S2.1 Hook event spike (Spike, ≤ 2 h).** As the developer, I want the real event sequence recorded before writing the state machine.
 
 - AC: log every event from `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PermissionRequest`, `PostToolUse`, `PostToolUseFailure`, `Notification`, `Elicitation`, `ElicitationResult`, `Stop`, `StopFailure`, `SessionEnd` across these scripted scenarios: plain answer, tool call auto-approved, tool call needing permission (approved and denied), interrupted with Esc, crash mid-turn, `/clear`, `/compact`, `/resume`, MCP elicitation, subagent, background agent.
 - AC: local UI: for `/model`, `/resume`, double-Esc and the login and first-run screens, record which events fire, if any, and what typed or pasted text does there. Re-derive the §4.3–4.4 rules from the result.
@@ -322,7 +322,8 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 
 - AC: pure module in `src/core` with states `starting`, `idle`, `busy`, `awaitingPermission`, `awaitingInput` (elicitation dialogs), `exited`, `unknown`.
 - AC: transitions derived from the S2.1 note; any unexpected event moves to `unknown` (fail safe). `SessionStart` with source `compact` or `fork` leaves the state unchanged, because auto-compaction can fire in the middle of a turn.
-- AC: `Stop` does not fire after a user interrupt, so `unknown` recovers only through `idle_prompt`, a later turn or a manual re-arm (TECH_SPEC §4.3), never on a timer.
+- AC: `Stop` does not fire after a user interrupt, and a denied permission fires no hook at all, so `unknown` recovers only through a later turn, a manual re-arm or `idle_prompt` (TECH_SPEC §4.3), never on a timer.
+- AC: a `Stop` never clears a background agent's pending permission, because voice text could then approve it (S2.1). A replay of `agent-permission-send` blocks at every step until that permission is answered.
 - AC: unit tests replay each recorded sequence from S2.1.
 
 **[ ] S2.5 Status indicator.** As a user, I want to see Claude's state at a glance.

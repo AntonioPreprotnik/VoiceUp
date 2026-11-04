@@ -1,0 +1,42 @@
+{
+  "name": "interrupt-then-idle",
+  "events": [
+    {
+      "t": 1203,
+      "event": "SessionStart",
+      "body": {
+        "hook_event_name": "SessionStart",
+        "source": "startup"
+      }
+    },
+    {
+      "t": 2769,
+      "input": "<prompt>"
+    },
+    {
+      "t": 2996,
+      "event": "UserPromptSubmit",
+      "body": {
+        "hook_event_name": "UserPromptSubmit",
+        "permission_mode": "default",
+        "prompt": "<prompt>"
+      }
+    },
+    {
+      "t": 6055,
+      "input": "Esc"
+    },
+    {
+      "t": 81071,
+      "input": "Ctrl+C twice"
+    },
+    {
+      "t": 81421,
+      "event": "SessionEnd",
+      "body": {
+        "hook_event_name": "SessionEnd",
+        "reason": "prompt_input_exit"
+      }
+    }
+  ]
+}

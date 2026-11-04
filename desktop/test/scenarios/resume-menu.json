@@ -1,0 +1,103 @@
+{
+  "name": "resume-menu",
+  "events": [
+    {
+      "t": 982,
+      "event": "SessionStart",
+      "body": {
+        "hook_event_name": "SessionStart",
+        "source": "startup"
+      }
+    },
+    {
+      "t": 2530,
+      "input": "<prompt>"
+    },
+    {
+      "t": 2750,
+      "event": "UserPromptSubmit",
+      "body": {
+        "hook_event_name": "UserPromptSubmit",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 4721,
+      "event": "Stop",
+      "body": {
+        "hook_event_name": "Stop",
+        "permission_mode": "default",
+        "stop_hook_active": false
+      }
+    },
+    {
+      "t": 4767,
+      "input": "/resume"
+    },
+    {
+      "t": 7939,
+      "input": "typed hello"
+    },
+    {
+      "t": 8939,
+      "input": "Backspace x5"
+    },
+    {
+      "t": 9454,
+      "input": "Enter (first session)"
+    },
+    {
+      "t": 9474,
+      "event": "SessionEnd",
+      "body": {
+        "hook_event_name": "SessionEnd",
+        "reason": "resume"
+      }
+    },
+    {
+      "t": 9502,
+      "event": "SessionStart",
+      "body": {
+        "hook_event_name": "SessionStart",
+        "source": "resume"
+      }
+    },
+    {
+      "t": 15464,
+      "input": "<prompt>"
+    },
+    {
+      "t": 15647,
+      "event": "UserPromptSubmit",
+      "body": {
+        "hook_event_name": "UserPromptSubmit",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 16545,
+      "event": "Stop",
+      "body": {
+        "hook_event_name": "Stop",
+        "permission_mode": "default",
+        "stop_hook_active": false
+      }
+    },
+    {
+      "t": 16604,
+      "input": "Ctrl+C twice"
+    },
+    {
+      "t": 16979,
+      "event": "SessionEnd",
+      "body": {
+        "hook_event_name": "SessionEnd",
+        "reason": "prompt_input_exit"
+      }
+    },
+    {
+      "t": 17588,
+      "ptyExit": -1073741510
+    }
+  ]
+}

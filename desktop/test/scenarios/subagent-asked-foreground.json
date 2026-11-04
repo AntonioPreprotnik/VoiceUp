@@ -1,0 +1,93 @@
+{
+  "name": "subagent-asked-foreground",
+  "events": [
+    {
+      "t": 898,
+      "event": "SessionStart",
+      "body": {
+        "hook_event_name": "SessionStart",
+        "source": "startup"
+      }
+    },
+    {
+      "t": 2473,
+      "input": "<prompt>"
+    },
+    {
+      "t": 2701,
+      "event": "UserPromptSubmit",
+      "body": {
+        "hook_event_name": "UserPromptSubmit",
+        "permission_mode": "default",
+        "prompt": "<prompt>"
+      }
+    },
+    {
+      "t": 5130,
+      "event": "PreToolUse",
+      "body": {
+        "hook_event_name": "PreToolUse",
+        "tool_name": "Agent",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 5175,
+      "event": "PostToolUse",
+      "body": {
+        "hook_event_name": "PostToolUse",
+        "tool_name": "Agent",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 6494,
+      "event": "PreToolUse",
+      "body": {
+        "hook_event_name": "PreToolUse",
+        "agent_id": "a4ee47ba5f7a96a0f",
+        "agent_type": "general-purpose",
+        "tool_name": "PowerShell",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 6933,
+      "event": "PermissionRequest",
+      "body": {
+        "hook_event_name": "PermissionRequest",
+        "agent_id": "a4ee47ba5f7a96a0f",
+        "agent_type": "general-purpose",
+        "tool_name": "PowerShell",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 7010,
+      "event": "Stop",
+      "body": {
+        "hook_event_name": "Stop",
+        "permission_mode": "default",
+        "stop_hook_active": false,
+        "background_tasks": 1
+      }
+    },
+    {
+      "t": 12952,
+      "event": "Notification",
+      "body": {
+        "hook_event_name": "Notification",
+        "notification_type": "permission_prompt",
+        "message": "Claude needs your permission"
+      }
+    },
+    {
+      "t": 27028,
+      "input": "Ctrl+C twice"
+    },
+    {
+      "t": 38035,
+      "ptyExit": -1073741510
+    }
+  ]
+}

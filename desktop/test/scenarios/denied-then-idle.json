@@ -1,0 +1,60 @@
+{
+  "name": "denied-then-idle",
+  "events": [
+    {
+      "t": 1348,
+      "event": "SessionStart",
+      "body": {
+        "hook_event_name": "SessionStart",
+        "source": "startup"
+      }
+    },
+    {
+      "t": 2918,
+      "input": "<prompt>"
+    },
+    {
+      "t": 3142,
+      "event": "UserPromptSubmit",
+      "body": {
+        "hook_event_name": "UserPromptSubmit",
+        "permission_mode": "default",
+        "prompt": "<prompt>"
+      }
+    },
+    {
+      "t": 10048,
+      "event": "PreToolUse",
+      "body": {
+        "hook_event_name": "PreToolUse",
+        "tool_name": "Write",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 10090,
+      "event": "PermissionRequest",
+      "body": {
+        "hook_event_name": "PermissionRequest",
+        "tool_name": "Write",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 11150,
+      "input": "Esc"
+    },
+    {
+      "t": 86154,
+      "input": "Ctrl+C twice"
+    },
+    {
+      "t": 86507,
+      "event": "SessionEnd",
+      "body": {
+        "hook_event_name": "SessionEnd",
+        "reason": "prompt_input_exit"
+      }
+    }
+  ]
+}

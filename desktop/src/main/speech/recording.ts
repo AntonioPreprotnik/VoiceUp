@@ -1,17 +1,22 @@
 import { ipcMain, type IpcMainEvent, type WebContents } from 'electron'
 import type { MessageCode } from '../../core/messages'
-import type { RecordingToggle } from '../../core/recordingToggle'
+import { transcribeTimeoutMs, type RecordingToggle } from '../../core/recordingToggle'
 import { RecorderError } from '../../shared/ipc'
 import { Channels } from '../../shared/ipcChannels'
 import type { WorkerCommand, WorkerEvent } from '../../shared/worker'
 import { SENDERS } from '../ipc/allowlist'
 import { validateSender } from '../ipc/validateSender'
 import { log } from '../log'
+import { logTranscript } from '../logConfig'
 import type { Overlay } from '../overlay'
 
 export interface RecordingOptions {
   readonly toggle: RecordingToggle
   readonly sendToWorker: (command: WorkerCommand) => void
+  /** False once the worker has crashed too often to come back. */
+  readonly workerRunning: () => boolean
+  /** Replaces a worker stuck on a decode. */
+  readonly restartWorker: () => void
   readonly recorder: WebContents
   /** Read at each recording, so a new choice applies from the next one. */
   readonly getDeviceId: () => string | null
@@ -25,6 +30,9 @@ export interface RecordingOptions {
 
 /** Ties the hotkey, the recorder window and the worker together for one recording at a time. */
 export class RecordingController {
+  private transcribeTimer: ReturnType<typeof setTimeout> | undefined
+  private clipMs = 0
+
   constructor(private readonly options: RecordingOptions) {
     ipcMain.on(Channels.recorderError, (event: IpcMainEvent, raw: unknown) => {
       if (!validateSender(event, ...SENDERS[Channels.recorderError])) return
@@ -38,7 +46,13 @@ export class RecordingController {
   }
 
   press(): void {
-    const { toggle, sendToWorker, getDeviceId, overlay, escape } = this.options
+    const { toggle, sendToWorker, getDeviceId, overlay, escape, workerRunning } = this.options
+    // Starting now would open the mic for a recording nothing can ever end.
+    if (toggle.phase === 'idle' && !workerRunning()) {
+      log.warn('Hotkey: no speech worker to record with')
+      overlay.failed('WORKER_CRASHED')
+      return
+    }
     const command = toggle.press()
     log.info(`Hotkey: ${command.type} recording`)
     sendToWorker(command)
@@ -53,6 +67,7 @@ export class RecordingController {
         this.cancel()
       })
     } else {
+      this.clearTimer()
       this.stopMic(command.recordingId)
       overlay.cancelled()
       escape.release()
@@ -64,8 +79,19 @@ export class RecordingController {
     if (this.options.toggle.phase !== 'idle') this.press()
   }
 
+  /** The worker died, so nothing it was doing will ever report back. */
+  workerLost(): void {
+    this.abandon('WORKER_ERROR')
+  }
+
   /** The mic closes as soon as the speech ends, not when the transcript arrives. */
   onWorkerEvent(event: WorkerEvent): void {
+    // A failure the worker can't tie to a recording, such as a frame it couldn't read, would leave
+    // the current one waiting for audio that never gets through.
+    if (event.type === 'error' && event.recordingId === undefined) {
+      this.abandon(event.code)
+      return
+    }
     const recordingId = 'recordingId' in event ? event.recordingId : undefined
     if (!this.options.toggle.onWorkerEvent(event) || recordingId === undefined) return
     const { overlay } = this.options
@@ -74,11 +100,47 @@ export class RecordingController {
     if (event.type === 'speechEnd') {
       log.info(`Speech ended after ${String(event.durationMs)} ms`)
       overlay.speechEnded()
+      this.startTimer(event.durationMs)
     }
-    if (event.type === 'transcript') overlay.finished()
-    if (event.type === 'error') overlay.failed(event.code)
+    if (event.type === 'transcript') {
+      this.clearTimer()
+      log.debug(`Transcribed ${String(this.clipMs)} ms of speech in ${String(event.decodeMs)} ms`)
+      logTranscript(log, event.text)
+      overlay.finished()
+    }
+    if (event.type === 'error') {
+      this.clearTimer()
+      overlay.failed(event.code)
+    }
     if (event.type === 'transcript' || event.type === 'error') this.options.escape.release()
     if (event.type === 'speechEnd' || event.type === 'error') this.stopMic(recordingId)
+  }
+
+  /** Kills the worker if it never answers, since a stuck decode can't be cancelled (§5.3). */
+  private startTimer(clipMs: number): void {
+    this.clipMs = clipMs
+    this.clearTimer()
+    const timeoutMs = transcribeTimeoutMs(clipMs)
+    this.transcribeTimer = setTimeout(() => {
+      log.error(`TRANSCRIBE_TIMEOUT: no transcript after ${String(timeoutMs)} ms`)
+      this.abandon('TRANSCRIBE_TIMEOUT')
+      this.options.restartWorker()
+    }, timeoutMs)
+  }
+
+  private clearTimer(): void {
+    clearTimeout(this.transcribeTimer)
+    this.transcribeTimer = undefined
+  }
+
+  /** Ends the current recording, if there is one, without the worker's help. */
+  private abandon(code: MessageCode): void {
+    const recordingId = this.options.toggle.abandon()
+    if (recordingId === undefined) return
+    this.clearTimer()
+    this.stopMic(recordingId)
+    this.options.overlay.failed(code)
+    this.options.escape.release()
   }
 
   private onRecorderError(recordingId: string, code: MessageCode): void {

@@ -211,6 +211,32 @@ describe('restarting with a new model', () => {
     expect(onCrash).not.toHaveBeenCalled()
     expect(utilityProcess.children).toHaveLength(2)
   })
+
+  it('keeps the same init when the worker was only stuck', () => {
+    const supervisor = create()
+    supervisor.start(init)
+    supervisor.restart()
+    expect(latest().messages[0]?.message).toEqual(init)
+    expect(utilityProcess.children).toHaveLength(2)
+  })
+
+  it('does not start anything while quitting', async () => {
+    const supervisor = create()
+    supervisor.start(init)
+    await supervisor.stop()
+    supervisor.restart()
+    expect(utilityProcess.children).toHaveLength(1)
+  })
+
+  it('is running until it stops', async () => {
+    const supervisor = create()
+    expect(supervisor.running).toBe(false)
+    supervisor.start(init)
+    expect(supervisor.running).toBe(true)
+    await supervisor.stop()
+    latest().emit('exit', 0)
+    expect(supervisor.running).toBe(false)
+  })
 })
 
 describe('stopping', () => {

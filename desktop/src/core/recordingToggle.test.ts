@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { RecordingToggle } from './recordingToggle'
+import { RecordingToggle, transcribeTimeoutMs } from './recordingToggle'
 
 let next: number
 let toggle: RecordingToggle
@@ -7,6 +7,37 @@ let toggle: RecordingToggle
 beforeEach(() => {
   next = 1
   toggle = new RecordingToggle(() => `r${String(next++)}`)
+})
+
+describe('transcribeTimeoutMs', () => {
+  it.each([
+    [0, 10000],
+    [2400, 10000],
+    [20000, 10000],
+    [20002, 10001],
+    [60000, 30000]
+  ])('gives a %d ms clip %d ms', (clipMs, timeout) => {
+    expect(transcribeTimeoutMs(clipMs)).toBe(timeout)
+  })
+})
+
+describe('abandoning', () => {
+  it('ends a recording, and says which', () => {
+    toggle.press()
+    expect(toggle.abandon()).toBe('r1')
+    expect(toggle.phase).toBe('idle')
+    expect(toggle.press()).toEqual({ type: 'start', recordingId: 'r2' })
+  })
+
+  it('has nothing to end when idle', () => {
+    expect(toggle.abandon()).toBeUndefined()
+  })
+
+  it('drops late events from what it ended', () => {
+    toggle.press()
+    toggle.abandon()
+    expect(toggle.onWorkerEvent({ type: 'transcript', recordingId: 'r1' })).toBe(false)
+  })
 })
 
 describe('pressing the hotkey', () => {

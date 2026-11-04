@@ -1,5 +1,5 @@
 import type { WebContents } from 'electron'
-import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { BrowserWindow, ipcMain, resetFakes } from '../../../test/fakes/electron'
 import fakeLog from '../../../test/fakes/electronLog'
 import { RecordingToggle } from '../../core/recordingToggle'
@@ -17,6 +17,8 @@ let destroyed: boolean
 let controller: RecordingController
 let next: number
 let micDevice: string | null
+let workerRunning: boolean
+let restartWorker: Mock
 let escape: { held: (() => void) | undefined; hold(onPress: () => void): void; release(): void }
 let overlay: {
   recordingStarted: Mock
@@ -41,6 +43,8 @@ beforeEach(() => {
   destroyed = false
   next = 1
   micDevice = null
+  workerRunning = true
+  restartWorker = vi.fn()
   escape = {
     held: undefined,
     hold(onPress) {
@@ -67,6 +71,8 @@ beforeEach(() => {
   controller = new RecordingController({
     toggle: new RecordingToggle(() => `r${String(next++)}`),
     sendToWorker: (command) => toWorker.push(command),
+    workerRunning: () => workerRunning,
+    restartWorker,
     recorder,
     getDeviceId: () => micDevice,
     overlay,
@@ -285,6 +291,150 @@ describe('the overlay', () => {
     controller.press()
     controller.onWorkerEvent({ type: 'level', recordingId: 'r1', rms: 0.3 })
     expect(overlay.level).not.toHaveBeenCalled()
+  })
+})
+
+describe('a transcript', () => {
+  it('goes to the log only at debug, with its timing', () => {
+    const debug = vi.spyOn(fakeLog, 'debug')
+    const others = [
+      vi.spyOn(fakeLog, 'info'),
+      vi.spyOn(fakeLog, 'warn'),
+      vi.spyOn(fakeLog, 'error')
+    ]
+    controller.press()
+    controller.onWorkerEvent({ type: 'speechEnd', recordingId: 'r1', durationMs: 2400 })
+    controller.onWorkerEvent({
+      type: 'transcript',
+      recordingId: 'r1',
+      text: 'delete the database',
+      decodeMs: 108
+    })
+    expect(debug).toHaveBeenCalledWith('Transcribed 2400 ms of speech in 108 ms')
+    expect(debug).toHaveBeenCalledWith('Transcript: delete the database')
+    for (const spy of others) {
+      expect(JSON.stringify(spy.mock.calls)).not.toContain('delete the database')
+    }
+  })
+})
+
+describe('the transcribe timeout', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  function untilTranscribing(durationMs: number): void {
+    controller.press()
+    controller.onWorkerEvent({ type: 'speechEnd', recordingId: 'r1', durationMs })
+  }
+
+  it('waits 10 s for a short clip, then restarts the worker and tells the user', () => {
+    untilTranscribing(2400)
+    vi.advanceTimersByTime(9999)
+    expect(restartWorker).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(1)
+    expect(restartWorker).toHaveBeenCalledOnce()
+    expect(overlay.failed).toHaveBeenCalledWith('TRANSCRIBE_TIMEOUT')
+    expect(escape.held).toBeUndefined()
+  })
+
+  it('waits half the clip for a long one', () => {
+    untilTranscribing(60000)
+    vi.advanceTimersByTime(29999)
+    expect(restartWorker).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(1)
+    expect(restartWorker).toHaveBeenCalledOnce()
+  })
+
+  it('leaves the next press free to start a new recording', () => {
+    untilTranscribing(2400)
+    vi.advanceTimersByTime(10000)
+    controller.press()
+    expect(toWorker.at(-1)).toEqual({ type: 'start', recordingId: 'r2' })
+  })
+
+  it('drops a transcript that arrives too late', () => {
+    untilTranscribing(2400)
+    vi.advanceTimersByTime(10000)
+    controller.onWorkerEvent({ type: 'transcript', recordingId: 'r1', text: 'x', decodeMs: 1 })
+    expect(overlay.finished).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['a transcript', { type: 'transcript', recordingId: 'r1', text: 'x', decodeMs: 1 }],
+    ['an error', { type: 'error', recordingId: 'r1', code: 'WORKER_ERROR', message: 'bad' }]
+  ] as const)('stops at %s', (_label, event) => {
+    untilTranscribing(2400)
+    controller.onWorkerEvent(event)
+    vi.advanceTimersByTime(60000)
+    expect(restartWorker).not.toHaveBeenCalled()
+  })
+
+  it('stops at a cancel', () => {
+    untilTranscribing(2400)
+    controller.press()
+    vi.advanceTimersByTime(60000)
+    expect(restartWorker).not.toHaveBeenCalled()
+  })
+
+  it('does not run while still recording', () => {
+    controller.press()
+    vi.advanceTimersByTime(60000)
+    expect(restartWorker).not.toHaveBeenCalled()
+    expect(overlay.failed).not.toHaveBeenCalled()
+  })
+})
+
+describe('no hung states', () => {
+  it('ends a recording when the worker dies, and closes the mic', () => {
+    controller.press()
+    controller.workerLost()
+    expect(toRecorder.at(-1)).toEqual([Channels.recorderStop, { recordingId: 'r1' }])
+    expect(overlay.failed).toHaveBeenCalledWith('WORKER_ERROR')
+    expect(escape.held).toBeUndefined()
+    controller.press()
+    expect(toWorker.at(-1)).toEqual({ type: 'start', recordingId: 'r2' })
+  })
+
+  it('stays quiet when the worker dies with nothing recording', () => {
+    controller.workerLost()
+    expect(overlay.failed).not.toHaveBeenCalled()
+  })
+
+  it('stops the timeout when the worker dies, so it restarts only once', () => {
+    vi.useFakeTimers()
+    controller.press()
+    controller.onWorkerEvent({ type: 'speechEnd', recordingId: 'r1', durationMs: 2400 })
+    controller.workerLost()
+    vi.advanceTimersByTime(60000)
+    vi.useRealTimers()
+    expect(restartWorker).not.toHaveBeenCalled()
+  })
+
+  it('ends a recording on a worker error with no recording id', () => {
+    controller.press()
+    controller.onWorkerEvent({ type: 'error', code: 'WORKER_ERROR', message: 'bad frame' })
+    expect(overlay.failed).toHaveBeenCalledWith('WORKER_ERROR')
+    expect(toRecorder.at(-1)).toEqual([Channels.recorderStop, { recordingId: 'r1' }])
+  })
+
+  it('does not open the mic when no worker is left', () => {
+    workerRunning = false
+    controller.press()
+    expect(overlay.failed).toHaveBeenCalledWith('WORKER_CRASHED')
+    expect(toRecorder).toEqual([])
+    expect(toWorker).toEqual([])
+  })
+
+  it('can still cancel a recording after the worker is gone', () => {
+    controller.press()
+    workerRunning = false
+    controller.press()
+    expect(overlay.cancelled).toHaveBeenCalled()
   })
 })
 

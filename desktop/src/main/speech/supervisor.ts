@@ -45,8 +45,17 @@ export class SpeechSupervisor {
     this.spawn()
   }
 
-  /** Starts over with a new model. A deliberate restart, so it doesn't count as a crash. */
-  restart(init: WorkerInit): void {
+  /** False once it crashed too often to restart, or before it starts. */
+  get running(): boolean {
+    return this.child !== undefined
+  }
+
+  /**
+   * Starts over, with a new model or because the worker is stuck. It's deliberate, so it doesn't
+   * count as a crash.
+   */
+  restart(init: WorkerInit | undefined = this.init): void {
+    if (this.stopping) return
     this.init = init
     const old = this.child
     this.child = undefined

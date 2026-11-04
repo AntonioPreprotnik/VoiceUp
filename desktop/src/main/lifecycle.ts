@@ -125,6 +125,10 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
         sendToWorker: (command) => {
           speech.send(command)
         },
+        workerRunning: () => speech.running,
+        restartWorker: () => {
+          speech.restart()
+        },
         recorder: recorderWindow.webContents,
         getDeviceId: () => claude.micDeviceId,
         overlay,
@@ -137,8 +141,12 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
             log.warn(`Speech worker error: ${event.code}: ${event.message}`)
           recording.onWorkerEvent(event)
         },
+        onCrash: () => {
+          recording.workerLost()
+        },
         onGaveUp: () => {
           log.error(MESSAGES.WORKER_CRASHED.title)
+          overlay.failed('WORKER_CRASHED')
         }
       })
       let shownPhase = 'idle'

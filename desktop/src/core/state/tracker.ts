@@ -60,6 +60,9 @@ export class ClaudeStateTracker {
   /** Ignored unless unknown: a click on a stale button must not change anything. */
   reArm(): void {
     if (this.context.state !== 'unknown') return
+    // The user is saying the prompt is ready. /model and /login fire no hook, so nothing else can
+    // say their text has gone.
+    this.dirty = false
     this.stopWatching()
     this.dispatch({ type: 'reArm' })
   }

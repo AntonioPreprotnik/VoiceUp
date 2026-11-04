@@ -328,7 +328,7 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 
 **[x] S2.5 Status indicator.** As a user, I want to see Claude's state at a glance.
 
-- AC: while the state is `unknown`, the status bar offers "Re-arm voice"; the user uses it to confirm that Claude's main prompt is ready.
+- AC: while the state is `unknown`, the status bar offers "Re-arm voice"; the user uses it to confirm that Claude's main prompt is ready and empty.
 - AC: status bar shows state with distinct color and text; tray icon mirrors it; optional Windows notification (`ui.notifications`, on by default) when Claude finishes or needs permission while the app is not focused.
 
 ### E3 — Voice capture

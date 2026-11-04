@@ -24,7 +24,8 @@ export interface GateInput {
 
 /** What the overlay shows for a block: each says why, in words the user can act on. */
 export const BLOCK_MESSAGES: Readonly<Record<BlockReason, string>> = {
-  unsentText: 'You have unsent text. Send it, or press Ctrl+C in the terminal to clear it.',
+  unsentText:
+    'Your prompt may have unsent text. If it is empty or only shows a grey suggestion, press Ctrl+C once in the terminal. Otherwise send or clear it.',
   busy: 'Claude is busy',
   queueFull: 'The queue is full',
   waitingForYou: 'Claude is waiting for you. Answer it in the terminal.',

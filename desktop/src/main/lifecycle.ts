@@ -257,6 +257,9 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
         }),
         onQueueChange: () => {
           publishStatus()
+        },
+        onBlocked: (reason) => {
+          log.info(`Voice text blocked: ${reason}`)
         }
       })
       publishStatus()

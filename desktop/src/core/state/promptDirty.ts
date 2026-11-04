@@ -10,9 +10,16 @@ const FOCUS_REPORT = /^\x1b\[[IO]$/u
 const MOUSE_REPORT = /^(?:\x1b\[<\d+;\d+;\d+[Mm]|\x1b\[M[\s\S]{3})+$/u
 const PAGE_KEYS = /^\x1b\[[56](?:;\d+)?~$/u
 /* eslint-enable no-control-regex */
+/**
+ * Claude's own shortcuts that add no text: Shift+Tab, Ctrl+O and Ctrl+T. Not Right or Tab, which
+ * can accept a grey suggestion into the prompt, where it would merge with a send.
+ */
+const UI_KEYS: ReadonlySet<string> = new Set(['\x1b[Z', '\x0f', '\x14'])
 
 function isHarmless(data: string): boolean {
-  return FOCUS_REPORT.test(data) || MOUSE_REPORT.test(data) || PAGE_KEYS.test(data)
+  return (
+    UI_KEYS.has(data) || FOCUS_REPORT.test(data) || MOUSE_REPORT.test(data) || PAGE_KEYS.test(data)
+  )
 }
 
 /** Keys at a permission prompt or dialog answer that, and don't reach the main prompt. */

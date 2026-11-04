@@ -38,7 +38,7 @@ const VIEWS: Readonly<Record<ClaudeState, Omit<StatusView, 'canReArm' | 'queue'>
   unknown: {
     state: 'unknown',
     label: 'Paused',
-    detail: "Can't tell if Claude is ready. If you see its main prompt, choose Re-arm voice.",
+    detail: "Can't tell if Claude is ready. If its main prompt is empty, choose Re-arm voice.",
     color: '#ff8c42'
   },
   exited: {

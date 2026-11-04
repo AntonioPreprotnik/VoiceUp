@@ -15,6 +15,7 @@ let claude: {
 }
 let overlay: { blocked: Mock; failed: Mock; finished: Mock; queued: Mock }
 let escape: { held: (() => void) | undefined; hold(onPress: () => void): void; release(): void }
+let onBlocked: Mock
 
 const TEXT = 'run the tests'
 const PASTED = `\x1b[200~${TEXT}\x1b[201~`
@@ -34,6 +35,7 @@ beforeEach(() => {
     onInput: vi.fn()
   }
   overlay = { blocked: vi.fn(), failed: vi.fn(), finished: vi.fn(), queued: vi.fn() }
+  onBlocked = vi.fn()
   escape = {
     held: undefined,
     hold(onPress) {
@@ -56,7 +58,8 @@ beforeEach(() => {
     escape,
     // Queueing is off here, which keeps these about sending and blocking. See queue.test.ts.
     settings: () => ({ queueEnabled: false, maxQueue: 0 }),
-    onQueueChange: () => undefined
+    onQueueChange: () => undefined,
+    onBlocked
   })
 })
 
@@ -132,6 +135,18 @@ describe('text the user has typed', () => {
     delivery.deliver(TEXT)
     expect(written).toEqual([])
     expect(overlay.blocked).toHaveBeenCalledWith(BLOCK_MESSAGES.unsentText)
+  })
+
+  it('reports which reason, for the log, on each try', () => {
+    claude.promptDirty = true
+    delivery.deliver(TEXT)
+    delivery.retry()
+    expect(onBlocked.mock.calls).toEqual([['unsentText'], ['unsentText']])
+  })
+
+  it('says what to do when only a suggestion is showing', () => {
+    expect(BLOCK_MESSAGES.unsentText).toContain('Ctrl+C')
+    expect(BLOCK_MESSAGES.unsentText).toContain('suggestion')
   })
 })
 

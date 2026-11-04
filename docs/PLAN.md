@@ -302,7 +302,7 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 - AC: record every `notification_type` value seen (the field name is already confirmed from the SDK types: `notification_type`, `message`, `title?`).
 - AC: start once in a never-trusted folder and confirm no hook fires until the trust prompt is accepted (documented behavior), then that `SessionStart` arrives.
 
-**[ ] S2.2 Local hook receiver.** As the developer, I want Claude Code to report events to the app.
+**[x] S2.2 Local hook receiver.** As the developer, I want Claude Code to report events to the app.
 
 - AC: HTTP server in main process on `127.0.0.1`, random port, requires a per-launch token header; rejects anything else with 401 and logs it.
 - AC: bodies validated with zod; an unrecognized event is logged and reaches the reducer as unexpected, which moves the state to `unknown` (fail safe).

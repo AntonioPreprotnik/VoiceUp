@@ -26,7 +26,8 @@
       "event": "UserPromptSubmit",
       "body": {
         "hook_event_name": "UserPromptSubmit",
-        "permission_mode": "default"
+        "permission_mode": "default",
+        "prompt": "prompt text"
       }
     },
     {

@@ -19,7 +19,7 @@
       "body": {
         "hook_event_name": "UserPromptSubmit",
         "permission_mode": "default",
-        "prompt": "<prompt>"
+        "prompt": "prompt text"
       }
     },
     {
@@ -49,7 +49,7 @@
         "hook_event_name": "Stop",
         "permission_mode": "default",
         "stop_hook_active": false,
-        "background_tasks": 0
+        "background_tasks": []
       }
     },
     {

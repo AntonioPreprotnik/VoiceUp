@@ -19,12 +19,15 @@ let next: number
 let micDevice: string | null
 let workerRunning: boolean
 let voiceBlock: 'HOOKS_BLOCKED' | null
+let previewSettings: { previewMs: number; alwaysConfirm: boolean }
+let deliver: Mock
 let restartWorker: Mock
 let escape: { held: (() => void) | undefined; hold(onPress: () => void): void; release(): void }
 let overlay: {
   recordingStarted: Mock
   level: Mock
   speechEnded: Mock
+  preview: Mock
   finished: Mock
   cancelled: Mock
   failed: Mock
@@ -46,6 +49,9 @@ beforeEach(() => {
   micDevice = null
   workerRunning = true
   voiceBlock = null
+  // No preview unless a test asks for one, which keeps the other tests about what they are about.
+  previewSettings = { previewMs: 0, alwaysConfirm: false }
+  deliver = vi.fn()
   restartWorker = vi.fn()
   escape = {
     held: undefined,
@@ -60,6 +66,7 @@ beforeEach(() => {
     recordingStarted: vi.fn(),
     level: vi.fn(),
     speechEnded: vi.fn(),
+    preview: vi.fn(),
     finished: vi.fn(),
     cancelled: vi.fn(),
     failed: vi.fn()
@@ -79,6 +86,8 @@ beforeEach(() => {
     getDeviceId: () => micDevice,
     minWords: 1,
     voiceBlock: () => voiceBlock,
+    previewSettings: () => previewSettings,
+    deliver,
     overlay,
     escape
   })
@@ -316,6 +325,115 @@ describe('a transcript', () => {
     })
     expect(debug).toHaveBeenCalledWith('Transcribed 2400 ms of speech in 108 ms')
     expect(debug).toHaveBeenCalledWith('Transcript: delete the database')
+    for (const spy of others) {
+      expect(JSON.stringify(spy.mock.calls)).not.toContain('delete the database')
+    }
+  })
+})
+
+describe('a preview', () => {
+  const transcript = (text = '  run the  tests '): void => {
+    controller.press()
+    controller.onWorkerEvent({ type: 'speechEnd', recordingId: 'r1', durationMs: 2400 })
+    controller.onWorkerEvent({ type: 'transcript', recordingId: 'r1', text, decodeMs: 108 })
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    previewSettings = { previewMs: 1000, alwaysConfirm: false }
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('shows the cleaned text with its countdown, and holds Esc', () => {
+    transcript()
+    expect(overlay.preview).toHaveBeenCalledWith('run the tests', 5000)
+    expect(escape.held).toBeDefined()
+    expect(deliver).not.toHaveBeenCalled()
+  })
+
+  it('delivers the cleaned text when the countdown ends', () => {
+    transcript()
+    vi.advanceTimersByTime(4999)
+    expect(deliver).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(1)
+    expect(deliver).toHaveBeenCalledWith('run the tests')
+    expect(overlay.finished).toHaveBeenCalledOnce()
+    expect(escape.held).toBeUndefined()
+  })
+
+  it('cancels on Esc: nothing is delivered', () => {
+    transcript()
+    escape.held?.()
+    vi.advanceTimersByTime(5000)
+    expect(deliver).not.toHaveBeenCalled()
+    expect(overlay.cancelled).toHaveBeenCalledOnce()
+    expect(escape.held).toBeUndefined()
+  })
+
+  it('sends at once on the hotkey, and starts no new recording', () => {
+    transcript()
+    vi.advanceTimersByTime(300)
+    toWorker.length = 0
+    controller.press()
+    expect(deliver).toHaveBeenCalledOnce()
+    expect(toWorker).toEqual([])
+    expect(toRecorder.filter(([channel]) => channel === Channels.recorderStart)).toHaveLength(1)
+  })
+
+  it('ignores the hotkey for the first 300 ms, and starts no new recording either', () => {
+    transcript()
+    vi.advanceTimersByTime(299)
+    toWorker.length = 0
+    controller.press()
+    expect(deliver).not.toHaveBeenCalled()
+    expect(toWorker).toEqual([])
+    expect(overlay.cancelled).not.toHaveBeenCalled()
+  })
+
+  it('waits for a key in always-confirm mode', () => {
+    previewSettings = { previewMs: 1000, alwaysConfirm: true }
+    transcript()
+    expect(overlay.preview).toHaveBeenCalledWith('run the tests', null)
+    vi.advanceTimersByTime(60000)
+    expect(deliver).not.toHaveBeenCalled()
+    controller.press()
+    expect(deliver).toHaveBeenCalledWith('run the tests')
+  })
+
+  it('delivers at once with a preview of 0, with nothing shown', () => {
+    previewSettings = { previewMs: 0, alwaysConfirm: false }
+    transcript()
+    expect(overlay.preview).not.toHaveBeenCalled()
+    expect(deliver).toHaveBeenCalledWith('run the tests')
+    expect(escape.held).toBeUndefined()
+  })
+
+  it('shows nothing and delivers nothing for an unusable transcript', () => {
+    transcript('[BLANK_AUDIO]')
+    expect(overlay.preview).not.toHaveBeenCalled()
+    expect(deliver).not.toHaveBeenCalled()
+    expect(escape.held).toBeUndefined()
+  })
+
+  it('lets a new recording start after it ends', () => {
+    transcript()
+    vi.advanceTimersByTime(5000)
+    controller.press()
+    expect(toWorker.at(-1)).toEqual({ type: 'start', recordingId: 'r2' })
+  })
+
+  it('never logs the text outside debug', () => {
+    const others = [
+      vi.spyOn(fakeLog, 'info'),
+      vi.spyOn(fakeLog, 'warn'),
+      vi.spyOn(fakeLog, 'error')
+    ]
+    transcript('delete the database')
+    vi.advanceTimersByTime(300)
+    controller.press()
     for (const spy of others) {
       expect(JSON.stringify(spy.mock.calls)).not.toContain('delete the database')
     }

@@ -5,6 +5,8 @@ import { Channels, type OverlaySound, type OverlayState } from '../shared/ipcCha
 import { log } from './log'
 
 const SIZE = { width: 320, height: 64 }
+// Room for three lines of a spoken command, plus the keys and the countdown.
+const PREVIEW_SIZE = { width: 560, height: 124 }
 const ERROR_SHOW_MS = 4000
 
 export interface OverlayOptions {
@@ -17,6 +19,7 @@ export interface OverlayOptions {
 export class Overlay {
   private hideTimer: ReturnType<typeof setTimeout> | undefined
   private pressedAt: number | undefined
+  private shownSize = SIZE
   private readonly now: () => number
 
   constructor(private readonly options: OverlayOptions) {
@@ -47,6 +50,12 @@ export class Overlay {
     this.show({ phase: 'transcribing' })
   }
 
+  /** Shown with no sound: the stop sound already played when the speech ended. */
+  preview(text: string, countdownMs: number | null): void {
+    this.pressedAt = undefined
+    this.show({ phase: 'preview', text, countdownMs })
+  }
+
   /** The transcript arrived or the recording was cancelled. */
   finished(): void {
     this.pressedAt = undefined
@@ -74,13 +83,18 @@ export class Overlay {
     window.webContents.send(Channels.overlayShow, state)
     if (state.phase === 'hidden') {
       window.hide()
-    } else if (!window.isVisible()) {
+      return
+    }
+    const size = state.phase === 'preview' ? PREVIEW_SIZE : SIZE
+    const visible = window.isVisible()
+    if (!visible || size !== this.shownSize) {
+      this.shownSize = size
       // On the display with the cursor, which is where the user is looking.
       const { workArea } = screen.getDisplayNearestPoint(screen.getCursorScreenPoint())
-      window.setBounds(overlayBounds(workArea, SIZE))
-      // Inactive: taking focus here would pull the user out of what they are typing into.
-      window.showInactive()
+      window.setBounds(overlayBounds(workArea, size))
     }
+    // Inactive: taking focus here would pull the user out of what they are typing into.
+    if (!visible) window.showInactive()
   }
 
   private playSound(sound: OverlaySound): void {

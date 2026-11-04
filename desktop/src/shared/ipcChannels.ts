@@ -58,6 +58,8 @@ export type OverlayState =
   | { readonly phase: 'hidden' }
   | { readonly phase: 'listening'; readonly level: number }
   | { readonly phase: 'transcribing' }
+  /** countdownMs is null in always-confirm mode, which waits for a key. */
+  | { readonly phase: 'preview'; readonly text: string; readonly countdownMs: number | null }
   | { readonly phase: 'error'; readonly code: string; readonly message: string }
 
 export type OverlaySound = 'start' | 'stop'

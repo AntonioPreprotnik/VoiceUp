@@ -414,9 +414,9 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 - AC: `idle` → send; `busy` → queue; `awaitingPermission`, `awaitingInput`, `starting`, `exited`, `unknown` → block with a visible reason.
 - AC: exhaustive unit tests over every state.
 
-**[ ] S5.2 Preview and cancel window.** As a user, I want a moment to catch a misheard command.
+**[x] S5.2 Preview and cancel window.** As a user, I want a moment to catch a misheard command.
 
-- AC: overlay shows the transcript with a countdown (default 1.0 s, configurable 0–5 s); Esc cancels; pressing the hotkey again sends at once, except in the first 300 ms of the preview, so a late cancel press can't send (the overlay is click-through, so it has no buttons).
+- AC: overlay shows the transcript with a countdown of one second per word, and at least 5 s (changed from a flat 1.0 s after Antonio tried it; `previewMs` is the time per word, configurable 0–5 s); Esc cancels; pressing the hotkey again sends at once, except in the first 300 ms of the preview, so a late cancel press can't send (the overlay is click-through, so it has no buttons).
 - AC: "Always confirm" mode waits for the hotkey (send) or Esc (cancel) instead of a countdown. No global Enter shortcut: it would steal Enter from every other app.
 
 **[ ] S5.3 Input injection spike (Spike, ≤ 2 h).** As the developer, I want to know the robust way to type into the Claude Code prompt.

@@ -118,6 +118,50 @@ describe('the phases', () => {
   })
 })
 
+describe('a preview', () => {
+  it('shows the text and the countdown', () => {
+    create().preview('run the tests', 1000)
+    expect(states().at(-1)).toEqual({ phase: 'preview', text: 'run the tests', countdownMs: 1000 })
+    expect(window.shownInactive).toBe(1)
+  })
+
+  it('shows no countdown in always-confirm mode', () => {
+    create().preview('run the tests', null)
+    expect(states().at(-1)).toMatchObject({ countdownMs: null })
+  })
+
+  it('stays until told otherwise, unlike an error', () => {
+    vi.useFakeTimers()
+    create().preview('run the tests', null)
+    vi.advanceTimersByTime(60000)
+    expect(states().at(-1)).toMatchObject({ phase: 'preview' })
+  })
+
+  it('grows the window for the text, without taking focus', () => {
+    const overlay = create()
+    overlay.speechEnded()
+    expect(window.bounds).toMatchObject({ width: 320, height: 64 })
+    overlay.preview('run the tests', 1000)
+    expect(window.bounds).toMatchObject({ width: 560, height: 124 })
+    expect(window.focused).toBe(false)
+  })
+
+  it('shrinks back for the next recording', () => {
+    const overlay = create()
+    overlay.speechEnded()
+    const small = window.bounds
+    overlay.preview('run the tests', 1000)
+    overlay.finished()
+    overlay.speechEnded()
+    expect(window.bounds).toEqual(small)
+  })
+
+  it('makes no sound', () => {
+    create().preview('run the tests', 1000)
+    expect(sounds()).toEqual([])
+  })
+})
+
 describe('the sounds', () => {
   it('plays start on the press and stop when speech ends', () => {
     const overlay = create()

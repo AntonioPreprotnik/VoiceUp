@@ -83,7 +83,7 @@ Seven processes at runtime; only the main process holds authority, and it is the
 6. Spawn `claude` in the PTY; state = `starting` until `SessionStart` arrives.
 7. Register the global hotkey; report failure if taken.
 
-**Shutdown order** (`before-quit`): unregister shortcuts → stop recording → `kill()` the PTY and wait up to 2 s → stop the worker → close the hook server → delete the per-launch hook files → flush logs. A watchdog force-exits after 5 s so a hung child never keeps the app alive.
+**Shutdown order** (`before-quit`): unregister shortcuts → remove the tray icon → stop recording → `kill()` the PTY and wait up to 2 s → stop the worker → close the hook server → delete the per-launch hook files → flush logs. A watchdog force-exits after 5 s so a hung child never keeps the app alive.
 
 **One voice command, step by step:**
 
@@ -347,7 +347,8 @@ Every boundary has one zod schema in `shared/`, imported by both sides; nothing 
 | `term:input` | renderer → main | string, ≤ 64 KB | terminal |
 | `term:resize` | renderer → main | `{ cols, rows }`, clamped | terminal |
 | `term:ack` | renderer → main | bytes written (flow control) | terminal |
-| `state:changed` | main → renderer | `{ state, reason?, queue: [{ id, preview }] }` | terminal, overlay, settings |
+| `state:changed` | main → renderer | `{ state, label, detail, color, canReArm }`, drawn as sent so the status bar and tray can't disagree; S5.5 adds `queue: [{ id, preview }]` | terminal; overlay and settings from their stories |
+| `state:get` | invoke | → the same, or `null`; for a page that loads after a change | terminal |
 | `overlay:show` | main → renderer | union on `phase`: `listening{level}`, `transcribing`, `preview{text, countdownMs}`, `blocked{reason}`, `error{code, message}`, `hidden` | overlay |
 | `overlay:sound` | main → renderer | `start` or `stop`; generated tones, off with `ui.sounds` | overlay |
 | `recorder:start` / `recorder:stop` | main → renderer | `{ recordingId, deviceId }` / `{ recordingId }` | recorder |
@@ -419,6 +420,7 @@ export const Settings = z.object({
   ui: z.object({
     fontSize: z.number().int().min(8).max(32).default(14),
     sounds: z.boolean().default(true),
+    notifications: z.boolean().default(true),  // only while the window isn't focused
     startWithWindows: z.boolean().default(false),
   }).prefault({}),
   logLevel: z.enum(['error', 'warn', 'info', 'debug']).default('info'),

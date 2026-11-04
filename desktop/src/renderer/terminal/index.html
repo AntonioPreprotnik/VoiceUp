@@ -9,12 +9,70 @@
     />
     <style>
       html,
-      body,
-      #terminal {
+      body {
         height: 100%;
         margin: 0;
         background: #0c0c0c;
         overflow: hidden;
+      }
+      body {
+        display: flex;
+        flex-direction: column;
+      }
+      #terminal {
+        flex: 1;
+        min-height: 0;
+        overflow: hidden;
+      }
+      #status-bar {
+        display: flex;
+        flex: none;
+        align-items: center;
+        gap: 8px;
+        height: 26px;
+        padding: 0 10px;
+        background: #1e1e1e;
+        border-top: 1px solid #333;
+        color: #f0f0f0;
+        font:
+          12px 'Segoe UI',
+          sans-serif;
+        white-space: nowrap;
+      }
+      #status-dot {
+        flex: none;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #9d9d9d;
+      }
+      #status-label {
+        flex: none;
+        font-weight: 600;
+      }
+      #status-detail {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        color: #b5b5b5;
+        text-overflow: ellipsis;
+      }
+      #re-arm {
+        flex: none;
+        padding: 1px 10px;
+        border: 0;
+        border-radius: 3px;
+        background: #0e639c;
+        color: #fff;
+        font: inherit;
+        cursor: pointer;
+      }
+      #re-arm[hidden] {
+        display: none;
+      }
+      #re-arm:hover,
+      #re-arm:focus-visible {
+        background: #1177bb;
       }
       /* Above xterm's layers, which go up to z-index 11 and would otherwise take the clicks. */
       #session-exited {
@@ -93,6 +151,14 @@
   </head>
   <body>
     <div id="terminal"></div>
+    <div id="status-bar" role="status">
+      <span id="status-dot"></span>
+      <span id="status-label">Starting</span>
+      <span id="status-detail"></span>
+      <button id="re-arm" type="button" title="Claude's main prompt is ready" hidden>
+        Re-arm voice
+      </button>
+    </div>
     <div id="session-exited" role="alert" hidden>
       <span id="session-exited-text"></span>
       <div id="session-command" hidden>

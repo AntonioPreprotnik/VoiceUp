@@ -17,7 +17,7 @@ describe('defaultSettings', () => {
       },
       delivery: { previewMs: 1000, alwaysConfirm: false, queue: true, maxQueue: 3 },
       claude: { projectDir: null, browserControl: false },
-      ui: { fontSize: 14, sounds: true, startWithWindows: false },
+      ui: { fontSize: 14, sounds: true, notifications: true, startWithWindows: false },
       logLevel: 'info'
     })
   })

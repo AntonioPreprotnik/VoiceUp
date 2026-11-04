@@ -60,6 +60,10 @@ export class BrowserWindow extends EventEmitter {
     this.title = title
   }
 
+  isFocused(): boolean {
+    return this.focused
+  }
+
   setProgressBar(progress: number): void {
     this.progress = progress
   }
@@ -126,6 +130,7 @@ class FakeApp extends EventEmitter {
   hasLock = true
   quitCount = 0
   exitCodes: number[] = []
+  appUserModelId = ''
 
   getAppPath(): string {
     return pathRoot
@@ -157,9 +162,65 @@ class FakeApp extends EventEmitter {
   exit(code: number): void {
     this.exitCodes.push(code)
   }
+
+  setAppUserModelId(id: string): void {
+    this.appUserModelId = id
+  }
 }
 
 export const app = new FakeApp()
+
+export const nativeImage = {
+  createEmpty: (): { bitmap: Buffer | null } => ({ bitmap: null }),
+  createFromBitmap: (bitmap: Buffer): { bitmap: Buffer } => ({ bitmap })
+}
+
+export class Tray extends EventEmitter {
+  static readonly instances: Tray[] = []
+  image: unknown
+  tooltip = ''
+  menu: unknown
+  destroyed = false
+
+  constructor(image: unknown) {
+    super()
+    this.image = image
+    Tray.instances.push(this)
+  }
+
+  setImage(image: unknown): void {
+    this.image = image
+  }
+
+  setToolTip(tooltip: string): void {
+    this.tooltip = tooltip
+  }
+
+  setContextMenu(menu: unknown): void {
+    this.menu = menu
+  }
+
+  destroy(): void {
+    this.destroyed = true
+  }
+}
+
+export class Notification extends EventEmitter {
+  static shown: Notification[] = []
+  static supported = true
+
+  static isSupported(): boolean {
+    return Notification.supported
+  }
+
+  constructor(readonly options: { title: string; body: string }) {
+    super()
+  }
+
+  show(): void {
+    Notification.shown.push(this)
+  }
+}
 
 type ProtocolHandler = (request: Request) => Response | Promise<Response>
 
@@ -373,6 +434,9 @@ export function resetFakes(): void {
   Menu.popups = []
   shell.external = []
   shell.openFails = false
+  Tray.instances.length = 0
+  Notification.shown = []
+  Notification.supported = true
   dialog.answers = []
   dialog.messageBoxes = []
   dialog.messageBoxFails = false

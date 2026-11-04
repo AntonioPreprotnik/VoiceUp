@@ -35,6 +35,7 @@ export const Settings = z.object({
     .object({
       fontSize: z.number().int().min(8).max(32).default(14),
       sounds: z.boolean().default(true),
+      notifications: z.boolean().default(true),
       startWithWindows: z.boolean().default(false)
     })
     .prefault({}),

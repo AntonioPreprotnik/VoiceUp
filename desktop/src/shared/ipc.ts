@@ -9,6 +9,7 @@ export const TermAck = z.number().int().nonnegative()
 export const TermResize = z.object({ cols: z.number().int(), rows: z.number().int() })
 export type TermResize = z.infer<typeof TermResize>
 export const SessionRestart = z.object({}).strict()
+export const StateReArm = z.object({}).strict()
 export const RecorderDevices = z
   .array(z.object({ deviceId: z.string().max(512), label: z.string().max(512) }))
   .max(64)

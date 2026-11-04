@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type {
   Channels as SharedChannels,
   SessionExit,
+  StatusView,
   TerminalApi,
   TerminalMenuAction
 } from '../shared/ipcChannels'
@@ -15,6 +16,9 @@ const Channels = {
   termAck: 'term:ack',
   sessionExited: 'session:exited',
   sessionRestart: 'session:restart',
+  stateChanged: 'state:changed',
+  stateGet: 'state:get',
+  stateReArm: 'state:rearm',
   clipboardWrite: 'clipboard:write',
   clipboardRead: 'clipboard:read',
   linkOpen: 'link:open',
@@ -57,6 +61,19 @@ const api: TerminalApi = {
   },
   restartSession: () => {
     ipcRenderer.send(Channels.sessionRestart, {})
+  },
+  claudeStatus: () => ipcRenderer.invoke(Channels.stateGet) as Promise<StatusView | null>,
+  onClaudeStatus: (listener) => {
+    const forward = (_event: unknown, view: StatusView): void => {
+      listener(view)
+    }
+    ipcRenderer.on(Channels.stateChanged, forward)
+    return () => {
+      ipcRenderer.off(Channels.stateChanged, forward)
+    }
+  },
+  reArm: () => {
+    ipcRenderer.send(Channels.stateReArm, {})
   },
   copy: (text) => {
     ipcRenderer.send(Channels.clipboardWrite, text)

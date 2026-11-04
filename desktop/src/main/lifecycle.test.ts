@@ -365,6 +365,30 @@ describe('the recorder window', () => {
   })
 })
 
+describe('the end-to-end test hook', () => {
+  const exposed = (): unknown => (globalThis as { voiceupE2e?: unknown }).voiceupE2e
+
+  afterEach(() => {
+    delete (globalThis as { voiceupE2e?: unknown }).voiceupE2e
+  })
+
+  // It can type into Claude, so a packaged build must never have it, whatever the environment says.
+  it('does not exist in a packaged build, even when asked for', async () => {
+    vi.stubEnv('VOICEUP_E2E', '1')
+    app.isPackaged = true
+    startApp({ argv: [] })
+    await settle()
+    expect(exposed()).toBeUndefined()
+  })
+
+  it('exists only when asked for in a dev build', async () => {
+    app.isPackaged = false
+    startApp({ argv: [] })
+    await settle()
+    expect(exposed()).toBeUndefined()
+  })
+})
+
 describe('the speech model', () => {
   const MOONSHINE = 'moonshine-base-en'
 

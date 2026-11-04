@@ -96,6 +96,93 @@ describe('re-arm', () => {
   )
 })
 
+describe('the prompt', () => {
+  it('starts clean', () => {
+    started()
+    expect(tracker.promptDirty).toBe(false)
+  })
+
+  it('is dirty once the user types', () => {
+    started()
+    tracker.onInput('h')
+    expect(tracker.promptDirty).toBe(true)
+  })
+
+  it('stays clean for harmless input', () => {
+    started()
+    tracker.onInput('\x1b[I')
+    tracker.onInput('\x1b[<64;1;1M')
+    expect(tracker.promptDirty).toBe(false)
+  })
+
+  it('is clean after the text is submitted', () => {
+    started()
+    tracker.onInput('h')
+    prompt()
+    expect(tracker.promptDirty).toBe(false)
+  })
+
+  it('stays dirty after Claude starts a turn of its own, which leaves the text there', () => {
+    started()
+    tracker.onInput('h')
+    hook({
+      hook_event_name: 'UserPromptSubmit',
+      prompt: '<task-notification>x</task-notification>'
+    })
+    expect(tracker.promptDirty).toBe(true)
+  })
+
+  it('is clean after Ctrl+C at the main prompt', () => {
+    started()
+    tracker.onInput('h')
+    tracker.onInput('\x03')
+    expect(tracker.promptDirty).toBe(false)
+  })
+
+  it('stays dirty after Ctrl+C at a permission prompt, which clears something else', () => {
+    started()
+    tracker.onInput('h')
+    prompt()
+    tracker.onInput('h')
+    hook({ hook_event_name: 'PermissionRequest', tool_name: 'Write' })
+    tracker.onInput('\x03')
+    expect(tracker.promptDirty).toBe(true)
+  })
+
+  it('is clean after /clear or a restart', () => {
+    started()
+    tracker.onInput('h')
+    started('clear')
+    expect(tracker.promptDirty).toBe(false)
+    tracker.onInput('h')
+    tracker.sessionRestart()
+    expect(tracker.promptDirty).toBe(false)
+  })
+
+  it('stays dirty through compaction', () => {
+    started()
+    tracker.onInput('h')
+    started('compact')
+    expect(tracker.promptDirty).toBe(true)
+  })
+
+  it('stays dirty after Enter with no prompt, and after re-arm', () => {
+    started()
+    tracker.onInput('h')
+    tracker.onInput('\r')
+    vi.advanceTimersByTime(LOCAL_UI_WAIT_MS)
+    expect(tracker.state).toBe('unknown')
+    tracker.reArm()
+    expect(tracker.promptDirty).toBe(true)
+  })
+
+  it('can be marked by a delivery that may have left its text', () => {
+    started()
+    tracker.markPromptDirty()
+    expect(tracker.promptDirty).toBe(true)
+  })
+})
+
 describe('keys', () => {
   it('sees Esc and Ctrl+C', () => {
     started()

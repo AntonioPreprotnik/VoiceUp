@@ -4,6 +4,7 @@ import { app, dialog, net, session, type BrowserWindow } from 'electron'
 import { MESSAGES } from '../core/messages'
 import { RecordingToggle } from '../core/recordingToggle'
 import { runShutdown, type ShutdownSteps } from '../core/shutdown'
+import { Delivery } from '../core/delivery/delivery'
 import { parseSmokeTestPath } from '../core/smokeTest'
 import { statusView } from '../core/state/status'
 import { ClaudeStateTracker } from '../core/state/tracker'
@@ -181,6 +182,7 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
             log.info('Claude session started')
           }
           claudeState.onHook(message)
+          delivery.onHook(message)
         },
         onUnavailable: (code, setting) => {
           publishStatus()
@@ -221,9 +223,31 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
         minWords: settings.speech.minWords,
         voiceBlock: () => hooks.voiceBlock,
         previewSettings: () => settings.delivery,
-        deliver: () => {
-          // S5.4 sends it through the gate. Nothing is typed into Claude until then.
-          log.info('Preview finished: delivery arrives in S5.4')
+        delivery: {
+          get holding() {
+            return delivery.holding
+          },
+          deliver: (text) => {
+            delivery.deliver(text)
+          },
+          retry: () => {
+            delivery.retry()
+          }
+        },
+        overlay,
+        escape: escapeKey
+      })
+      const delivery = new Delivery({
+        claude: claudeState,
+        write: (data) => {
+          // Never through onInput: this isn't the user's typing.
+          claude.host.write(data)
+        },
+        schedule: (callback, ms) => {
+          const timer = setTimeout(callback, ms)
+          return () => {
+            clearTimeout(timer)
+          }
         },
         overlay,
         escape: escapeKey
@@ -295,11 +319,13 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
         hooks: {
           prepareLaunch: (cwd) => hooks.prepareLaunch(cwd),
           launched: () => {
+            delivery.sessionEnded()
             claudeState.sessionRestart()
             hooks.launched()
             publishStatus()
           },
           exited: () => {
+            delivery.sessionEnded()
             claudeState.ptyExit()
             hooks.exited()
           }
@@ -347,6 +373,29 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
         app.quit()
       })
       await loadRenderer(mainWindow, 'terminal')
+      // Dev and test builds only: the e2e test has no model and no network, and reaches delivery
+      // directly, since it has no microphone. A packaged build never takes this path.
+      if (!app.isPackaged && process.env['VOICEUP_E2E'] === '1') {
+        Object.assign(globalThis, {
+          voiceupE2e: {
+            deliver: (text: string) => {
+              delivery.deliver(text)
+            },
+            retry: () => {
+              delivery.retry()
+            },
+            discard: () => {
+              delivery.discard()
+            },
+            status: () => ({
+              state: claudeState.state,
+              promptDirty: claudeState.promptDirty,
+              holding: delivery.holding
+            })
+          }
+        })
+        return
+      }
       // After the load, which would otherwise replace the title showing the progress.
       models.ensure()
 

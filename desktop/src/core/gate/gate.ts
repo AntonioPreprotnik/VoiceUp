@@ -24,13 +24,13 @@ export interface GateInput {
 
 /** What the overlay shows for a block: each says why, in words the user can act on. */
 export const BLOCK_MESSAGES: Readonly<Record<BlockReason, string>> = {
-  unsentText: 'You have unsent text',
+  unsentText: 'You have unsent text. Send it, or press Ctrl+C in the terminal to clear it.',
   busy: 'Claude is busy',
   queueFull: 'The queue is full',
-  waitingForYou: 'Claude is waiting for you',
+  waitingForYou: 'Claude is waiting for you. Answer it in the terminal.',
   starting: 'Claude is starting',
-  exited: 'The Claude session has ended',
-  unknown: "Can't tell if Claude is ready"
+  exited: 'The Claude session has ended. Restart it in the terminal.',
+  unknown: "Can't tell if Claude is ready. Check the terminal, then Re-arm voice."
 }
 
 function block(reason: BlockReason): GateDecision {

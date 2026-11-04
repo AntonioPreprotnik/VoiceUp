@@ -5,8 +5,11 @@
 //
 //   VOICEUP_FAKE_SCENARIO  name of the scenario file (default: plain)
 //   VOICEUP_FAKE_SPEED     0 replays with no gaps; 1, the default, keeps the recorded timing
+//   VOICEUP_FAKE_LIVE      a file: instead of replaying, act like a session. Each submitted prompt
+//                          fires UserPromptSubmit and Stop, and is added to the file. A prompt
+//                          containing "ask permission" fires PermissionRequest instead of Stop.
 import { spawn } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { appendFileSync, readFileSync } from 'node:fs'
 import { request } from 'node:http'
 import { Buffer } from 'node:buffer'
 import { dirname, join } from 'node:path'
@@ -23,6 +26,7 @@ if (settingsPath === undefined) {
 const { hooks } = JSON.parse(readFileSync(settingsPath, 'utf8'))
 const scenarioName = process.env.VOICEUP_FAKE_SCENARIO ?? 'plain'
 const speed = Number(process.env.VOICEUP_FAKE_SPEED ?? '1')
+const liveLog = process.env.VOICEUP_FAKE_LIVE
 const here = dirname(fileURLToPath(import.meta.url))
 const scenario = JSON.parse(readFileSync(join(here, 'scenarios', `${scenarioName}.json`), 'utf8'))
 
@@ -107,6 +111,46 @@ async function fire(event, body) {
 
 process.stdout.write('fake-claude> ')
 process.stdin.setEncoding('utf8')
+
+/** Like Claude's prompt: a paste and typed text build one line, and Enter submits it. */
+async function runLive(log) {
+  let line = ''
+  if (process.stdin.isTTY) process.stdin.setRawMode(true)
+  process.stdin.on('data', (data) => {
+    process.stdout.write(data)
+    const text = data.replaceAll('\x1b[200~', '').replaceAll('\x1b[201~', '')
+    if (text === '\x03') {
+      line = ''
+      return
+    }
+    if (text !== '\r') {
+      line += text
+      return
+    }
+    const prompt = line
+    line = ''
+    appendFileSync(log, `${prompt}\n`)
+    void (async () => {
+      await fire('UserPromptSubmit', { hook_event_name: 'UserPromptSubmit', prompt })
+      if (prompt.includes('ask permission')) {
+        await fire('PermissionRequest', {
+          hook_event_name: 'PermissionRequest',
+          tool_name: 'Write'
+        })
+      } else {
+        await fire('Stop', { hook_event_name: 'Stop' })
+      }
+    })()
+  })
+  await fire('SessionStart', { hook_event_name: 'SessionStart', source: 'startup' })
+  process.stdout.write('fake-claude: ready\n')
+}
+
+if (liveLog !== undefined) {
+  await runLive(liveLog)
+  await new Promise(() => undefined)
+}
+
 process.stdin.on('data', (data) => process.stdout.write(data))
 process.stdin.on('end', () => process.exit())
 

@@ -36,10 +36,14 @@ function show(state: OverlayState): void {
   if (pill === null || text === null || meter === null || level === null || hint === null) return
   pill.hidden = state.phase === 'hidden'
   pill.dataset['kind'] =
-    state.phase === 'error' ? 'error' : state.phase === 'preview' ? 'preview' : 'info'
+    state.phase === 'error' || state.phase === 'blocked'
+      ? 'error'
+      : state.phase === 'preview'
+        ? 'preview'
+        : 'info'
   const counting = state.phase === 'preview' && state.countdownMs !== null
   meter.hidden = state.phase !== 'listening' && !counting
-  hint.hidden = state.phase !== 'preview'
+  hint.hidden = state.phase !== 'preview' && state.phase !== 'blocked'
   if (state.phase === 'listening') {
     text.textContent = 'Listening…'
     level.style.transition = 'none'
@@ -52,6 +56,9 @@ function show(state: OverlayState): void {
         ? 'Hotkey sends · Esc cancels'
         : 'Sending soon · Hotkey sends now · Esc cancels'
     if (state.countdownMs !== null) runCountdown(level, state.countdownMs)
+  } else if (state.phase === 'blocked') {
+    text.textContent = state.reason
+    hint.textContent = 'Not sent yet · Hotkey tries again · Esc discards'
   } else if (state.phase === 'transcribing') {
     text.textContent = 'Transcribing…'
   } else if (state.phase === 'error') {

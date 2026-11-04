@@ -282,6 +282,7 @@ modelConfig: {
 - `decodeAsync` keeps the worker's event loop free, but the worker still lives in a `utilityProcess` (native crash isolation, memory). Main keeps a timeout of max(10 s, half the clip length) that kills and restarts a stuck worker; a flat 10 s could kill a legitimate 60 s Parakeet decode at the measured 1-thread speed (RTF 0.17).
 - External buffers: in Electron, `vad.front()` and `readWave(path)` with the default argument throw `External buffers are not allowed`; `front(false)` and `readWave(path, false)` work. Plain Node accepts both, so only an Electron test catches it.
 - Measured on the real target in S4.1 (Ryzen 5 3600, 4 threads, 2.4 s median spoken command): Moonshine 108 ms, Whisper base.en 286 ms, Parakeet 240 ms. Numbers are in `docs/decisions/S4.1-speech-engine.md`.
+- Long clips, measured in S4.4 (stitched recordings, Moonshine, same PC): about 0.4 s for 11 s, 1.8 s for 30 s, 3.5 s for 47 s, all complete. At about 60 s Moonshine degrades: one clip lost text and two fell into repeating loops, taking over 10 s. Parakeet stayed clean at every length. One live 11 s clip came back empty in 161 ms and did not repeat in two later long tries; its audio was not kept, so the cause is unknown.
 - Earlier spike timings (2 vCPU Linux container, 5.9 s clip, `numThreads: 4`): Parakeet load 2.2 s, decode 1.8 s; Moonshine base load 1.3 s, decode 0.6–0.8 s. Both transcribed the clip correctly. Real numbers come from the S4.1 benchmark on the reference laptops.
 
 ### 5.4 Model manager (main)
@@ -424,8 +425,8 @@ export const Settings = z.object({
 | `HOTKEY_TAKEN` | `register()` returns false, or the combination is invalid | "Hotkey taken, pick another" | close the other app, or change `hotkey` in `settings.json` until S6.6 adds the setting |
 | `MODEL_MISSING`, `MODEL_CORRUPT` | file absent; hash mismatch or an archive that won't unpack | "Speech model needs downloading" | Speech model > Retry download; a button from S6.5 |
 | `MODEL_DOWNLOAD_FAILED` | no connection, an HTTP error, or the disk filling up | "Speech model download failed" | Speech model > Retry download, which resumes |
-| `WORKER_ERROR` | the worker reports a failure it survived, such as a failed decode | logged; S4.4 decides what the user sees | try again |
-| `WORKER_CRASHED` | worker exit ≠ 0 three times in 60 s | "Speech engine stopped" | restart button, logs link |
+| `WORKER_ERROR` | the worker reports a failure it survived, such as a failed decode, or it crashes during a recording | "Speech engine had a problem" | press the hotkey again |
+| `WORKER_CRASHED` | worker exit ≠ 0 three times in 60 s, and again at each hotkey press after that, without opening the mic | "Speech engine stopped" | restart VoiceUp, logs link; a restart button from S6.5 |
 | `APP_START_FAILED` | a package fails to load, or an uncaught exception in main | "VoiceUp could not start" and the error | reinstall; the app exits 1 and never lingers without a window |
 | `NO_PROJECT_FOLDER` | the folder picker is cancelled with no saved folder | "No project folder chosen" | File > Change folder |
 | `CLAUDE_NOT_FOUND` | no binary | "Claude Code isn't installed" and the official install command (S1.5; S6.3 replaces it with the guided step) | copy the command, install, Check again |

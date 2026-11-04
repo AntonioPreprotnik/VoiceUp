@@ -56,6 +56,10 @@ export const MESSAGES = {
     title: 'Speech engine had a problem',
     detail: 'Press the hotkey again. If it keeps happening, send the logs.'
   },
+  TRANSCRIBE_TIMEOUT: {
+    title: 'Transcription took too long',
+    detail: 'The speech engine restarted. Press the hotkey and try again.'
+  },
   WORKER_CRASHED: {
     title: 'Speech engine stopped',
     detail: 'Restart VoiceUp. If it keeps happening, send the logs from Help > Open logs folder.'

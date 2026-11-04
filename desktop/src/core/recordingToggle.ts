@@ -13,6 +13,13 @@ export interface RecordingEvent {
   readonly recordingId?: string | undefined
 }
 
+const MIN_TRANSCRIBE_TIMEOUT_MS = 10000
+
+/** Half the clip, so a flat limit can't kill a long but healthy decode (TECH_SPEC §5.3). */
+export function transcribeTimeoutMs(clipMs: number): number {
+  return Math.max(MIN_TRANSCRIBE_TIMEOUT_MS, clipMs / 2)
+}
+
 export class RecordingToggle {
   private current: string | undefined
   private phaseNow: RecordingPhase = 'idle'
@@ -34,6 +41,14 @@ export class RecordingToggle {
     this.current = recordingId
     this.phaseNow = 'recording'
     return { type: 'start', recordingId }
+  }
+
+  /** Ends the recording from outside, when the worker can't. Returns which one, if any. */
+  abandon(): string | undefined {
+    const recordingId = this.current
+    this.current = undefined
+    this.phaseNow = 'idle'
+    return recordingId
   }
 
   /** Returns whether the event belongs to the current recording. Others must be dropped. */

@@ -391,7 +391,7 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 - AC: recognition model chosen in settings; the first-run default is Moonshine base (S4.1), with Parakeet TDT 0.6B v2 as an option in settings, downloaded on first run from a pinned release URL with progress, resume and **SHA-256 verification** before use.
 - AC: the small Silero VAD model ships inside the app; works offline after download; disk usage shown in settings.
 
-**[ ] S4.4 Transcribe.** As a user, I want my speech turned into text.
+**[x] S4.4 Transcribe.** As a user, I want my speech turned into text.
 
 - AC: speech segment → recognizer → text, with timing logged at `debug`.
 - AC: timeout of max(10 s, half the clip length) with a user-visible error; no hung states.

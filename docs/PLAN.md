@@ -407,7 +407,7 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 
 *Goal: transcripts reach Claude only when it is safe, and the user can always stop a mistake.*
 
-**[ ] S5.1 Send gate.** As a user, I never want voice text typed into a permission prompt or menu.
+**[x] S5.1 Send gate.** As a user, I never want voice text typed into a permission prompt or menu.
 
 - AC: pure function in `src/core` with the TECH_SPEC §4.4 inputs: returns `send`, `queue` or `block`.
 - AC: a pending delivery (text written, `UserPromptSubmit` not yet seen) is treated like `busy`, so two sends can never overlap.

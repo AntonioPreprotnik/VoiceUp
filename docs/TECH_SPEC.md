@@ -202,7 +202,7 @@ The state lives in `core/state/tracker.ts`, which holds the reducer's context an
 
 ### 4.4 Send gate and prompt-dirty tracking
 
-`gate(state, promptDirty, deliveryPending, queueLength, settings) → send | queue | block(reason)`. While `deliveryPending` is true (text written, `UserPromptSubmit` not yet seen), `idle` is treated like `busy`, so two sends can never overlap.
+`gate({ state, promptDirty, deliveryPending, queueLength, queueEnabled, maxQueue }) → send | queue | block(reason)`, in `core/gate/gate.ts`. While `deliveryPending` is true (text written, `UserPromptSubmit` not yet seen), `idle` is treated like `busy`, so two sends can never overlap. Nothing calls it until S5.4.
 
 | State | Prompt clean | Prompt has typed text |
 | --- | --- | --- |

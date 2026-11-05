@@ -1,5 +1,6 @@
 import type {
   ClaudeStepStatus,
+  FolderStepStatus,
   WizardApi,
   WizardResult,
   WizardView
@@ -41,6 +42,10 @@ const claudeGit = element('claude-git')
 const claudeOutput = element('claude-output')
 const install = button('claude-install')
 const check = button('claude-check')
+const folder = element('folder')
+const folderMessage = element('folder-message')
+const folderPath = element('folder-path')
+const chooseFolder = button('folder-choose')
 
 /** What the step says. */
 function claudeText(state: ClaudeStepStatus): string {
@@ -77,6 +82,17 @@ function drawClaude(state: ClaudeStepStatus): void {
   claudeOutput.scrollTop = claudeOutput.scrollHeight
 }
 
+function drawFolder({ path, missing }: FolderStepStatus): void {
+  folderMessage.textContent = missing
+    ? 'That folder no longer exists, so choose another:'
+    : path === null
+      ? 'Claude can read and change the files there.'
+      : 'Claude will work in this folder:'
+  folderPath.textContent = path
+  folderPath.hidden = path === null
+  chooseFolder.textContent = path === null || missing ? 'Choose folder' : 'Change folder'
+}
+
 function draw(view: WizardView): void {
   steps.replaceChildren(
     ...view.steps.map((step, index) => {
@@ -93,12 +109,16 @@ function draw(view: WizardView): void {
   detail.textContent = step.detail
   const onClaude = step.id === 'claudeCode'
   claude.hidden = !onClaude
-  notice.hidden = onClaude
+  const onFolder = step.id === 'projectFolder'
+  folder.hidden = !onFolder
+  notice.hidden = onClaude || onFolder
   if (onClaude) drawClaude(view.claude)
+  if (onFolder) drawFolder(view.folder)
   back.disabled = view.index === 0
   next.disabled = !view.canContinue
   next.textContent = view.index === view.steps.length - 1 ? 'Finish' : 'Continue'
   if (view.canContinue) next.focus()
+  else if (onFolder) chooseFolder.focus()
 }
 
 /** One request at a time, so a double click can't skip a step. */
@@ -130,6 +150,9 @@ install.addEventListener('click', () => {
 })
 check.addEventListener('click', () => {
   void run(() => window.voiceupWizard.checkClaude())
+})
+chooseFolder.addEventListener('click', () => {
+  void run(() => window.voiceupWizard.chooseFolder())
 })
 window.voiceupWizard.onChanged(draw)
 window.voiceupWizard.onOutput((text) => {

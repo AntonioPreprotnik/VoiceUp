@@ -30,6 +30,7 @@ export const Channels = {
   wizardBack: 'wizard:back',
   wizardClaudeCheck: 'wizard:claudeCheck',
   wizardClaudeInstall: 'wizard:claudeInstall',
+  wizardChooseFolder: 'wizard:chooseFolder',
   wizardChanged: 'wizard:changed',
   wizardOutput: 'wizard:output'
 } as const
@@ -131,8 +132,15 @@ export type ClaudeStepStatus =
   | { readonly status: 'installing' }
   | { readonly status: 'failed'; readonly command: string }
 
+/** The Project folder step. A saved path is shown even when it's gone, so the user knows which. */
+export interface FolderStepStatus {
+  readonly path: string | null
+  readonly missing: boolean
+}
+
 export interface WizardView extends WizardProgress {
   readonly claude: ClaudeStepStatus
+  readonly folder: FolderStepStatus
   /** Main refuses Continue when this is false. */
   readonly canContinue: boolean
 }
@@ -148,6 +156,8 @@ export interface WizardApi {
   back(): Promise<WizardResult>
   checkClaude(): Promise<WizardResult>
   installClaude(): Promise<WizardResult>
+  /** Opens the Windows folder picker. The page can't supply a path. */
+  chooseFolder(): Promise<WizardResult>
   /** Returns the function that unsubscribes. */
   onChanged(listener: (view: WizardView) => void): () => void
   /** The installer's output, as it arrives. Returns the function that unsubscribes. */

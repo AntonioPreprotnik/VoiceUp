@@ -14,6 +14,7 @@ const Channels = {
   wizardBack: 'wizard:back',
   wizardClaudeCheck: 'wizard:claudeCheck',
   wizardClaudeInstall: 'wizard:claudeInstall',
+  wizardChooseFolder: 'wizard:chooseFolder',
   wizardChanged: 'wizard:changed',
   wizardOutput: 'wizard:output'
 } as const satisfies Partial<typeof SharedChannels>
@@ -27,6 +28,7 @@ const api: WizardApi = {
   checkClaude: () => ipcRenderer.invoke(Channels.wizardClaudeCheck, {}) as Promise<WizardResult>,
   installClaude: () =>
     ipcRenderer.invoke(Channels.wizardClaudeInstall, {}) as Promise<WizardResult>,
+  chooseFolder: () => ipcRenderer.invoke(Channels.wizardChooseFolder, {}) as Promise<WizardResult>,
   onChanged: (listener) => {
     const handler = (_event: unknown, view: WizardView): void => {
       listener(view)

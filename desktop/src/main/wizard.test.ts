@@ -19,6 +19,8 @@ const findClaude = vi.fn<() => Promise<ClaudeCommand | null>>()
 const readClaudeVersion = vi.fn<(command: ClaudeCommand) => Promise<string | null>>()
 const stopInstaller = vi.fn()
 const runInstaller = vi.fn<(onOutput: (text: string) => void) => RunningInstall>()
+const chooseFolder = vi.fn<(window: unknown, current: string | null) => Promise<string | null>>()
+const isFolder = vi.fn<(path: string) => boolean>()
 let settings: Settings
 let wizardEvent: unknown
 let window: BrowserWindow
@@ -51,7 +53,9 @@ function open(): void {
     onAbandoned,
     findClaude,
     readClaudeVersion,
-    runInstaller
+    runInstaller,
+    chooseFolder,
+    isFolder
   })
   const created = BrowserWindow.instances.at(-1)
   if (created === undefined) throw new Error('No window was created')
@@ -66,6 +70,9 @@ beforeEach(() => {
   resetFakes()
   vi.resetAllMocks()
   settings = defaultSettings()
+  settings.claude.projectDir = 'C:\\work'
+  isFolder.mockReturnValue(true)
+  chooseFolder.mockResolvedValue(null)
   findClaude.mockResolvedValue({ file: 'claude.exe', args: [] })
   readClaudeVersion.mockResolvedValue('2.1.318')
   runInstaller.mockReturnValue({ done: Promise.resolve(), stop: stopInstaller })
@@ -77,6 +84,100 @@ async function openReady(): Promise<void> {
     expect(invoke(Channels.wizardGet, wizardEvent)?.canContinue).toBe(true)
   })
 }
+
+describe('the Project folder step', () => {
+  const CHOSEN = 'C:\\chosen'
+
+  async function atFolderStep(): Promise<void> {
+    settings.wizard.completed = ['claudeCode']
+    await new Promise((resolve) => setImmediate(resolve))
+    open()
+    expect(invoke(Channels.wizardGet, wizardEvent)?.steps[1]?.id).toBe('projectFolder')
+    expect(invoke(Channels.wizardGet, wizardEvent)?.index).toBe(1)
+  }
+
+  it('refuses Continue with no folder, whatever the page asks', async () => {
+    settings.claude.projectDir = null
+    await atFolderStep()
+    expect(invoke(Channels.wizardGet, wizardEvent)?.canContinue).toBe(false)
+    expect(invoke(Channels.wizardNext, wizardEvent)?.index).toBe(1)
+    expect(save).not.toHaveBeenCalled()
+  })
+
+  it('keeps a folder already saved', async () => {
+    await atFolderStep()
+    expect(invoke(Channels.wizardGet, wizardEvent)?.folder).toEqual({
+      path: 'C:\\work',
+      missing: false
+    })
+    expect(invoke(Channels.wizardNext, wizardEvent)?.index).toBe(2)
+    expect(chooseFolder).not.toHaveBeenCalled()
+  })
+
+  it('refuses Continue when the saved folder is gone, and says which', async () => {
+    isFolder.mockReturnValue(false)
+    await atFolderStep()
+    expect(invoke(Channels.wizardGet, wizardEvent)?.folder).toEqual({
+      path: 'C:\\work',
+      missing: true
+    })
+    expect(invoke(Channels.wizardNext, wizardEvent)?.index).toBe(1)
+  })
+
+  it('saves the chosen folder straight away, and tells the page', async () => {
+    settings.claude.projectDir = null
+    await atFolderStep()
+    chooseFolder.mockResolvedValue(CHOSEN)
+    invoke(Channels.wizardChooseFolder, wizardEvent)
+    await vi.waitFor(() => {
+      expect(save).toHaveBeenCalledOnce()
+    })
+    expect(settings.claude.projectDir).toBe(CHOSEN)
+    expect(window.webContents.sent.at(-1)?.[0]).toBe(Channels.wizardChanged)
+    expect(invoke(Channels.wizardGet, wizardEvent)?.canContinue).toBe(true)
+  })
+
+  it('opens the picker from the saved folder, on this window', async () => {
+    await atFolderStep()
+    invoke(Channels.wizardChooseFolder, wizardEvent)
+    expect(chooseFolder).toHaveBeenCalledWith(window, 'C:\\work')
+  })
+
+  it('changes nothing when the picker is cancelled', async () => {
+    await atFolderStep()
+    invoke(Channels.wizardChooseFolder, wizardEvent)
+    await new Promise((resolve) => setImmediate(resolve))
+    expect(settings.claude.projectDir).toBe('C:\\work')
+    expect(save).not.toHaveBeenCalled()
+  })
+
+  it('opens one picker, however often it is clicked', async () => {
+    await atFolderStep()
+    invoke(Channels.wizardChooseFolder, wizardEvent)
+    invoke(Channels.wizardChooseFolder, wizardEvent)
+    await new Promise((resolve) => setImmediate(resolve))
+    expect(chooseFolder).toHaveBeenCalledOnce()
+    invoke(Channels.wizardChooseFolder, wizardEvent)
+    expect(chooseFolder).toHaveBeenCalledTimes(2)
+  })
+
+  it('ignores a path sent by the page', async () => {
+    await atFolderStep()
+    const answer = result(Channels.wizardChooseFolder, wizardEvent, { path: 'C:\\evil' })
+    expect(answer).toEqual({ ok: false, code: 'WIZARD_REFUSED' })
+    expect(chooseFolder).not.toHaveBeenCalled()
+    expect(settings.claude.projectDir).toBe('C:\\work')
+  })
+
+  it('survives a picker that fails', async () => {
+    await atFolderStep()
+    chooseFolder.mockRejectedValue(new Error('no dialog'))
+    invoke(Channels.wizardChooseFolder, wizardEvent)
+    await new Promise((resolve) => setImmediate(resolve))
+    invoke(Channels.wizardChooseFolder, wizardEvent)
+    expect(chooseFolder).toHaveBeenCalledTimes(2)
+  })
+})
 
 describe('the Claude Code step', () => {
   const missing = async (): Promise<void> => {
@@ -221,7 +322,8 @@ describe.each([
   Channels.wizardNext,
   Channels.wizardBack,
   Channels.wizardClaudeCheck,
-  Channels.wizardClaudeInstall
+  Channels.wizardClaudeInstall,
+  Channels.wizardChooseFolder
 ])('%s', (channel) => {
   it('refuses any other window, and changes nothing', () => {
     open()

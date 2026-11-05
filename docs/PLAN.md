@@ -460,7 +460,7 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 - AC: verify with `claude --version` and enforce a minimum version that supports the hook features used (record it in a constant).
 - AC: note in the UI that Git for Windows is optional.
 
-**[ ] S6.11 Project folder step.** As a new user, I want to choose Claude's folder as part of setup. Added during S6.3, and needed before S6.4.
+**[x] S6.11 Project folder step.** As a new user, I want to choose Claude's folder as part of setup. Added during S6.3, and needed before S6.4.
 
 - AC: the wizard's Project folder step asks for a folder and saves it to `claude.projectDir`, and Continue stays off until one is chosen. A folder already saved is shown and can be kept.
 - AC: the folder picker no longer appears after the wizard for a new user.

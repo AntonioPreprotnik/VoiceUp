@@ -130,6 +130,19 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
         voiceBlock: () => hooks.voiceBlock,
         micDeviceId: () => claude.micDeviceId,
         progressWindow: () => mainWindow,
+        // While the wizard is open, what the hotkey hears is its microphone test, never Claude's.
+        divert: () =>
+          wizard === undefined
+            ? null
+            : (text) => {
+                wizard?.onTranscript(text)
+              },
+        onVoiceFailed: (code) => {
+          wizard?.onVoiceFailed(code)
+        },
+        onModelStatus: () => {
+          wizard?.onModelStatus()
+        },
         rebuildMenu: () => {
           rebuildMenu()
         },
@@ -169,7 +182,9 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
       const rebuildMenu = (): void => {
         // Electron applies this to every window, which would undo the wizard's removeMenu and offer
         // Change folder, which starts Claude. Rebuilt when the wizard finishes.
-        if (wizardWindow !== undefined) return
+        // Checked by the saved state, not the window: the wizard can change the menu while it is still
+        // opening, as a download it resumes reports progress.
+        if (!settings.wizard.done) return
         installAppMenu({
           changeFolder: () => claude.changeFolder(),
           changeFontSize: (change) => {
@@ -208,6 +223,15 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
       let terminalLoad: Promise<void> | undefined
       const loadTerminal = (): Promise<void> =>
         (terminalLoad ??= loadRenderer(terminalWindow, 'terminal'))
+      // Once only: the wizard's microphone test may have turned it on already.
+      let hotkeyOn: boolean | undefined
+      const startHotkey = (): boolean => {
+        steps.shortcuts ??= unregisterHotkeys
+        hotkeyOn ??= registerHotkey(settings.hotkey, () => {
+          recording.press()
+        })
+        return hotkeyOn
+      }
       const openTerminal = async (): Promise<void> => {
         await loadTerminal()
         // The e2e tests have no model and no network, so nothing downloads for them.
@@ -216,12 +240,7 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
         models.ensure()
 
         // Step 7: the global hotkey, last, so a press always finds everything running.
-        const { hotkey } = settings
-        steps.shortcuts ??= unregisterHotkeys
-        const registered = registerHotkey(hotkey, () => {
-          recording.press()
-        })
-        if (!registered) reportHotkeyTaken(terminalWindow, hotkey)
+        if (!startHotkey()) reportHotkeyTaken(terminalWindow, settings.hotkey)
       }
       if (settings.wizard.done) {
         await openTerminal()
@@ -270,7 +289,16 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
         promptDirty: () => claudeState.promptDirty,
         schedule,
         // Whether it is set, and never its value.
-        apiKeySet: (process.env['ANTHROPIC_API_KEY'] ?? '') !== ''
+        apiKeySet: (process.env['ANTHROPIC_API_KEY'] ?? '') !== '',
+        models: {
+          ensure: () => {
+            models.ensure()
+          },
+          status: () => models.status,
+          chosenModel: () => models.chosenModel()
+        },
+        startHotkey,
+        hotkey: settings.hotkey
       })
       wizard.onClaudeState(claudeState.state)
       wizardWindow = wizard.window

@@ -1,15 +1,23 @@
 import type { BrowserWindow } from 'electron'
 import type { ClaudeCommand } from '../core/claudeCommand'
 import { ClaudeStep } from '../core/claudeStep'
-import { MESSAGES } from '../core/messages'
+import { MESSAGES, type MessageCode } from '../core/messages'
+import { formatSize } from '../core/modelChoice'
 import { SignInStep } from '../core/signInStep'
 import type { ClaudeState } from '../core/state/reducer'
 import { WizardFlow } from '../core/wizardFlow'
 import type { HookMessage } from '../shared/hooks'
-import { Channels, type FolderStepStatus, type WizardView } from '../shared/ipcChannels'
+import {
+  Channels,
+  type FolderStepStatus,
+  type MicStepStatus,
+  type ModelStepStatus,
+  type WizardView
+} from '../shared/ipcChannels'
 import type { Settings } from '../shared/settings'
 import { registerWizardIpc } from './ipc/wizard'
 import { log } from './log'
+import type { ModelStatus } from './models/controller'
 import type { RunningInstall } from './pty/installClaude'
 import { createWindow } from './windows/factory'
 
@@ -35,12 +43,26 @@ export interface WizardOptions {
   readonly promptDirty: () => boolean
   readonly schedule: (callback: () => void, ms: number) => () => void
   readonly apiKeySet: boolean
+  readonly models: {
+    /** Starts the download if the model isn't on disk. */
+    ensure(): void
+    status(): ModelStatus
+    chosenModel(): { label: string; bytes: number; installed: boolean }
+  }
+  /** Turns the global hotkey on, once. False if another app has it. */
+  readonly startHotkey: () => boolean
+  /** As Electron names it, such as Control+Shift+Space. */
+  readonly hotkey: string
 }
 
 export interface Wizard {
   readonly window: BrowserWindow
   onClaudeState(state: ClaudeState): void
   onHook(message: HookMessage): void
+  onModelStatus(): void
+  /** What the microphone test heard. Shown on the page, never sent and never logged. */
+  onTranscript(text: string): void
+  onVoiceFailed(code: MessageCode): void
 }
 
 /** Opens the first-run wizard, with its progress saved after each step. The caller loads the page. */
@@ -60,7 +82,10 @@ export function openWizard({
   discardDelivery,
   promptDirty,
   schedule,
-  apiKeySet
+  apiKeySet,
+  models,
+  startHotkey,
+  hotkey
 }: WizardOptions): Wizard {
   const flow = new WizardFlow(settings.wizard.completed)
   const window = createWindow('wizard')
@@ -101,12 +126,46 @@ export function openWizard({
   })
 
   let claudeStarted = false
+  let hotkeyOn: boolean | null = null
+  let heard: string | null = null
+  let micProblem: MicStepStatus['problem'] = null
+  let micSkipped = false
   const enteredStep = (): void => {
-    if (claudeStarted || flow.currentStep !== 'signIn') return
-    if (flow.completed.includes('signIn')) return
-    claudeStarted = true
-    startClaude(window)
+    const step = flow.currentStep
+    const done = flow.completed.includes(step)
+    if (step === 'signIn' && !claudeStarted && !done) {
+      claudeStarted = true
+      startClaude(window)
+    }
+    if (step === 'speechModel' && !done) models.ensure()
+    if (step === 'micAndHotkey' && hotkeyOn === null) hotkeyOn = startHotkey()
   }
+
+  const model = (): ModelStepStatus => {
+    const chosen = models.chosenModel()
+    const status = models.status()
+    const phase: ModelStepStatus['phase'] = chosen.installed
+      ? 'ready'
+      : status.phase === 'installing'
+        ? status.stage
+        : status.phase === 'failed'
+          ? 'failed'
+          : 'waiting'
+    return {
+      label: chosen.label,
+      size: formatSize(chosen.bytes),
+      phase,
+      percent: status.phase === 'installing' ? status.percent : 0
+    }
+  }
+
+  const mic = (): MicStepStatus => ({
+    hotkey: hotkey.replaceAll('Control', 'Ctrl'),
+    hotkeyOn,
+    heard,
+    problem: micProblem,
+    skipped: micSkipped
+  })
 
   const folder = (): FolderStepStatus => {
     const path = settings.claude.projectDir
@@ -119,7 +178,10 @@ export function openWizard({
       const { path, missing } = folder()
       return path !== null && !missing
     }
-    if (flow.currentStep === 'signIn') return signIn.isDone || flow.completed.includes('signIn')
+    if (flow.completed.includes(flow.currentStep)) return true
+    if (flow.currentStep === 'signIn') return signIn.isDone
+    if (flow.currentStep === 'speechModel') return models.chosenModel().installed
+    if (flow.currentStep === 'micAndHotkey') return heard !== null || micSkipped
     return true
   }
   const view = (): WizardView => ({
@@ -127,6 +189,8 @@ export function openWizard({
     claude: claudeStep.status,
     folder: folder(),
     signIn: signIn.status,
+    model: model(),
+    mic: mic(),
     apiKeyWarning: apiKeySet ? MESSAGES.API_KEY_SET : null,
     canContinue: canContinue()
   })
@@ -199,6 +263,17 @@ export function openWizard({
     restartClaude: () => {
       if (claudeStarted) restartClaude()
       return view()
+    },
+    retryModel: () => {
+      if (flow.currentStep === 'speechModel') models.ensure()
+      return view()
+    },
+    skipMicTest: () => {
+      if (flow.currentStep === 'micAndHotkey') {
+        log.info('Setup: microphone test skipped')
+        micSkipped = true
+      }
+      return view()
     }
   })
 
@@ -215,6 +290,18 @@ export function openWizard({
     },
     onHook: (message) => {
       signIn.onHook(message)
+    },
+    onModelStatus: () => {
+      send(Channels.wizardChanged, view())
+    },
+    onTranscript: (text) => {
+      heard = text
+      micProblem = null
+      send(Channels.wizardChanged, view())
+    },
+    onVoiceFailed: (code) => {
+      micProblem = { title: MESSAGES[code].title, detail: MESSAGES[code].detail }
+      send(Channels.wizardChanged, view())
     }
   }
 }

@@ -83,6 +83,16 @@ export class ModelController {
     }
   }
 
+  /** The model that will be used, for the wizard. */
+  chosenModel(): { label: string; bytes: number; installed: boolean } {
+    const entry = this.chosen()
+    return {
+      label: entry.label,
+      bytes: entry.bytes,
+      installed: this.options.manager.isInstalled(entry)
+    }
+  }
+
   menu(): {
     choices: { id: ModelId; label: string; checked: boolean }[]
     notes: string[]

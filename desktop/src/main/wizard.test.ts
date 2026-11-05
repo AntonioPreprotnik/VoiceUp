@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { BrowserWindow, ipcMain, resetFakes } from '../../test/fakes/electron'
 import { defaultSettings } from '../core/settingsMigrate'
 import type { ClaudeCommand } from '../core/claudeCommand'
+import type { ModelStatus } from './models/controller'
 import type { RunningInstall } from './pty/installClaude'
 import { Channels, type WizardResult, type WizardView } from '../shared/ipcChannels'
 import type { HookMessage } from '../shared/hooks'
@@ -28,6 +29,10 @@ const deliver = vi.fn<(text: string) => void>()
 const discardDelivery = vi.fn()
 const promptDirty = vi.fn<() => boolean>()
 let apiKeySet = false
+let modelInstalled = true
+let modelStatus: ModelStatus = { phase: 'idle' }
+const ensureModel = vi.fn()
+const startHotkey = vi.fn<() => boolean>()
 let wizard: Wizard
 let settings: Settings
 let wizardEvent: unknown
@@ -70,7 +75,14 @@ function open(): void {
     discardDelivery,
     promptDirty,
     schedule: () => () => undefined,
-    apiKeySet
+    apiKeySet,
+    models: {
+      ensure: ensureModel,
+      status: () => modelStatus,
+      chosenModel: () => ({ label: 'Moonshine', bytes: 250807309, installed: modelInstalled })
+    },
+    startHotkey,
+    hotkey: 'Control+Shift+Space'
   })
   const created = BrowserWindow.instances.at(-1)
   if (created === undefined) throw new Error('No window was created')
@@ -87,6 +99,9 @@ beforeEach(() => {
   settings = defaultSettings()
   settings.claude.projectDir = 'C:\\work'
   apiKeySet = false
+  modelInstalled = true
+  modelStatus = { phase: 'idle' }
+  startHotkey.mockReturnValue(true)
   promptDirty.mockReturnValue(false)
   isFolder.mockReturnValue(true)
   chooseFolder.mockResolvedValue(null)
@@ -101,6 +116,117 @@ async function openReady(): Promise<void> {
     expect(invoke(Channels.wizardGet, wizardEvent)?.canContinue).toBe(true)
   })
 }
+
+describe('the Speech model step', () => {
+  function atModel(): void {
+    settings.wizard.completed = ['claudeCode', 'projectFolder', 'signIn']
+    open()
+    expect(invoke(Channels.wizardGet, wizardEvent)?.steps[3]?.id).toBe('speechModel')
+  }
+
+  it('starts the download on reaching it, and refuses Continue until it is installed', () => {
+    modelInstalled = false
+    atModel()
+    expect(ensureModel).toHaveBeenCalledOnce()
+    expect(invoke(Channels.wizardNext, wizardEvent)?.index).toBe(3)
+    modelInstalled = true
+    expect(invoke(Channels.wizardNext, wizardEvent)?.index).toBe(4)
+  })
+
+  it('shows the progress, and tells the page as it changes', () => {
+    modelInstalled = false
+    atModel()
+    modelStatus = { phase: 'installing', stage: 'downloading', percent: 42 }
+    wizard.onModelStatus()
+    expect(window.webContents.sent.at(-1)?.[1]).toMatchObject({
+      model: { phase: 'downloading', percent: 42, label: 'Moonshine', size: '251 MB' }
+    })
+  })
+
+  it('offers a retry after a failure, which only works on this step', () => {
+    modelInstalled = false
+    modelStatus = { phase: 'failed' }
+    atModel()
+    expect(invoke(Channels.wizardGet, wizardEvent)?.model.phase).toBe('failed')
+    ensureModel.mockClear()
+    invoke(Channels.wizardRetryModel, wizardEvent)
+    expect(ensureModel).toHaveBeenCalledOnce()
+  })
+
+  it('does not download on an earlier step', async () => {
+    await openReady()
+    invoke(Channels.wizardRetryModel, wizardEvent)
+    expect(ensureModel).not.toHaveBeenCalled()
+  })
+})
+
+describe('the Microphone and hotkey step', () => {
+  function atMic(): void {
+    settings.wizard.completed = [
+      'claudeCode',
+      'projectFolder',
+      'signIn',
+      'speechModel',
+      'claudeInChrome'
+    ]
+    open()
+    expect(invoke(Channels.wizardGet, wizardEvent)?.steps[5]?.id).toBe('micAndHotkey')
+  }
+
+  it('turns the hotkey on there, once, and shows it by its usual name', () => {
+    atMic()
+    invoke(Channels.wizardBack, wizardEvent)
+    invoke(Channels.wizardNext, wizardEvent)
+    expect(startHotkey).toHaveBeenCalledOnce()
+    expect(invoke(Channels.wizardGet, wizardEvent)?.mic).toMatchObject({
+      hotkey: 'Ctrl+Shift+Space',
+      hotkeyOn: true
+    })
+  })
+
+  it('does not turn the hotkey on before it', async () => {
+    await openReady()
+    expect(startHotkey).not.toHaveBeenCalled()
+  })
+
+  it('refuses Continue until it hears something, then shows what it heard', () => {
+    atMic()
+    expect(invoke(Channels.wizardNext, wizardEvent)?.index).toBe(5)
+    wizard.onTranscript('hello Claude')
+    const view = invoke(Channels.wizardGet, wizardEvent)
+    expect(view?.mic.heard).toBe('hello Claude')
+    expect(view?.canContinue).toBe(true)
+    expect(deliver).not.toHaveBeenCalled()
+  })
+
+  it('shows a voice problem, and clears it once something is heard', () => {
+    atMic()
+    wizard.onVoiceFailed('MIC_DENIED')
+    expect(invoke(Channels.wizardGet, wizardEvent)?.mic.problem?.title).toBe(
+      'Windows is blocking the microphone'
+    )
+    wizard.onTranscript('hello Claude')
+    expect(invoke(Channels.wizardGet, wizardEvent)?.mic.problem).toBeNull()
+  })
+
+  it('says when another app has the hotkey', () => {
+    startHotkey.mockReturnValue(false)
+    atMic()
+    expect(invoke(Channels.wizardGet, wizardEvent)?.mic.hotkeyOn).toBe(false)
+  })
+
+  it('can be skipped, so a broken microphone can not trap anyone in setup', () => {
+    atMic()
+    invoke(Channels.wizardSkipMicTest, wizardEvent)
+    expect(invoke(Channels.wizardGet, wizardEvent)?.canContinue).toBe(true)
+  })
+
+  it('can not be skipped from another step', async () => {
+    await openReady()
+    invoke(Channels.wizardSkipMicTest, wizardEvent)
+    expect(invoke(Channels.wizardGet, wizardEvent)?.mic.skipped).toBe(false)
+  })
+})
 
 describe('the Sign in step', () => {
   const stopHook = (hook_event_name: string): HookMessage =>
@@ -405,7 +531,7 @@ describe('openWizard', () => {
   })
 
   it('finishes from the last step: saved first, then the app goes on and the window closes', async () => {
-    settings.wizard.completed = ['signIn']
+    settings.wizard.completed = ['signIn', 'micAndHotkey']
     await openReady()
     const order: string[] = []
     save.mockImplementation(() => {
@@ -425,7 +551,7 @@ describe('openWizard', () => {
   })
 
   it('finishes only once when Continue is pressed again', async () => {
-    settings.wizard.completed = ['signIn']
+    settings.wizard.completed = ['signIn', 'micAndHotkey']
     await openReady()
     for (let step = 0; step < STEP_COUNT + 2; step++) invoke(Channels.wizardNext, wizardEvent, {})
     expect(onFinished).toHaveBeenCalledOnce()
@@ -450,7 +576,9 @@ describe.each([
   Channels.wizardClaudeInstall,
   Channels.wizardChooseFolder,
   Channels.wizardTestClaude,
-  Channels.wizardRestartClaude
+  Channels.wizardRestartClaude,
+  Channels.wizardRetryModel,
+  Channels.wizardSkipMicTest
 ])('%s', (channel) => {
   it('refuses any other window, and changes nothing', () => {
     open()

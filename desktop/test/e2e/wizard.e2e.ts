@@ -92,7 +92,12 @@ test('a new user walks through the wizard, resumes after quitting, then reaches 
   // A folder already set, or Claude waits at the native folder picker, which this can't click.
   writeFileSync(
     join(dir, 'settings.json'),
-    JSON.stringify({ version: 1, claude: { projectDir: dir }, wizard: { done: false } })
+    // Past the model and microphone steps: CI has neither the model nor a microphone.
+    JSON.stringify({
+      version: 1,
+      claude: { projectDir: dir },
+      wizard: { done: false, completed: ['speechModel', 'micAndHotkey'] }
+    })
   )
   app = await launch()
   let wizard = await windowAt('wizard')
@@ -106,7 +111,10 @@ test('a new user walks through the wizard, resumes after quitting, then reaches 
   await expect(wizard.locator('#title')).toHaveText('Sign in')
   await wizard.locator('#back').click()
   await expect(wizard.locator('#title')).toHaveText('Project folder')
-  expect(savedWizard()).toEqual({ done: false, completed: ['claudeCode', 'projectFolder'] })
+  expect(savedWizard()).toEqual({
+    done: false,
+    completed: ['speechModel', 'micAndHotkey', 'claudeCode', 'projectFolder']
+  })
 
   // Closing the window is how a user quits halfway.
   const exited = new Promise((resolve) => app.process().once('exit', resolve))
@@ -117,7 +125,7 @@ test('a new user walks through the wizard, resumes after quitting, then reaches 
   wizard = await windowAt('wizard')
   await expect(wizard.locator('#title')).toHaveText('Sign in')
   await expect(wizard.locator('#position')).toHaveText('Step 3 of 6')
-  await expect(wizard.locator('li[data-done="true"]')).toHaveCount(2)
+  await expect(wizard.locator('li[data-done="true"]')).toHaveCount(4)
 
   await passSignIn(wizard)
   for (const title of ['Speech model', 'Claude in Chrome', 'Microphone and hotkey']) {
@@ -131,9 +139,15 @@ test('a new user walks through the wizard, resumes after quitting, then reaches 
   await expect(terminal.locator('#status-label')).toHaveText('Ready', { timeout: 20000 })
   await expect.poll(() => hasWindowAt('wizard')).toBe(false)
   expect(savedWizard()).toMatchObject({ done: true })
+
+  // It does not come back.
+  await app.close()
+  app = await launch()
+  await windowAt('terminal')
+  expect(hasWindowAt('wizard')).toBe(false)
 })
 
-test('a new user chooses a folder in the wizard, and Claude starts there with no second picker', async () => {
+test('a new user chooses a folder in the wizard, and Claude starts there at Sign in', async () => {
   app = await launch()
   const wizard = await windowAt('wizard')
   await stubPicker(dir)
@@ -148,18 +162,11 @@ test('a new user chooses a folder in the wizard, and Claude starts there with no
   expect(savedProjectDir()).toBe(dir)
 
   await wizard.locator('#continue').click()
+  // Claude starts here, in the chosen folder. The steps after this need a model and a microphone.
   await passSignIn(wizard)
-  for (let step = 0; step < 3; step++) await wizard.locator('#continue').click()
-  await expect(wizard.locator('#continue')).toHaveText('Finish')
-  await wizard.locator('#continue').click()
   const terminal = await windowAt('terminal')
-  await expect(terminal.locator('#status-label')).toHaveText('Ready', { timeout: 20000 })
+  await expect(terminal.locator('#status-label')).toHaveText('Ready')
   expect(await pickerUses()).toBe(1)
-  await app.close()
-
-  app = await launch()
-  await windowAt('terminal')
-  expect(hasWindowAt('wizard')).toBe(false)
 })
 
 test('cancelling the picker changes nothing', async () => {

@@ -14,6 +14,8 @@ export interface WizardActions {
   chooseFolder(): WizardView
   testClaude(): WizardView
   restartClaude(): WizardView
+  retryModel(): WizardView
+  skipMicTest(): WizardView
 }
 
 type WizardChannel =
@@ -25,6 +27,8 @@ type WizardChannel =
   | typeof Channels.wizardChooseFolder
   | typeof Channels.wizardTestClaude
   | typeof Channels.wizardRestartClaude
+  | typeof Channels.wizardRetryModel
+  | typeof Channels.wizardSkipMicTest
 
 /**
  * The wizard page can read its progress, move through the steps, ask for the fixed Claude Code
@@ -50,4 +54,6 @@ export function registerWizardIpc(actions: WizardActions): void {
   handle(Channels.wizardChooseFolder, () => actions.chooseFolder())
   handle(Channels.wizardTestClaude, () => actions.testClaude())
   handle(Channels.wizardRestartClaude, () => actions.restartClaude())
+  handle(Channels.wizardRetryModel, () => actions.retryModel())
+  handle(Channels.wizardSkipMicTest, () => actions.skipMicTest())
 }

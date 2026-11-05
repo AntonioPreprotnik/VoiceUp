@@ -23,6 +23,7 @@ let previewSettings: { previewMs: number; alwaysConfirm: boolean }
 let deliver: Mock
 let retry: Mock
 let delivery: { holding: boolean; deliver: Mock; retry: Mock }
+let divert: ((text: string) => void) | null
 let restartWorker: Mock
 let escape: { held: (() => void) | undefined; hold(onPress: () => void): void; release(): void }
 let overlay: {
@@ -56,6 +57,7 @@ beforeEach(() => {
   deliver = vi.fn()
   retry = vi.fn()
   delivery = { holding: false, deliver, retry }
+  divert = null
   restartWorker = vi.fn()
   escape = {
     held: undefined,
@@ -93,7 +95,8 @@ beforeEach(() => {
     previewSettings: () => previewSettings,
     delivery,
     overlay,
-    escape
+    escape,
+    divert: () => divert
   })
 })
 
@@ -126,6 +129,37 @@ describe('the hotkey', () => {
     destroyed = true
     controller.press()
     expect(toRecorder).toEqual([])
+  })
+})
+
+describe('a diverted transcript', () => {
+  it('goes to the wizard, never to Claude, with no preview', () => {
+    const heard = vi.fn()
+    divert = heard
+    controller.press()
+    controller.onWorkerEvent({ type: 'speechEnd', recordingId: 'r1', durationMs: 900 })
+    controller.onWorkerEvent({
+      type: 'transcript',
+      recordingId: 'r1',
+      text: 'hello Claude',
+      decodeMs: 1
+    })
+    expect(heard).toHaveBeenCalledWith('hello Claude')
+    expect(deliver).not.toHaveBeenCalled()
+    expect(overlay.preview).not.toHaveBeenCalled()
+    expect(overlay.finished).toHaveBeenCalled()
+    controller.press()
+    expect(toWorker.at(-1)).toMatchObject({ type: 'start' })
+  })
+
+  it('is still dropped when it has nothing usable', () => {
+    const heard = vi.fn()
+    divert = heard
+    controller.press()
+    controller.onWorkerEvent({ type: 'speechEnd', recordingId: 'r1', durationMs: 900 })
+    controller.onWorkerEvent({ type: 'transcript', recordingId: 'r1', text: '  ', decodeMs: 1 })
+    expect(heard).not.toHaveBeenCalled()
+    expect(overlay.failed).toHaveBeenCalledWith('TRANSCRIPT_DROPPED')
   })
 })
 

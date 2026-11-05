@@ -241,7 +241,10 @@ describe('the first-run wizard', () => {
       // Past the step that needs a running Claude, which has its own tests here and end to end.
       writeFileSync(
         settingsFile(),
-        JSON.stringify({ version: 1, wizard: { done: false, completed: ['signIn'] } })
+        JSON.stringify({
+          version: 1,
+          wizard: { done: false, completed: ['signIn', 'speechModel', 'micAndHotkey'] }
+        })
       )
     }
     startApp({ argv: [] })
@@ -324,6 +327,58 @@ describe('the first-run wizard', () => {
     window.close()
     expect(app.quitCount).toBe(1)
     expect(saved().wizard).toEqual({ done: false, completed: ['claudeCode', 'projectFolder'] })
+  })
+
+  it('turns the hotkey on for the microphone test, sends what it hears to the wizard, and registers it once', async () => {
+    writeFileSync(
+      settingsFile(),
+      JSON.stringify({
+        version: 1,
+        claude: { projectDir: userDataDir() },
+        wizard: {
+          done: false,
+          completed: ['claudeCode', 'projectFolder', 'signIn', 'speechModel', 'claudeInChrome']
+        }
+      })
+    )
+    // Esc is a global shortcut too, held during a recording, so only the hotkey itself counts.
+    const register = vi.spyOn(globalShortcut, 'register')
+    const hotkeyRegistrations = (): number =>
+      register.mock.calls.filter(([accelerator]) => accelerator === 'Control+Shift+Space').length
+    startApp({ argv: [] })
+    await vi.waitFor(() => {
+      expect(hotkeyRegistrations()).toBe(1)
+    })
+    const window = wizard()
+    if (window === undefined) throw new Error('No wizard window')
+    globalShortcut.press('Control+Shift+Space')
+    const child = utilityProcess.children.at(0)
+    const { recordingId } = child?.messages.at(-1)?.message as { recordingId: string }
+    child?.emit('message', { type: 'speechEnd', recordingId, durationMs: 900 })
+    child?.emit('message', { type: 'transcript', recordingId, text: 'hello Claude', decodeMs: 1 })
+    expect(window.webContents.sent.at(-1)?.[1]).toMatchObject({ mic: { heard: 'hello Claude' } })
+    expect(spawned).toEqual([])
+
+    press(window, 2)
+    await settle()
+    expect(hotkeyRegistrations()).toBe(1)
+    expect(dialog.messageBoxes).toEqual([])
+  })
+
+  it('keeps the app menu off when it resumes at the model step, whose download changes the menu', async () => {
+    writeFileSync(
+      settingsFile(),
+      JSON.stringify({
+        version: 1,
+        wizard: { done: false, completed: ['claudeCode', 'projectFolder', 'signIn'] }
+      })
+    )
+    startApp({ argv: [] })
+    await vi.waitFor(() => {
+      expect(fakeModels.installs).toHaveLength(1)
+    })
+    fakeModels.installs[0]?.progress('downloading', 0.5)
+    expect(calls).not.toContain('menu')
   })
 
   it('starts Claude beside it at Sign in, with voice and the model download still waiting', async () => {

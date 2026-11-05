@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { installScript, plainOutput, runInstaller } from '../../src/main/pty/installClaude'
 import { readClaudeVersion } from '../../src/main/pty/claudeVersion'
-import { cmdExePath } from '../../src/main/pty/resolveClaude'
+import { cmdExePath, system32Path } from '../../src/main/pty/resolveClaude'
 import { INSTALL_COMMAND } from '../../src/core/claudeVersion'
 
 vi.mock('electron', () => import('../fakes/electron'))
@@ -13,6 +13,22 @@ vi.mock('electron-log/main', () => import('../fakes/electronLog'))
 
 // Real PowerShell and cmd.exe with harmless scripts. Nothing here runs the real installer, which
 // would change this machine's Claude Code.
+
+const POWERSHELL = system32Path('WindowsPowerShell\\v1.0\\powershell.exe')
+
+/** How many processes have this in their command line, other than the one asking. */
+function processesNamed(marker: string): number {
+  const output = execFileSync(
+    POWERSHELL,
+    [
+      '-NoProfile',
+      '-Command',
+      `@(Get-CimInstance Win32_Process | Where-Object { $_.ProcessId -ne $PID -and $_.CommandLine -like '*${marker}*' }).Count`
+    ],
+    { encoding: 'utf8' }
+  )
+  return Number(output.trim())
+}
 
 async function run(script: string): Promise<string> {
   let output = ''
@@ -35,36 +51,29 @@ describe('runInstaller', () => {
 
   it('stops the script and what it started', async () => {
     const marker = `voiceup-install-test-${String(process.pid)}`
-    const script = `Write-Output started; Start-Process -NoNewWindow -Wait ping -ArgumentList '-n','60','${marker}.invalid'`
-    let stop: () => void = () => undefined
-    const started = new Promise<void>((resolve) => {
-      const running = runInstaller(script, () => {
-        resolve()
-      })
-      stop = () => {
-        running.stop()
-      }
-      void running.done.then(() => {
-        finished = true
-      })
-    })
+    // A child that really keeps running, named so that it can be found.
+    const script = `Start-Process -NoNewWindow -Wait ${POWERSHELL} -ArgumentList '-NoProfile','-Command','Start-Sleep 120; # ${marker}'`
+    const running = runInstaller(script, () => undefined)
     let finished = false
-    await started
-    stop()
+    void running.done.then(() => {
+      finished = true
+    })
+
+    // Both processes first, or a child that never started would pass this.
+    await vi.waitFor(
+      () => {
+        expect(processesNamed(marker)).toBeGreaterThanOrEqual(2)
+      },
+      { timeout: 20000, interval: 500 }
+    )
+    running.stop()
     await vi.waitFor(
       () => {
         expect(finished).toBe(true)
+        expect(processesNamed(marker)).toBe(0)
       },
-      { timeout: 15000 }
+      { timeout: 20000, interval: 500 }
     )
-    const left = execFileSync(
-      'wmic',
-      ['process', 'where', "name='PING.EXE'", 'get', 'commandline'],
-      {
-        encoding: 'utf8'
-      }
-    )
-    expect(left).not.toContain(marker)
   }, 60000)
 })
 

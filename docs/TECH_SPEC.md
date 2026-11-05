@@ -273,7 +273,7 @@ while (!vad.isEmpty()) {
 }
 ```
 
-A "no speech" timer (default 8 s) counts from the last speech heard and cancels a recording with nothing to transcribe, including one where a click started speech and the VAD then rejected it as too short (found in S3.3). End of speech is the VAD's minimum silence, which starts only after speech is detected; the VAD also enforces the max length. All of these come from `settings.json` and apply at the next launch, until S6.6 adds a settings screen.
+A "no speech" timer (default 8 s) counts from the last speech heard and cancels a recording with nothing to transcribe, including one where a click started speech and the VAD then rejected it as too short (found in S3.3). End of speech is the VAD's minimum silence, which starts only after speech is detected; the VAD also enforces the max length. All of these come from `settings.json`. The settings screen (S6.6) changes silence and maximum length, which restart the worker between recordings.
 
 ### 5.3 Recognition (worker)
 
@@ -341,7 +341,7 @@ Values measured 2026-10-26 from the downloaded archives. Unpacked: Parakeet abou
 
 - Download to `userData/models/<id>.partial` with HTTP `Range` resume, through Electron's `net.fetch` so the system proxy applies. Hash the finished file, not the stream, so a resumed download is covered from its first byte. On mismatch delete and report `MODEL_CORRUPT`; a failed download keeps the partial file and reports `MODEL_DOWNLOAD_FAILED`.
 - Extract to `userData/models/<id>.tmp`, then rename atomically to `userData/models/<id>`. The extractor is `unbzip2-stream` 1.4.3 with `tar-stream` 3.2.2, in main, writing only the files the manifest names. Measured in S4.3 on the real Moonshine archive: 40 s, peak memory 133 MB, worst main-process stall 107 ms, and every file byte-identical. It can't be the system `tar.exe`: S4.1 measured it deadlocking, because it has no built-in bzip2 and shells out to one that a friend's PC may not have. Git's `tar` took 73 s for Moonshine and 158 s for Parakeet.
-- Until the settings screen (S6.6) and wizard (S6.5) exist, a **Speech model** menu chooses the model, shows disk usage and retries a failed download. Progress shows in the terminal window's title and taskbar button, and a change of model restarts the worker. The `models:*` channels arrive with those screens.
+- The settings screen (S6.6) chooses the model, shows its download and retries a failed one; the wizard (S6.5) downloads the default. Progress also shows in the terminal window's title and taskbar button, and a change of model restarts the worker. The `settings:*` channels carry it, so the planned `models:*` channels were not needed.
 - On startup, check presence and size of each file only; the full hash runs once, at download.
 - `silero_vad.onnx` (643,854 bytes, sha256 `9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6`, from the same `asr-models` release) ships in `resources/` and is never downloaded.
 
@@ -368,11 +368,11 @@ Every boundary has one zod schema in `shared/`, imported by both sides; nothing 
 | `overlay:sound` | main → renderer | `start` or `stop`; generated tones, off with `ui.sounds` | overlay |
 | `recorder:start` / `recorder:stop` | main → renderer | `{ recordingId, deviceId }` / `{ recordingId }` | recorder |
 | `recorder:error` | renderer → main | `{ recordingId, code }`; `code` is `MIC_DENIED`, `MIC_MISSING` or `MIC_FAILED` | recorder |
-| `settings:get` / `settings:set` | invoke | → `Settings` / `Partial<Settings>` → `Result` | settings |
-| `models:status` / `models:download` | invoke + `models:progress` events | `{ id }` → status | settings, wizard |
+| `settings:get` / `settings:set` / `settings:reset` / `settings:retryModel` | invoke | `{}`, or for `set` only the screen's changed fields (`SettingsChange`: hotkey, micDeviceId, modelId, endSilenceSec, maxRecordingSec, previewMs, queue, sounds, notifications, startWithWindows, logLevel) → `{ ok, data: { values, microphones, models, model, hotkeyOn, canStartWithWindows }, errors? }`. Main checks the result against the full schema and refuses out-of-range values per field. A new hotkey is registered before the old one is released, and the old one stays if that fails. Reset changes only these fields | settings |
+| `settings:changed` | main → renderer | the same view, after a change made elsewhere, a download or a new microphone | settings |
 | `wizard:get` / `wizard:next` / `wizard:back` / `wizard:claudeCheck` / `wizard:claudeInstall` / `wizard:chooseFolder` / `wizard:testClaude` / `wizard:restartClaude` / `wizard:retryModel` / `wizard:skipMicTest` | invoke | `{}` → `{ ok: true, data: { steps: [{ id, title, detail, done }], index, claude, folder, signIn, apiKeyWarning, model, mic, canContinue } }` or `{ ok: false, code: 'WIZARD_REFUSED' }`. The page can only read and move through its steps, ask for the fixed install, open the folder picker, send the fixed test prompt and restart Claude. It can't choose what runs, supply a path or choose the prompt's text. Main refuses `next` when `canContinue` is false. A step that needs a setting gets its own narrow channel with its story, not `settings:set` | wizard |
 | `wizard:changed` / `wizard:output` | main → renderer | the same view / installer text with terminal codes removed, never logged | wizard |
-| `recorder:devices` | renderer → main | `[{ deviceId, label }]`; the recorder enumerates, at load and on a device change, and main fills the Microphone menu (S3.6). S6.6 moves this to the settings screen | recorder |
+| `recorder:devices` | renderer → main | `[{ deviceId, label }]`; the recorder enumerates, at load and on a device change, and main lists them on the settings screen (S6.6) | recorder |
 | `app:openLogs` | invoke | none | settings |
 | `recorder:port` | main → renderer | a `MessagePort` for frames to the worker; sent again after a worker restart | recorder |
 | `state:rearm` | renderer → main | `{}`; ignored unless the state is `unknown` | terminal |
@@ -457,7 +457,7 @@ export const Settings = z.object({
 | --- | --- | --- | --- |
 | `MIC_DENIED` | `NotAllowedError` | "Windows is blocking the microphone" | button opens `ms-settings:privacy-microphone` |
 | `MIC_MISSING` | `NotFoundError`, or the track ends mid-recording because the device was unplugged | "No microphone found" | device picker |
-| `HOTKEY_TAKEN` | `register()` returns false, or the combination is invalid | "Hotkey taken, pick another" | close the other app, or change `hotkey` in `settings.json` until S6.6 adds the setting |
+| `HOTKEY_TAKEN` | `register()` returns false, or the combination is invalid | "Hotkey taken, pick another" | close the other app, or choose another in Settings |
 | `MODEL_MISSING`, `MODEL_CORRUPT` | file absent; hash mismatch or an archive that won't unpack | "Speech model needs downloading" | Speech model > Retry download; a button from S6.5 |
 | `MODEL_DOWNLOAD_FAILED` | no connection, an HTTP error, or the disk filling up | "Speech model download failed" | Speech model > Retry download, which resumes |
 | `WORKER_ERROR` | the worker reports a failure it survived, such as a failed decode, or it crashes during a recording | "Speech engine had a problem" | press the hotkey again |

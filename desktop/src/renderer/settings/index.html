@@ -1,0 +1,227 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>VoiceUp settings</title>
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; media-src 'self' blob:"
+    />
+    <style>
+      html,
+      body {
+        margin: 0;
+      }
+      body {
+        background: #1e1e20;
+        color: #f0f0f0;
+        font:
+          14px/1.5 'Segoe UI',
+          sans-serif;
+      }
+      main {
+        max-width: 620px;
+        padding: 16px 24px 24px;
+      }
+      h1 {
+        margin: 0 0 4px;
+        font-size: 20px;
+        font-weight: 600;
+      }
+      h2 {
+        margin: 20px 0 8px;
+        color: #a8a8a8;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+      .row {
+        display: grid;
+        grid-template-columns: 210px minmax(0, 1fr);
+        align-items: center;
+        gap: 4px 12px;
+        margin: 0 0 10px;
+      }
+      .row > .note,
+      .row > .error,
+      .row > .warning {
+        grid-column: 2;
+        margin: 0;
+        font-size: 12px;
+      }
+      .note {
+        color: #a8a8a8;
+      }
+      .error {
+        color: #f48771;
+      }
+      .warning {
+        color: #f5c26b;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      .inline {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+      }
+      #hotkey-value {
+        padding: 3px 10px;
+        border-radius: 6px;
+        background: #111113;
+        font-family: Consolas, monospace;
+      }
+      #hotkey-value[data-listening='true'] {
+        outline: 2px solid #4ec9b0;
+      }
+      select {
+        max-width: 100%;
+      }
+      select,
+      input[type='number'] {
+        padding: 4px 6px;
+        border: 1px solid #55555a;
+        border-radius: 6px;
+        background: #2c2c30;
+        color: inherit;
+        font: inherit;
+      }
+      input[type='number'] {
+        width: 90px;
+      }
+      input[type='checkbox'] {
+        width: 16px;
+        height: 16px;
+        accent-color: #4ec9b0;
+      }
+      button {
+        padding: 4px 14px;
+        border: 1px solid #55555a;
+        border-radius: 6px;
+        background: #2c2c30;
+        color: inherit;
+        font: inherit;
+        white-space: nowrap;
+      }
+      :focus-visible {
+        outline: 2px solid #4ec9b0;
+        outline-offset: 2px;
+      }
+      progress {
+        width: 200px;
+        height: 8px;
+        accent-color: #4ec9b0;
+      }
+      footer {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-top: 24px;
+      }
+      #status {
+        color: #a8a8a8;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Settings</h1>
+      <p class="note">Changes are saved as you make them.</p>
+
+      <h2>Voice</h2>
+      <div class="row">
+        <span>Hotkey</span>
+        <span class="inline">
+          <span id="hotkey-value"></span>
+          <button id="hotkey-change" type="button">Change</button>
+        </span>
+        <p class="note" id="hotkey-help" hidden>
+          Press the new keys, with Ctrl, Alt or the Windows key. Esc stops.
+        </p>
+        <p class="warning" id="hotkey-warning" hidden>
+          Ctrl+Alt is AltGr on Croatian and other keyboards, so it may fire while you type @ or {.
+        </p>
+        <p class="error" data-error-for="hotkey" hidden></p>
+      </div>
+      <div class="row">
+        <label for="micDeviceId">Microphone</label>
+        <select id="micDeviceId" data-field="micDeviceId"></select>
+        <p class="error" data-error-for="micDeviceId" hidden></p>
+      </div>
+      <div class="row">
+        <label for="modelId">Speech model</label>
+        <select id="modelId" data-field="modelId"></select>
+        <span class="note inline" id="model-status-row">
+          <span id="model-status"></span>
+          <progress id="model-progress" max="100" value="0" hidden></progress>
+          <button id="model-retry" type="button" hidden>Try again</button>
+        </span>
+        <p class="error" data-error-for="modelId" hidden></p>
+      </div>
+      <div class="row">
+        <label for="endSilenceSec">Silence before stopping (seconds)</label>
+        <input id="endSilenceSec" type="number" data-field="endSilenceSec" />
+        <p class="error" data-error-for="endSilenceSec" hidden></p>
+      </div>
+      <div class="row">
+        <label for="maxRecordingSec">Longest recording (seconds)</label>
+        <input id="maxRecordingSec" type="number" data-field="maxRecordingSec" />
+        <p class="error" data-error-for="maxRecordingSec" hidden></p>
+      </div>
+
+      <h2>Sending</h2>
+      <div class="row">
+        <label for="previewMs">Preview time per word (ms)</label>
+        <input id="previewMs" type="number" data-field="previewMs" />
+        <p class="note">How long you have to cancel before the text goes to Claude.</p>
+        <p class="error" data-error-for="previewMs" hidden></p>
+      </div>
+      <div class="row">
+        <label for="queue">Queue while Claude works</label>
+        <input id="queue" type="checkbox" data-field="queue" />
+        <p class="error" data-error-for="queue" hidden></p>
+      </div>
+
+      <h2>App</h2>
+      <div class="row">
+        <label for="sounds">Sounds</label>
+        <input id="sounds" type="checkbox" data-field="sounds" />
+        <p class="error" data-error-for="sounds" hidden></p>
+      </div>
+      <div class="row">
+        <label for="notifications">Notifications</label>
+        <input id="notifications" type="checkbox" data-field="notifications" />
+        <p class="error" data-error-for="notifications" hidden></p>
+      </div>
+      <div class="row">
+        <label for="startWithWindows">Start with Windows</label>
+        <input id="startWithWindows" type="checkbox" data-field="startWithWindows" />
+        <p class="note" id="start-note" hidden>Only the installed app can start with Windows.</p>
+        <p class="error" data-error-for="startWithWindows" hidden></p>
+      </div>
+      <div class="row">
+        <label for="logLevel">Log level</label>
+        <select id="logLevel" data-field="logLevel">
+          <option value="error">Errors</option>
+          <option value="warn">Warnings</option>
+          <option value="info">Normal</option>
+          <option value="debug">Debug</option>
+        </select>
+        <p class="warning" id="debug-warning" hidden>
+          Debug writes what you say to the log file. Use it only while finding a problem.
+        </p>
+        <p class="error" data-error-for="logLevel" hidden></p>
+      </div>
+
+      <footer>
+        <button id="reset" type="button">Reset to defaults</button>
+        <span id="status" role="status"></span>
+      </footer>
+      <p class="note">Reset changes only what is on this screen. Your project folder stays.</p>
+    </main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

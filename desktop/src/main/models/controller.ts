@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { app } from 'electron'
 import { chooseModel, formatSize } from '../../core/modelChoice'
+import type { ModelStepStatus, SettingsView } from '../../shared/ipcChannels'
 import { ModelManifest, type ModelEntry, type ModelId } from '../../shared/models'
 import type { Settings } from '../../shared/settings'
 import type { ModelPaths } from '../../shared/worker'
@@ -63,7 +64,8 @@ export class ModelController {
     return manager.isInstalled(entry) ? { id: entry.id, paths: manager.paths(entry) } : null
   }
 
-  select(id: ModelId): void {
+  /** 'auto' is the default model. */
+  select(id: Settings['speech']['modelId']): void {
     this.modelId = id
     this.ensure()
   }
@@ -93,27 +95,35 @@ export class ModelController {
     }
   }
 
-  menu(): {
-    choices: { id: ModelId; label: string; checked: boolean }[]
-    notes: string[]
-    canRetry: boolean
-  } {
+  /** Every model, for the settings screen. */
+  choices(): SettingsView['models'] {
     const { manifest, manager } = this.options
     const chosen = this.chosen()
-    const { phase } = this.current
+    return manifest.map((entry) => ({
+      id: entry.id,
+      label: entry.label,
+      size: formatSize(entry.bytes),
+      installed: manager.isInstalled(entry),
+      chosen: entry.id === chosen.id
+    }))
+  }
+
+  /** The chosen model's download, as the wizard and the settings screen show it. */
+  chosenStatus(): ModelStepStatus {
+    const entry = this.chosen()
+    const { current } = this
+    const phase: ModelStepStatus['phase'] = this.options.manager.isInstalled(entry)
+      ? 'ready'
+      : current.phase === 'installing'
+        ? current.stage
+        : current.phase === 'failed'
+          ? 'failed'
+          : 'waiting'
     return {
-      choices: manifest.map((entry) => ({
-        id: entry.id,
-        label: manager.isInstalled(entry)
-          ? entry.label
-          : `${entry.label}, downloads ${formatSize(entry.bytes)}`,
-        checked: entry.id === chosen.id
-      })),
-      notes: [
-        ...(phase === 'installing' ? ['Installing, the title bar shows how far along'] : []),
-        `Models on disk: ${formatSize(manager.diskUsageBytes())}`
-      ],
-      canRetry: phase === 'failed'
+      label: entry.label,
+      size: formatSize(entry.bytes),
+      phase,
+      percent: current.phase === 'installing' ? current.percent : 0
     }
   }
 

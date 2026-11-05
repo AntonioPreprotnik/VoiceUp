@@ -22,9 +22,11 @@ export class Overlay {
   private pressedAt: number | undefined
   private shownSize = SIZE
   private readonly now: () => number
+  private sounds: boolean
 
   constructor(private readonly options: OverlayOptions) {
     this.now = options.now ?? Date.now
+    this.sounds = options.sounds
     // Click-through, so it can sit over whatever the user is doing.
     options.window.setIgnoreMouseEvents(true)
     // Above fullscreen apps too, which the normal always-on-top level is not.
@@ -113,8 +115,12 @@ export class Overlay {
     if (!visible) window.showInactive()
   }
 
+  setSounds(on: boolean): void {
+    this.sounds = on
+  }
+
   private playSound(sound: OverlaySound): void {
-    const { window, sounds } = this.options
-    if (sounds && !window.isDestroyed()) window.webContents.send(Channels.overlaySound, sound)
+    const { window } = this.options
+    if (this.sounds && !window.isDestroyed()) window.webContents.send(Channels.overlaySound, sound)
   }
 }

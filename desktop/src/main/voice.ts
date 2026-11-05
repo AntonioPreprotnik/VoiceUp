@@ -37,6 +37,8 @@ export interface VoiceOptions {
 export interface Voice {
   readonly recording: RecordingController
   readonly models: ModelController
+  /** Restarts the worker with the saved speech settings, ending any recording. */
+  readonly applySpeechSettings: () => void
 }
 
 /** From the microphone to text: the recorder window, the speech worker and its models. */
@@ -168,5 +170,12 @@ export function createVoice({
   loadRenderer(recorderWindow, 'recorder').catch((error: unknown) => {
     log.error('Could not load the recorder window', error)
   })
-  return { recording, models }
+  return {
+    recording,
+    models,
+    applySpeechSettings: () => {
+      recording.cancel()
+      speech.restart(workerInit(settings.current.speech, models.installedModel()))
+    }
+  }
 }

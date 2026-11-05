@@ -81,6 +81,34 @@ function onlyWindow(): BrowserWindow {
   return window
 }
 
+/** Opens the settings window from File, and returns what its IPC calls send as their sender. */
+function openSettingsWindow(): { window: BrowserWindow; event: unknown } {
+  interface Item {
+    label?: string
+    click?: () => void
+    submenu?: Item[]
+  }
+  ;(Menu.installed as Item[])
+    .find((item) => item.label === 'File')
+    ?.submenu?.find((item) => item.label === 'Settings...')
+    ?.click?.()
+  const window = BrowserWindow.instances.find(({ options }) =>
+    String((options['webPreferences'] as { preload?: string }).preload).endsWith('settings.js')
+  )
+  if (window === undefined) throw new Error('No settings window')
+  return {
+    window,
+    event: {
+      sender: { id: window.webContents.id },
+      senderFrame: { url: 'app://voiceup/settings/index.html' }
+    }
+  }
+}
+
+function invokeSettings(channel: string, event: unknown, payload: unknown = {}): unknown {
+  return ipcMain.handlers.get(channel)?.(event, payload)
+}
+
 function wizard(): BrowserWindow | undefined {
   return BrowserWindow.instances.find(({ options }) =>
     String((options['webPreferences'] as { preload?: string }).preload).endsWith('wizard.js')
@@ -308,15 +336,8 @@ describe('the first-run wizard', () => {
     const window = await freshStart({ signedIn: true })
     press(window, STEP_COUNT)
     await settle()
-    interface Item {
-      label?: string
-      click?: () => void
-      submenu?: Item[]
-    }
-    ;(Menu.installed as Item[])
-      .find((item) => item.label === 'Microphone')
-      ?.submenu?.find((item) => item.label === 'System default')
-      ?.click?.()
+    const { event } = openSettingsWindow()
+    invokeSettings('settings:set', event, { previewMs: 500 })
     expect(saved().wizard.done).toBe(true)
   })
 
@@ -408,12 +429,10 @@ describe('the first-run wizard', () => {
     if (window === undefined) throw new Error('No wizard window')
     press(window, STEP_COUNT)
     await settle()
-    interface Item {
-      label?: string
-      submenu?: Item[]
-    }
-    const microphones = (Menu.installed as Item[]).find((item) => item.label === 'Microphone')
-    expect(microphones?.submenu?.map((item) => item.label)).toContain('USB Mic')
+    const settings = openSettingsWindow()
+    expect(invokeSettings('settings:get', settings.event)).toMatchObject({
+      data: { microphones: [{ deviceId: 'usb', label: 'USB Mic' }] }
+    })
   })
 
   it('brings up the wizard, not the blank terminal, for a second launch', async () => {
@@ -533,7 +552,7 @@ describe('the recorder window', () => {
     expect(portsSent()).toBe(1)
   })
 
-  it('fills the Microphone menu from what it reports, and a choice is remembered', async () => {
+  it('lists the microphones it reports in the settings, and a choice is used', async () => {
     startApp({ argv: [] })
     await settle()
     const event = {
@@ -541,19 +560,14 @@ describe('the recorder window', () => {
       senderFrame: { url: 'app://voiceup/recorder/index.html' }
     }
     ipcMain.emit('recorder:devices', event, [{ deviceId: 'usb', label: 'USB Mic' }])
-    interface Item {
-      label?: string
-      checked?: boolean
-      click?: () => void
-      submenu?: Item[]
-    }
-    const entries = (): Item[] =>
-      (Menu.installed as Item[]).find((item) => item.label === 'Microphone')?.submenu ?? []
-    expect(entries().map((item) => item.label)).toEqual(['System default', 'USB Mic'])
-    entries()
-      .find((item) => item.label === 'USB Mic')
-      ?.click?.()
-    expect(entries().find((item) => item.label === 'USB Mic')?.checked).toBe(true)
+    const settings = openSettingsWindow()
+    expect(invokeSettings('settings:get', settings.event)).toMatchObject({
+      data: { microphones: [{ deviceId: 'usb', label: 'USB Mic' }], values: { micDeviceId: null } }
+    })
+    expect(invokeSettings('settings:set', settings.event, { micDeviceId: 'usb' })).toMatchObject({
+      ok: true,
+      data: { values: { micDeviceId: 'usb' } }
+    })
 
     globalShortcut.press('Control+Shift+Space')
     expect(recorderWindow().webContents.sent.at(-1)?.[1]).toMatchObject({ deviceId: 'usb' })
@@ -647,22 +661,156 @@ describe('the speech model', () => {
     })
   })
 
-  it('reports a failure in the title, and the menu retries it', async () => {
+  it('reports a failure in the title, and the settings screen retries it', async () => {
     const install = await installing()
     install.finish(new ModelError('MODEL_DOWNLOAD_FAILED', 'offline'))
     await vi.waitFor(() => {
       expect(onlyWindow().title).toBe('VoiceUp - Speech model download failed')
     })
-    interface Item {
-      label?: string
-      click?: () => void
-      submenu?: Item[]
-    }
-    const retry = (Menu.installed as Item[])
-      .find((item) => item.label === 'Speech model')
-      ?.submenu?.find((item) => item.label === 'Retry download')
-    retry?.click?.()
+    const { event } = openSettingsWindow()
+    expect(invokeSettings('settings:get', event)).toMatchObject({
+      data: { model: { phase: 'failed' } }
+    })
+    invokeSettings('settings:retryModel', event)
     expect(fakeModels.installs).toHaveLength(2)
+  })
+
+  it('downloads a model chosen in the settings', async () => {
+    fakeModels.installed.add('moonshine-base-en')
+    startApp({ argv: [] })
+    await settle()
+    const { event } = openSettingsWindow()
+    invokeSettings('settings:set', event, { modelId: 'parakeet-tdt-0.6b-v2-int8' })
+    expect(fakeModels.installs.map(({ id }) => id)).toEqual(['parakeet-tdt-0.6b-v2-int8'])
+  })
+})
+
+describe('the settings screen', () => {
+  async function opened(): Promise<unknown> {
+    startApp({ argv: [] })
+    await settle()
+    return openSettingsWindow().event
+  }
+
+  it('opens once, and brings the same window up again', async () => {
+    await opened()
+    const before = BrowserWindow.instances.length
+    openSettingsWindow()
+    expect(BrowserWindow.instances).toHaveLength(before)
+  })
+
+  it('is not offered during setup', async () => {
+    rmSync(join(app.getPath('userData'), 'settings.json'))
+    startApp({ argv: [] })
+    await vi.waitFor(() => {
+      expect(wizard()?.loadedUrl).toBe('app://voiceup/wizard/index.html')
+    })
+    expect(Menu.installed).toBeUndefined()
+  })
+
+  it('saves a change and applies it at once', async () => {
+    const event = await opened()
+    invokeSettings('settings:set', event, { logLevel: 'debug' })
+    expect(fakeLog.transports.file.level).toBe('debug')
+    const file = JSON.parse(
+      readFileSync(join(app.getPath('userData'), 'settings.json'), 'utf8')
+    ) as {
+      logLevel: string
+    }
+    expect(file.logLevel).toBe('debug')
+  })
+
+  it('refuses a value out of range, with a message, saving nothing', async () => {
+    const event = await opened()
+    expect(invokeSettings('settings:set', event, { previewMs: 99999 })).toMatchObject({
+      ok: false,
+      errors: { previewMs: 'Choose from 0 to 5000 ms.' },
+      data: { values: { previewMs: 300 } }
+    })
+  })
+
+  it('refuses a field the screen does not have, such as the project folder', async () => {
+    const event = await opened()
+    expect(invokeSettings('settings:set', event, { projectDir: 'C:\\evil' })).toMatchObject({
+      ok: false,
+      data: null
+    })
+  })
+
+  it('ignores any other window', async () => {
+    await opened()
+    const terminal = {
+      sender: { id: onlyWindow().webContents.id },
+      senderFrame: { url: 'app://voiceup/terminal/index.html' }
+    }
+    expect(invokeSettings('settings:set', terminal, { logLevel: 'debug' })).toMatchObject({
+      ok: false,
+      data: null
+    })
+  })
+
+  it('moves the hotkey: the new one works and the old one is free', async () => {
+    const event = await opened()
+    invokeSettings('settings:set', event, { hotkey: 'Alt+V' })
+    expect(globalShortcut.registered.has('Alt+V')).toBe(true)
+    expect(globalShortcut.registered.has('Control+Shift+Space')).toBe(false)
+  })
+
+  it('keeps the old hotkey when another app has the new one, and says so', async () => {
+    const event = await opened()
+    globalShortcut.takenByAnotherApp = 'Alt+V'
+    expect(
+      invokeSettings('settings:set', event, { hotkey: 'Alt+V', previewMs: 500 })
+    ).toMatchObject({
+      ok: false,
+      errors: { hotkey: expect.stringContaining('old hotkey is still on') as unknown },
+      data: { values: { hotkey: 'Control+Shift+Space', previewMs: 500 } }
+    })
+    expect(globalShortcut.registered.has('Control+Shift+Space')).toBe(true)
+  })
+
+  it('resets the screen to defaults, keeping the project folder', async () => {
+    writeFileSync(
+      join(app.getPath('userData'), 'settings.json'),
+      JSON.stringify({
+        version: 1,
+        claude: { projectDir: 'C:\\work' },
+        delivery: { previewMs: 900 }
+      })
+    )
+    startApp({ argv: [] })
+    await settle()
+    const { event } = openSettingsWindow()
+    invokeSettings('settings:reset', event)
+    const file = JSON.parse(
+      readFileSync(join(app.getPath('userData'), 'settings.json'), 'utf8')
+    ) as {
+      delivery: { previewMs: number }
+      claude: { projectDir: string }
+    }
+    expect(file.delivery.previewMs).toBe(300)
+    expect(file.claude.projectDir).toBe('C:\\work')
+  })
+
+  it('adds itself to the startup list only when packaged', async () => {
+    const event = await opened()
+    invokeSettings('settings:set', event, { startWithWindows: true })
+    expect(app.loginItem).toEqual({ openAtLogin: true })
+  })
+
+  it('never touches the startup list when unpackaged', async () => {
+    app.isPackaged = false
+    const event = await opened()
+    invokeSettings('settings:set', event, { startWithWindows: true })
+    expect(app.loginItem).toBeUndefined()
+  })
+
+  it('restarts the speech worker for new silence settings', async () => {
+    const event = await opened()
+    invokeSettings('settings:set', event, { endSilenceSec: 2 })
+    expect(utilityProcess.children.at(-1)?.messages[0]?.message).toMatchObject({
+      vad: { endSilenceSec: 2 }
+    })
   })
 })
 

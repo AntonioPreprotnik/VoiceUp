@@ -18,7 +18,8 @@ function create(notifications = true): ClaudeStatus {
     notifications,
     reArm,
     showWindow,
-    quit
+    quit,
+    openSettings: () => undefined
   })
 }
 

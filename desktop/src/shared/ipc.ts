@@ -11,6 +11,24 @@ export type TermResize = z.infer<typeof TermResize>
 export const SessionRestart = z.object({}).strict()
 export const StateReArm = z.object({}).strict()
 export const WizardAction = z.object({}).strict()
+export const NoPayload = z.object({}).strict()
+/** Only the fields the settings screen shows. Their bounds are checked against the full schema. */
+export const SettingsChange = z
+  .object({
+    hotkey: z.string().min(1).max(64),
+    micDeviceId: z.string().max(512).nullable(),
+    modelId: z.string().max(64),
+    endSilenceSec: z.number(),
+    maxRecordingSec: z.number(),
+    previewMs: z.number(),
+    queue: z.boolean(),
+    sounds: z.boolean(),
+    notifications: z.boolean(),
+    startWithWindows: z.boolean(),
+    logLevel: z.enum(['error', 'warn', 'info', 'debug'])
+  })
+  .partial()
+  .strict()
 export const QueueCancel = z.object({ id: z.string().max(32) }).strict()
 export const RecorderDevices = z
   .array(z.object({ deviceId: z.string().max(512), label: z.string().max(512) }))

@@ -29,6 +29,7 @@ export interface ClaudeLinkOptions {
   /** The window a message box belongs to, if one is still open. */
   readonly parentWindow: () => BrowserWindow | undefined
   readonly showWindow: () => void
+  readonly openSettings: () => void
   /** Writes to Claude's terminal. */
   readonly write: (data: string) => void
   readonly steps: ShutdownSteps
@@ -42,6 +43,7 @@ export interface ClaudeLink {
   readonly delivery: Delivery
   readonly hooks: HookLink
   readonly publishStatus: () => void
+  readonly setNotifications: (on: boolean) => void
 }
 
 /** What VoiceUp knows of Claude, and what reaches it: state, status, hooks and voice delivery. */
@@ -51,6 +53,7 @@ export function createClaudeLink({
   terminalWindow,
   parentWindow,
   showWindow,
+  openSettings,
   write,
   steps,
   onClaudeState,
@@ -78,6 +81,7 @@ export function createClaudeLink({
       claudeState.reArm()
     },
     showWindow,
+    openSettings,
     quit: () => {
       app.quit()
     }
@@ -162,5 +166,13 @@ export function createClaudeLink({
     }
   })
   publishStatus()
-  return { claudeState, delivery, hooks, publishStatus }
+  return {
+    claudeState,
+    delivery,
+    hooks,
+    publishStatus,
+    setNotifications: (on) => {
+      claudeStatus.setNotifications(on)
+    }
+  }
 }

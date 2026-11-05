@@ -60,6 +60,16 @@ export class BrowserWindow extends EventEmitter {
     this.title = title
   }
 
+  menuRemoved = false
+
+  removeMenu(): void {
+    this.menuRemoved = true
+  }
+
+  close(): void {
+    this.emit('closed')
+  }
+
   isFocused(): boolean {
     return this.focused
   }
@@ -342,7 +352,7 @@ export const globalShortcut = {
   }
 }
 
-type InvokeHandler = (event: unknown) => unknown
+type InvokeHandler = (event: unknown, ...args: unknown[]) => unknown
 
 class FakeIpcMain extends EventEmitter {
   readonly handlers = new Map<string, InvokeHandler>()

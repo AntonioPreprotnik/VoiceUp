@@ -8,8 +8,9 @@ export type SettingsUpgrades = Readonly<Partial<Record<number, (raw: RawSettings
 // Upgrades key on the version they upgrade from. Add one when the schema version changes.
 const UPGRADES: SettingsUpgrades = {}
 
+/** A new start, so setup runs. A file that merely lacks the wizard section gets done: true instead. */
 export function defaultSettings(): Settings {
-  return Settings.parse({ version: CURRENT_SETTINGS_VERSION })
+  return Settings.parse({ version: CURRENT_SETTINGS_VERSION, wizard: { done: false } })
 }
 
 function isRecord(value: unknown): value is RawSettings {

@@ -52,7 +52,12 @@ describe('loadSettings', () => {
     writeFileSync(settingsPath(), JSON.stringify({ version: 1, oldField: 1, hotkey: 'Alt+V' }))
     const settings = loadSettings(dir, log)
     expect(settings.hotkey).toBe('Alt+V')
-    expect(readSaved()).toEqual({ ...defaultSettings(), hotkey: 'Alt+V' })
+    expect(readSaved()).toEqual({
+      ...defaultSettings(),
+      hotkey: 'Alt+V',
+      // A file with no wizard section is from before the wizard, so it never runs for this one.
+      wizard: { done: true, completed: [] }
+    })
   })
 
   it.each([

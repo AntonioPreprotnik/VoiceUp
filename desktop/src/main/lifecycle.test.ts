@@ -1,4 +1,4 @@
-import { cpSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -74,6 +74,12 @@ function onlyWindow(): BrowserWindow {
   return window
 }
 
+function wizard(): BrowserWindow | undefined {
+  return BrowserWindow.instances.find(({ options }) =>
+    String((options['webPreferences'] as { preload?: string }).preload).endsWith('wizard.js')
+  )
+}
+
 async function settle(): Promise<void> {
   await vi.waitFor(() => {
     expect(calls).toContain('hotkey')
@@ -90,6 +96,8 @@ beforeEach(() => {
   }
   mkdirSync(join(userData, 'resources'), { recursive: true })
   cpSync(join(__dirname, '../../resources/models.json'), join(userData, 'resources/models.json'))
+  // A file from before the wizard, so these tests start as a set-up copy does.
+  writeFileSync(join(userData, 'settings.json'), JSON.stringify({ version: 1 }))
   fakeModels.installed.clear()
   fakeModels.installs.length = 0
   calls.length = 0
@@ -206,9 +214,116 @@ describe('settings and logging at startup', () => {
   it('starts on defaults when the settings file is corrupt', async () => {
     writeFileSync(join(app.getPath('userData'), 'settings.json'), '{ not json')
     startApp({ argv: [] })
-    await settle()
+    await vi.waitFor(() => {
+      expect(wizard()?.loadedUrl).toBe('app://voiceup/wizard/index.html')
+    })
     expect(fakeLog.transports.file.level).toBe('info')
+  })
+})
+
+describe('the first-run wizard', () => {
+  const STEP_COUNT = 6
+  const settingsFile = (): string => join(app.getPath('userData'), 'settings.json')
+  const saved = (): { wizard: { done: boolean; completed: string[] } } =>
+    JSON.parse(readFileSync(settingsFile(), 'utf8')) as never
+
+  async function freshStart(): Promise<BrowserWindow> {
+    rmSync(settingsFile())
+    startApp({ argv: [] })
+    await vi.waitFor(() => {
+      expect(wizard()?.loadedUrl).toBe('app://voiceup/wizard/index.html')
+    })
+    const window = wizard()
+    if (window === undefined) throw new Error('No wizard window')
+    return window
+  }
+
+  function press(window: BrowserWindow, times: number): void {
+    const event = {
+      sender: { id: window.webContents.id },
+      senderFrame: { url: 'app://voiceup/wizard/index.html' }
+    }
+    for (let press = 0; press < times; press++) ipcMain.handlers.get('wizard:next')?.(event, {})
+  }
+
+  it('does not open for a settings file from before it existed', async () => {
+    startApp({ argv: [] })
+    await settle()
+    expect(wizard()).toBeUndefined()
     expect(onlyWindow().loadedUrl).toBe('app://voiceup/terminal/index.html')
+  })
+
+  it('holds the terminal, the model download and the hotkey on a fresh start', async () => {
+    await freshStart()
+    expect(onlyWindow().loadedUrl).toBeUndefined()
+    expect(fakeModels.installs).toEqual([])
+    expect(calls).not.toContain('hotkey')
+    expect(utilityProcess.children).toHaveLength(1)
+  })
+
+  it('opens the terminal when finished, and not again on the next start', async () => {
+    const window = await freshStart()
+    press(window, STEP_COUNT)
+    await settle()
+    expect(onlyWindow().loadedUrl).toBe('app://voiceup/terminal/index.html')
+    expect(fakeModels.installs).toHaveLength(1)
+    expect(saved().wizard.done).toBe(true)
+    expect(app.quitCount).toBe(0)
+  })
+
+  it('keeps the finished state when a later change saves the settings', async () => {
+    const window = await freshStart()
+    press(window, STEP_COUNT)
+    await settle()
+    interface Item {
+      label?: string
+      click?: () => void
+      submenu?: Item[]
+    }
+    ;(Menu.installed as Item[])
+      .find((item) => item.label === 'Microphone')
+      ?.submenu?.find((item) => item.label === 'System default')
+      ?.click?.()
+    expect(saved().wizard.done).toBe(true)
+  })
+
+  it('quits when closed early, with the progress saved', async () => {
+    const window = await freshStart()
+    press(window, 2)
+    window.close()
+    expect(app.quitCount).toBe(1)
+    expect(saved().wizard).toEqual({ done: false, completed: ['claudeCode', 'projectFolder'] })
+  })
+
+  it('does not put the app menu back while open, then shows what it missed', async () => {
+    await freshStart()
+    const recorder = BrowserWindow.instances.at(1)
+    const event = {
+      sender: { id: recorder?.webContents.id },
+      senderFrame: { url: 'app://voiceup/recorder/index.html' }
+    }
+    calls.length = 0
+    ipcMain.emit('recorder:devices', event, [{ deviceId: 'usb', label: 'USB Mic' }])
+    // Electron applies the app menu to every window, which would undo the wizard's removeMenu.
+    expect(calls).not.toContain('menu')
+
+    const window = wizard()
+    if (window === undefined) throw new Error('No wizard window')
+    press(window, STEP_COUNT)
+    await settle()
+    interface Item {
+      label?: string
+      submenu?: Item[]
+    }
+    const microphones = (Menu.installed as Item[]).find((item) => item.label === 'Microphone')
+    expect(microphones?.submenu?.map((item) => item.label)).toContain('USB Mic')
+  })
+
+  it('brings up the wizard, not the blank terminal, for a second launch', async () => {
+    const window = await freshStart()
+    app.emit('second-instance')
+    expect(window.focused).toBe(true)
+    expect(onlyWindow().focused).toBe(false)
   })
 })
 

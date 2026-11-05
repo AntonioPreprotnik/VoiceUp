@@ -22,7 +22,8 @@ export default defineConfig({
         input: {
           terminal: resolve(__dirname, 'src/preload/terminal.ts'),
           recorder: resolve(__dirname, 'src/preload/recorder.ts'),
-          overlay: resolve(__dirname, 'src/preload/overlay.ts')
+          overlay: resolve(__dirname, 'src/preload/overlay.ts'),
+          wizard: resolve(__dirname, 'src/preload/wizard.ts')
         }
       }
     }
@@ -33,7 +34,8 @@ export default defineConfig({
         input: {
           terminal: resolve(__dirname, 'src/renderer/terminal/index.html'),
           recorder: resolve(__dirname, 'src/renderer/recorder/index.html'),
-          overlay: resolve(__dirname, 'src/renderer/overlay/index.html')
+          overlay: resolve(__dirname, 'src/renderer/overlay/index.html'),
+          wizard: resolve(__dirname, 'src/renderer/wizard/index.html')
         }
       }
     }

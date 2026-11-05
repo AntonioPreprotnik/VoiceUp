@@ -75,6 +75,20 @@ async function checkRecorderPage(consoleErrors: string[]): Promise<void> {
     "fetch('/frames-worklet.js').then((response) => response.ok)"
   )
   if (worklet !== true) consoleErrors.push('The recorder worklet is missing')
+  await checkWizardPage(consoleErrors)
+}
+
+/** Nothing in main answers this page here, so it shows its error, which is only a warning. */
+async function checkWizardPage(consoleErrors: string[]): Promise<void> {
+  const window = createWindow('wizard', { showWhenReady: false })
+  window.webContents.on('console-message', (details) => {
+    if (details.level === 'error') consoleErrors.push(details.message)
+  })
+  await loadRenderer(window, 'wizard')
+  const ready: unknown = await window.webContents.executeJavaScript(
+    "typeof window.voiceupWizard?.next === 'function' && document.getElementById('continue') !== null"
+  )
+  if (ready !== true) consoleErrors.push('The wizard page did not get its preload')
 }
 
 /** Spawns `cmd.exe /c exit 0` through node-pty, proving the native module loads and runs. */

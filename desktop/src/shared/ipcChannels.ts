@@ -24,7 +24,10 @@ export const Channels = {
   recorderError: 'recorder:error',
   recorderDevices: 'recorder:devices',
   overlayShow: 'overlay:show',
-  overlaySound: 'overlay:sound'
+  overlaySound: 'overlay:sound',
+  wizardGet: 'wizard:get',
+  wizardNext: 'wizard:next',
+  wizardBack: 'wizard:back'
 } as const
 
 /** RIS, the terminal's full reset, sent on its own as a session is replaced. */
@@ -93,6 +96,31 @@ export interface RecorderApi {
   onStop(listener: (stop: { recordingId: string }) => void): void
   reportError(recordingId: string, code: RecorderErrorCode): void
   reportDevices(devices: readonly MicDevice[]): void
+}
+
+/** One step of the first-run wizard, ready to show. */
+export interface WizardStepView {
+  readonly id: string
+  readonly title: string
+  readonly detail: string
+  readonly done: boolean
+}
+
+export interface WizardView {
+  readonly steps: readonly WizardStepView[]
+  /** The step showing now. */
+  readonly index: number
+}
+
+export type WizardResult =
+  | { readonly ok: true; readonly data: WizardView }
+  | { readonly ok: false; readonly code: 'WIZARD_REFUSED' }
+
+/** What the wizard preload exposes as window.voiceupWizard. */
+export interface WizardApi {
+  view(): Promise<WizardResult>
+  next(): Promise<WizardResult>
+  back(): Promise<WizardResult>
 }
 
 /** What the terminal preload exposes as window.voiceup. */

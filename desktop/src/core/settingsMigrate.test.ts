@@ -18,12 +18,30 @@ describe('defaultSettings', () => {
       delivery: { previewMs: 300, alwaysConfirm: false, queue: true, maxQueue: 3 },
       claude: { projectDir: null, browserControl: false, showBrowser: 'off' },
       ui: { fontSize: 14, sounds: true, notifications: true, startWithWindows: false },
+      wizard: { done: false, completed: [] },
       logLevel: 'info'
     })
   })
 })
 
 describe('migrate', () => {
+  const existing = (): unknown => ({ ...defaultSettings(), wizard: { done: true, completed: [] } })
+
+  it('counts a file from before the wizard as already set up', () => {
+    const settings = migrate({ version: 1, claude: { projectDir: 'C:\\work' } })
+    expect(settings?.wizard).toEqual({ done: true, completed: [] })
+  })
+
+  it('keeps saved wizard progress', () => {
+    const wizard = { done: false, completed: ['claudeCode'] }
+    expect(migrate({ version: 1, wizard })?.wizard).toEqual(wizard)
+  })
+
+  it('keeps a wizard step it does not know, rather than rejecting the file', () => {
+    const wizard = { done: false, completed: ['fromANewerVersion'] }
+    expect(migrate({ version: 1, wizard })?.wizard).toEqual(wizard)
+  })
+
   it('keeps valid values', () => {
     const settings = migrate({ version: 1, hotkey: 'Alt+V', ui: { fontSize: 20 } })
     expect(settings?.hotkey).toBe('Alt+V')
@@ -31,18 +49,18 @@ describe('migrate', () => {
   })
 
   it('fills missing fields and whole missing sections with defaults', () => {
-    expect(migrate({ version: 1 })).toEqual(defaultSettings())
+    expect(migrate({ version: 1 })).toEqual(existing())
     expect(migrate({ version: 1, ui: { fontSize: 20 } })?.ui.sounds).toBe(true)
   })
 
   it('strips unknown keys at the top level and inside sections', () => {
     const settings = migrate({ version: 1, removedField: 1, speech: { oldOption: true } })
-    expect(settings).toEqual(defaultSettings())
+    expect(settings).toEqual(existing())
   })
 
   it('does not let __proto__ in a file through', () => {
     const settings = migrate(JSON.parse('{"version":1,"__proto__":{"polluted":true}}'))
-    expect(settings).toEqual(defaultSettings())
+    expect(settings).toEqual(existing())
     expect(({} as Record<string, unknown>)['polluted']).toBeUndefined()
   })
 

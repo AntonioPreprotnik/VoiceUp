@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 import { app, dialog, net, session, type BrowserWindow } from 'electron'
+import { BrowserFollow } from '../core/browserFollow'
 import { MESSAGES } from '../core/messages'
 import { RecordingToggle } from '../core/recordingToggle'
 import { runShutdown, type ShutdownSteps } from '../core/shutdown'
@@ -10,6 +11,7 @@ import { statusView } from '../core/state/status'
 import { ClaudeStateTracker } from '../core/state/tracker'
 import { RecorderDevices } from '../shared/ipc'
 import { Channels, type MicDevice } from '../shared/ipcChannels'
+import { showBrowser } from './browser/showBrowser'
 import { HookLink } from './hooks/link'
 import { readHookPolicies } from './hooks/policy'
 import { escapeKey, registerHotkey, reportHotkeyTaken, unregisterHotkeys } from './hotkey'
@@ -179,6 +181,7 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
         }
       )
       // Step 4: stale files go, then the hook server and this launch's hook files.
+      const browserFollow = new BrowserFollow()
       const hooks = new HookLink({
         runDir: join(app.getPath('userData'), 'run'),
         curlPath: system32Path('curl.exe'),
@@ -189,6 +192,10 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
           }
           claudeState.onHook(message)
           delivery.onHook(message)
+          const browser = settings.claude.showBrowser
+          if (browser !== 'off' && browserFollow.onHook(message, claudeState.state)) {
+            void showBrowser(browser)
+          }
         },
         onUnavailable: (code, setting) => {
           publishStatus()

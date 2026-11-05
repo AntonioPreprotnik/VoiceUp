@@ -29,7 +29,9 @@ export const Settings = z.object({
   claude: z
     .object({
       projectDir: z.string().nullable().default(null),
-      browserControl: z.boolean().default(false)
+      browserControl: z.boolean().default(false),
+      /** Which browser to bring forward when Claude uses it (decision note S6.10). */
+      showBrowser: z.enum(['off', 'brave', 'chrome', 'edge']).default('off')
     })
     .prefault({}),
   ui: z

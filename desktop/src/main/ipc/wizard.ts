@@ -9,14 +9,20 @@ export interface WizardActions {
   view(): WizardView
   next(): WizardView
   back(): WizardView
+  checkClaude(): WizardView
+  installClaude(): WizardView
 }
 
 type WizardChannel =
-  typeof Channels.wizardGet | typeof Channels.wizardNext | typeof Channels.wizardBack
+  | typeof Channels.wizardGet
+  | typeof Channels.wizardNext
+  | typeof Channels.wizardBack
+  | typeof Channels.wizardClaudeCheck
+  | typeof Channels.wizardClaudeInstall
 
 /**
- * The wizard page can read its progress and move through the steps. Nothing here can change any
- * other setting (TECH_SPEC §6.1).
+ * The wizard page can read its progress, move through the steps and ask for the fixed Claude Code
+ * install. It can't choose what runs, and nothing here changes any other setting (TECH_SPEC §6.1).
  */
 export function registerWizardIpc(actions: WizardActions): void {
   const handle = (channel: WizardChannel, act: () => WizardView): void => {
@@ -32,4 +38,6 @@ export function registerWizardIpc(actions: WizardActions): void {
   handle(Channels.wizardGet, () => actions.view())
   handle(Channels.wizardNext, () => actions.next())
   handle(Channels.wizardBack, () => actions.back())
+  handle(Channels.wizardClaudeCheck, () => actions.checkClaude())
+  handle(Channels.wizardClaudeInstall, () => actions.installClaude())
 }

@@ -1,3 +1,5 @@
+import { INSTALL_COMMAND, MIN_CLAUDE_VERSION, UPDATE_COMMAND } from './claudeVersion'
+
 // User-facing error text, keyed by the codes in TECH_SPEC §6.5. Logs always carry the code.
 export const MESSAGES = {
   APP_START_FAILED: {
@@ -7,7 +9,13 @@ export const MESSAGES = {
   CLAUDE_NOT_FOUND: {
     title: "Claude Code isn't installed",
     detail: 'Run this command in PowerShell to install it, then check again.',
-    command: 'irm https://claude.ai/install.ps1 | iex',
+    command: INSTALL_COMMAND,
+    action: 'Check again'
+  },
+  CLAUDE_TOO_OLD: {
+    title: 'Claude Code needs updating',
+    detail: `VoiceUp needs version ${MIN_CLAUDE_VERSION} or newer. Run this command in PowerShell, then check again.`,
+    command: UPDATE_COMMAND,
     action: 'Check again'
   },
   CLAUDE_EXITED: {

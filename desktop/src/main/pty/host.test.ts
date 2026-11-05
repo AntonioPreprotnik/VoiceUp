@@ -29,6 +29,8 @@ function createHost(command: typeof claude | null = claude): {
     send: (data) => sent.push(data),
     onExit: (exitCode) => exits.push(exitCode),
     onNotFound: () => undefined,
+    readVersion: () => Promise.resolve('2.1.318'),
+    onTooOld: () => undefined,
     resolveCommand: () => Promise.resolve(command),
     resolveCwd: () => Promise.resolve('C:\\work')
   })
@@ -66,6 +68,8 @@ describe('the hooks', () => {
       send: () => undefined,
       onExit: () => undefined,
       onNotFound: () => undefined,
+      readVersion: () => Promise.resolve('2.1.318'),
+      onTooOld: () => undefined,
       resolveCommand: () => Promise.resolve(command),
       resolveCwd: () => Promise.resolve('C:\\work'),
       prepareLaunch: () => Promise.resolve(extras),
@@ -142,6 +146,8 @@ describe('starting', () => {
       send: () => undefined,
       onExit: () => undefined,
       onNotFound,
+      readVersion: () => Promise.resolve('2.1.318'),
+      onTooOld: () => undefined,
       resolveCommand: () => Promise.resolve(null),
       resolveCwd: () => Promise.resolve('C:\\work')
     })
@@ -160,6 +166,8 @@ describe('starting', () => {
       send: () => undefined,
       onExit: (exitCode) => exits.push(exitCode),
       onNotFound: () => undefined,
+      readVersion: () => Promise.resolve('2.1.318'),
+      onTooOld: () => undefined,
       resolveCommand: () => Promise.reject(new Error('boom')),
       resolveCwd: () => Promise.resolve('C:\\work')
     })
@@ -385,6 +393,8 @@ describe('only the first size starts Claude', () => {
       send: () => undefined,
       onExit: () => undefined,
       onNotFound: () => undefined,
+      readVersion: () => Promise.resolve('2.1.318'),
+      onTooOld: () => undefined,
       resolveCommand: () => Promise.resolve(claude),
       resolveCwd
     })
@@ -405,6 +415,8 @@ describe('only the first size starts Claude', () => {
       send: () => undefined,
       onExit: () => undefined,
       onNotFound: () => undefined,
+      readVersion: () => Promise.resolve('2.1.318'),
+      onTooOld: () => undefined,
       resolveCommand,
       resolveCwd: () => Promise.resolve('C:\\work')
     })

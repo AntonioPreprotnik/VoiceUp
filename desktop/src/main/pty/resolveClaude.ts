@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
@@ -35,6 +35,11 @@ async function where(name: string): Promise<string | undefined> {
 
 /** Never a bare `where.exe claude`: on an npm install it finds a shim that can't be spawned. */
 export async function resolveClaude(isPackaged: boolean): Promise<ClaudeCommand | null> {
+  // A test seam, like the one below: Claude "appears" when a fake installer writes this file.
+  const overrideFile = process.env['VOICEUP_CLAUDE_CMD_FILE']
+  if (overrideFile !== undefined && !isPackaged) {
+    return existsSync(overrideFile) ? parseClaudeOverride(readFileSync(overrideFile, 'utf8')) : null
+  }
   const override = process.env['VOICEUP_CLAUDE_CMD']
   if (override !== undefined && !isPackaged) {
     const parsed = parseClaudeOverride(override)

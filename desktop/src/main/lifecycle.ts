@@ -27,6 +27,8 @@ import { Overlay } from './overlay'
 import { installPermissions } from './permissions'
 import { installProcessErrorLogging } from './processErrors'
 import { registerAppScheme, serveAppProtocol } from './protocol'
+import { readClaudeVersion } from './pty/claudeVersion'
+import { installScript, runInstaller } from './pty/installClaude'
 import { resolveClaude, system32Path } from './pty/resolveClaude'
 import { ClaudeSession } from './pty/session'
 import { loadSettings, saveSettings } from './settings/store'
@@ -337,6 +339,7 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
         settings,
         settingsDir: app.getPath('userData'),
         resolveCommand: () => resolveClaude(app.isPackaged),
+        readVersion: readClaudeVersion,
         hooks: {
           prepareLaunch: (cwd) => hooks.prepareLaunch(cwd),
           launched: () => {
@@ -431,7 +434,10 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
         onAbandoned: () => {
           wizardWindow = undefined
           app.quit()
-        }
+        },
+        findClaude: () => resolveClaude(app.isPackaged),
+        readClaudeVersion,
+        runInstaller: (onOutput) => runInstaller(installScript(app.isPackaged), onOutput)
       })
       await loadRenderer(wizardWindow, 'wizard')
     })

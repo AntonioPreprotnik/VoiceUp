@@ -1,5 +1,6 @@
 import type { IPty } from 'node-pty'
 import { childEnv, ptyArgs, type ClaudeCommand } from '../../core/claudeCommand'
+import { isTooOld } from '../../core/claudeVersion'
 import { MESSAGES } from '../../core/messages'
 import { clampTermSize, FlowControl, OutputBatcher } from '../../core/terminalFlow'
 import type { TermResize } from '../../shared/ipc'
@@ -20,6 +21,10 @@ export interface PtyHostOptions {
   readonly onExit: (exitCode: number | null) => void
   /** Claude Code isn't installed. */
   readonly onNotFound: () => void
+  /** Null when it can't be read, which doesn't block a start. */
+  readonly readVersion: (command: ClaudeCommand) => Promise<string | null>
+  /** Claude Code is older than VoiceUp supports. */
+  readonly onTooOld: () => void
   /** The folder to run in, which may ask the user. Null means they declined. */
   readonly resolveCwd: () => Promise<string | null>
   /** What this launch adds for the hooks, which depends on the folder. */
@@ -150,6 +155,13 @@ export class PtyHost {
       if (command === null) {
         log.error('CLAUDE_NOT_FOUND')
         this.options.onNotFound()
+        return
+      }
+      const version = await this.options.readVersion(command)
+      if (this.isStopping()) return
+      if (isTooOld(version)) {
+        log.error('CLAUDE_TOO_OLD')
+        this.options.onTooOld()
         return
       }
       const extras = await this.options.prepareLaunch(cwd)

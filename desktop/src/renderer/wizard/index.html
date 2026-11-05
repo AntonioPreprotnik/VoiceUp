@@ -64,6 +64,48 @@
       #notice {
         color: #a8a8a8;
       }
+      [hidden] {
+        display: none !important;
+      }
+      #claude {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        min-height: 0;
+      }
+      #claude-command {
+        display: block;
+        margin: 0 0 8px;
+        padding: 6px 10px;
+        border-radius: 6px;
+        background: #111113;
+        font:
+          13px Consolas,
+          monospace;
+        overflow-wrap: anywhere;
+      }
+      #claude-git {
+        color: #a8a8a8;
+        font-size: 13px;
+      }
+      .actions {
+        display: flex;
+        gap: 8px;
+      }
+      #claude-output {
+        flex: 1;
+        min-height: 60px;
+        margin: 0 0 12px;
+        padding: 8px 10px;
+        overflow: auto;
+        border-radius: 6px;
+        background: #111113;
+        font:
+          12px Consolas,
+          monospace;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
       #error {
         color: #f48771;
       }
@@ -100,7 +142,17 @@
       <p id="position"></p>
       <h1 id="title"></h1>
       <p id="detail"></p>
-      <p id="notice">This step isn't ready yet, so you can just continue.</p>
+      <p id="notice" hidden>This step isn't ready yet, so you can just continue.</p>
+      <div id="claude" hidden>
+        <p id="claude-message"></p>
+        <code id="claude-command" hidden></code>
+        <p id="claude-git" hidden>Git for Windows is optional, so you don't need it for this.</p>
+        <p class="actions">
+          <button id="claude-install" type="button" hidden>Install</button>
+          <button id="claude-check" type="button" hidden>Check again</button>
+        </p>
+        <pre id="claude-output" hidden></pre>
+      </div>
       <p id="error" hidden></p>
       <nav>
         <button id="back" type="button">Back</button>

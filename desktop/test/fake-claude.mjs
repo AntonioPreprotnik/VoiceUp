@@ -18,6 +18,10 @@ import process from 'node:process'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath, URL } from 'node:url'
 
+if (process.argv.includes('--version')) {
+  process.stdout.write(`${process.env.VOICEUP_FAKE_VERSION ?? '2.1.318'} (Claude Code)\n`)
+  process.exit(0)
+}
 const settingsAt = process.argv.indexOf('--settings')
 const settingsPath = settingsAt === -1 ? undefined : process.argv[settingsAt + 1]
 if (settingsPath === undefined) {

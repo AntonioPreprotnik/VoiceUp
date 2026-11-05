@@ -27,7 +27,11 @@ export const Channels = {
   overlaySound: 'overlay:sound',
   wizardGet: 'wizard:get',
   wizardNext: 'wizard:next',
-  wizardBack: 'wizard:back'
+  wizardBack: 'wizard:back',
+  wizardClaudeCheck: 'wizard:claudeCheck',
+  wizardClaudeInstall: 'wizard:claudeInstall',
+  wizardChanged: 'wizard:changed',
+  wizardOutput: 'wizard:output'
 } as const
 
 /** RIS, the terminal's full reset, sent on its own as a session is replaced. */
@@ -106,10 +110,31 @@ export interface WizardStepView {
   readonly done: boolean
 }
 
-export interface WizardView {
+export interface WizardProgress {
   readonly steps: readonly WizardStepView[]
   /** The step showing now. */
   readonly index: number
+}
+
+/** The Claude Code step. A command is one the user can read, or is about to have run for them. */
+export type ClaudeStepStatus =
+  | { readonly status: 'checking' }
+  /** The version is null when it couldn't be read, which doesn't block a start. */
+  | { readonly status: 'ready'; readonly version: string | null }
+  | { readonly status: 'missing'; readonly command: string }
+  | {
+      readonly status: 'tooOld'
+      readonly version: string
+      readonly minimum: string
+      readonly command: string
+    }
+  | { readonly status: 'installing' }
+  | { readonly status: 'failed'; readonly command: string }
+
+export interface WizardView extends WizardProgress {
+  readonly claude: ClaudeStepStatus
+  /** Main refuses Continue when this is false. */
+  readonly canContinue: boolean
 }
 
 export type WizardResult =
@@ -121,6 +146,12 @@ export interface WizardApi {
   view(): Promise<WizardResult>
   next(): Promise<WizardResult>
   back(): Promise<WizardResult>
+  checkClaude(): Promise<WizardResult>
+  installClaude(): Promise<WizardResult>
+  /** Returns the function that unsubscribes. */
+  onChanged(listener: (view: WizardView) => void): () => void
+  /** The installer's output, as it arrives. Returns the function that unsubscribes. */
+  onOutput(listener: (text: string) => void): () => void
 }
 
 /** What the terminal preload exposes as window.voiceup. */

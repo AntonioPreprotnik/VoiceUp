@@ -17,6 +17,7 @@ export interface ClaudeSessionOptions {
   /** Where settings.json lives. */
   readonly settingsDir: string
   readonly resolveCommand: () => Promise<ClaudeCommand | null>
+  readonly readVersion: (command: ClaudeCommand) => Promise<string | null>
   readonly hooks: {
     prepareLaunch(cwd: string): Promise<LaunchExtras>
     launched(): void
@@ -56,7 +57,11 @@ export class ClaudeSession {
       onNotFound: () => {
         this.report({ ...MESSAGES.CLAUDE_NOT_FOUND, exitCode: null })
       },
+      onTooOld: () => {
+        this.report({ ...MESSAGES.CLAUDE_TOO_OLD, exitCode: null })
+      },
       resolveCommand: options.resolveCommand,
+      readVersion: options.readVersion,
       resolveCwd: () => this.resolveFolder()
     })
   }

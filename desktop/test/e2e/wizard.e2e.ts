@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { _electron, expect, test, type ElectronApplication, type Page } from '@playwright/test'
@@ -13,7 +13,7 @@ const FAKE = join(DESKTOP, 'test/fake-claude.mjs')
 let dir: string
 let app: ElectronApplication
 
-function launch(): Promise<ElectronApplication> {
+function launch(env: Record<string, string> = {}): Promise<ElectronApplication> {
   return _electron.launch({
     args: [DESKTOP, `--user-data-dir=${dir}`],
     cwd: DESKTOP,
@@ -21,7 +21,8 @@ function launch(): Promise<ElectronApplication> {
       ...process.env,
       VOICEUP_E2E: '1',
       VOICEUP_CLAUDE_CMD: JSON.stringify([process.execPath, FAKE]),
-      CLAUDE_CONFIG_DIR: dir
+      CLAUDE_CONFIG_DIR: dir,
+      ...env
     }
   })
 }
@@ -104,4 +105,68 @@ test('an empty data folder starts it, and it does not come back after finishing'
   app = await launch()
   await windowAt('terminal')
   expect(hasWindowAt('wizard')).toBe(false)
+})
+
+test('it installs Claude when asked, shows the output, and only then lets you continue', async () => {
+  const commandFile = join(dir, 'claude-command.json')
+  const command = JSON.stringify([process.execPath, FAKE]).replace(/'/g, "''")
+  app = await launch({
+    VOICEUP_CLAUDE_CMD_FILE: commandFile,
+    VOICEUP_INSTALL_SCRIPT: `Write-Output 'fake installer ran'; Set-Content -Path '${commandFile}' -Value '${command}'`
+  })
+  const wizard = await windowAt('wizard')
+  await expect(wizard.locator('#claude-command')).toHaveText(
+    'irm https://claude.ai/install.ps1 | iex'
+  )
+  await expect(wizard.locator('#claude-git')).toContainText('optional')
+  await expect(wizard.locator('#continue')).toBeDisabled()
+  expect(existsSync(commandFile)).toBe(false)
+
+  await wizard.locator('#claude-install').click()
+  await expect(wizard.locator('#claude-output')).toContainText('fake installer ran')
+  await expect(wizard.locator('#claude-message')).toContainText('2.1.318 found')
+  await expect(wizard.locator('#continue')).toBeEnabled()
+  await wizard.locator('#continue').click()
+  await expect(wizard.locator('#title')).toHaveText('Project folder')
+})
+
+test('a failed install says so, and can be tried again', async () => {
+  const commandFile = join(dir, 'claude-command.json')
+  app = await launch({
+    VOICEUP_CLAUDE_CMD_FILE: commandFile,
+    VOICEUP_INSTALL_SCRIPT:
+      '1..40 | ForEach-Object { Write-Output "line $_" }; Write-Output \'no connection\'; exit 1'
+  })
+  const wizard = await windowAt('wizard')
+  await wizard.locator('#claude-install').click()
+  await expect(wizard.locator('#claude-install')).toHaveText('Try again')
+  await expect(wizard.locator('#claude-output')).toContainText('no connection')
+  // The last lines explain the failure, and the buttons appearing makes the box shorter.
+  const hiddenBelow = await wizard.evaluate<number>(
+    "(() => { const box = document.getElementById('claude-output'); return box.scrollHeight - box.clientHeight - box.scrollTop })()"
+  )
+  expect(hiddenBelow).toBeLessThanOrEqual(1)
+  await expect(wizard.locator('#continue')).toBeDisabled()
+})
+
+test('a Claude that is too old holds the wizard, and shows the update command', async () => {
+  app = await launch({ VOICEUP_FAKE_VERSION: '2.0.0' })
+  const wizard = await windowAt('wizard')
+  await expect(wizard.locator('#claude-message')).toContainText('2.0.0 is too old')
+  await expect(wizard.locator('#claude-command')).toHaveText('claude update')
+  await expect(wizard.locator('#claude-install')).toBeHidden()
+  await expect(wizard.locator('#continue')).toBeDisabled()
+})
+
+test('a Claude that is too old stops a set-up copy, with the update command', async () => {
+  writeFileSync(
+    join(dir, 'settings.json'),
+    JSON.stringify({ version: 1, claude: { projectDir: dir } })
+  )
+  app = await launch({ VOICEUP_FAKE_VERSION: '2.0.0' })
+  const terminal = await windowAt('terminal')
+  await expect(terminal.locator('#session-exited-text')).toContainText('needs updating', {
+    timeout: 20000
+  })
+  await expect(terminal.locator('#session-command-text')).toHaveText('claude update')
 })

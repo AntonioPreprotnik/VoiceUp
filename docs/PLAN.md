@@ -492,6 +492,14 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 - AC: onboarding test asks Claude to open a web page and confirms it worked.
 - AC: if Claude Code reports the extension is not detected, show the documented fixes: restart Chrome and Claude, or run `/chrome` → Reconnect.
 
+**[ ] S6.10 Show the browser.** As a user, I want to see what Claude is doing in my browser. Added during M4 at Antonio's request and built ahead of S6.2 (decision note S6.10).
+
+- AC: with `claude.showBrowser` set to a browser, that browser comes to the front and takes the keyboard when the first Claude in Chrome action of a command finishes. It is off by default.
+- AC: other tools never move it; it moves at most once per command; it never moves while Claude is asking for permission or input.
+- AC: a browser that is closed or that Windows refuses to raise is logged, and Claude's work is unaffected.
+- Known limit: this shows the browser's active tab, which may not be Claude's, because Claude works in a background tab. The helper extension in `spikes/S6.10/tab-follow/` is being tested for that.
+- Brave works here (S6.10), but S6.8 still promises only Chrome and Edge, the browsers Claude Code documents.
+
 ### E7 — Hardening and friends release
 
 *Goal: it works on machines other than yours and fails gracefully.*

@@ -230,6 +230,10 @@ Every value here was measured in S5.3 (`docs/decisions/S5.3-input-injection.md`)
 
 **Queue.** Text spoken while Claude works waits in memory, up to `maxQueue` items, shown in the status bar with a button to remove each. Items count as a pending delivery, so new text can't overtake them. When Claude's state or the prompt changes, the next item goes if the gate says `send`, after 300 ms, since `Stop` fires while the turn is still ending on screen, and the gate is asked again at that point. One goes at a time: the next waits for the following `idle`. It stays put through `unknown`, a permission prompt or typed text, so a failed delivery stops the queue until the user deals with it. A new session clears it, because those commands were meant for the old one.
 
+### 4.6 Showing the browser
+
+`core/browserFollow.ts` watches hooks for a finished tool named `mcp__claude-in-chrome__*`. It answers yes once per command, and arms again on `UserPromptSubmit` or `SessionStart`. It uses `PostToolUse`, not `PreToolUse`, and waits during `awaitingPermission` and `awaitingInput`, so the browser, which takes the keyboard, never covers a prompt that needs an answer. `main/browser/showBrowser.ts` then runs a fixed PowerShell script by absolute path: it picks the browser's topmost titled window and calls `SetForegroundWindow`. Only process names from its own table reach the script. The hook has already been answered by then, so this can't affect Claude. Findings are in decision note S6.10.
+
 ## 5. Speech pipeline
 
 One hotkey press produces exactly one recording, one VAD segment and one transcript, tagged with a `recordingId` so late results from a cancelled recording are dropped.
@@ -423,6 +427,7 @@ export const Settings = z.object({
   claude: z.object({
     projectDir: z.string().nullable().default(null),
     browserControl: z.boolean().default(false),
+    showBrowser: z.enum(['off', 'brave', 'chrome', 'edge']).default('off'),  // decision note S6.10
   }).prefault({}),
   ui: z.object({
     fontSize: z.number().int().min(8).max(32).default(14),

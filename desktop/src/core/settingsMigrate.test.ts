@@ -16,7 +16,7 @@ describe('defaultSettings', () => {
         minWords: 1
       },
       delivery: { previewMs: 300, alwaysConfirm: false, queue: true, maxQueue: 3 },
-      claude: { projectDir: null, browserControl: false },
+      claude: { projectDir: null, browserControl: false, showBrowser: 'off' },
       ui: { fontSize: 14, sounds: true, notifications: true, startWithWindows: false },
       logLevel: 'info'
     })

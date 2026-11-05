@@ -129,6 +129,8 @@ const claude = pty.spawn(claudePath, [
 ```
 
 - **Resolve `claudePath`** in this order: `where.exe claude.exe`, `%USERPROFILE%\.local\bin\claude.exe`, then `where.exe claude.cmd`. Never use a bare `where.exe claude`: on an npm install its first hit is an extensionless shell shim that can't be spawned. A `.cmd` runs as `cmd.exe /d /s /c "<quoted line>"`, passed to `node-pty` as one string: as an array, a path with a space fails, because `/s` strips the first and last quote (found in S2.3). It uses cmd.exe's full path: `node-pty` fails with an empty "File not found" on a relative name that exists in the current folder, and an app launched from Explorer starts in System32 (found in S1.1). S1.1 checks Ctrl+C through it. Re-resolve after S6.3 installs Claude, checking the known install paths too, because the running app's PATH is stale. Dev and test builds also accept `VOICEUP_CLAUDE_CMD`, a JSON array such as `["node", "test/fake-claude.mjs"]`; packaged builds ignore it.
+- **Version:** each launch runs `claude --version` first, about 60 ms on the test machine. Below `MIN_CLAUDE_VERSION` (`core/claudeVersion.ts`) it stops with `CLAUDE_TOO_OLD`. A version that can't be read is logged and doesn't block.
+- **Install (S6.3):** the wizard runs Anthropic's `irm https://claude.ai/install.ps1 | iex` in PowerShell after the user clicks Install, with its output on the page. Per Anthropic's docs it puts `claude.exe` in `%USERPROFILE%\.local\bin` and doesn't change PATH, which is why the resolve order checks that folder directly. VoiceUp doesn't edit PATH either.
 - **Output:** `onData` chunks are batched per 16 ms and sent to the terminal window. If the renderer reports more than 1 MB unacknowledged, call `pause()` until xterm's write callback drains it.
 - **Input:** every keystroke from xterm goes through main (`term:input`) before `write()`. That is what makes prompt-dirty tracking possible (4.4).
 - **Resize:** debounce 50 ms, clamp to 10–1000 columns, 5–500 rows.
@@ -368,7 +370,8 @@ Every boundary has one zod schema in `shared/`, imported by both sides; nothing 
 | `recorder:error` | renderer → main | `{ recordingId, code }`; `code` is `MIC_DENIED`, `MIC_MISSING` or `MIC_FAILED` | recorder |
 | `settings:get` / `settings:set` | invoke | → `Settings` / `Partial<Settings>` → `Result` | settings |
 | `models:status` / `models:download` | invoke + `models:progress` events | `{ id }` → status | settings, wizard |
-| `wizard:get` / `wizard:next` / `wizard:back` | invoke | `{}` → `{ ok: true, data: { steps: [{ id, title, detail, done }], index } }` or `{ ok: false, code: 'WIZARD_REFUSED' }`. The page can only read and move through its steps; a step that needs a setting gets its own narrow channel with its story, not `settings:set` | wizard |
+| `wizard:get` / `wizard:next` / `wizard:back` / `wizard:claudeCheck` / `wizard:claudeInstall` | invoke | `{}` → `{ ok: true, data: { steps: [{ id, title, detail, done }], index, claude, canContinue } }` or `{ ok: false, code: 'WIZARD_REFUSED' }`. The page can only read and move through its steps, and ask for the fixed install. It can't choose what runs. Main refuses `next` when `canContinue` is false. A step that needs a setting gets its own narrow channel with its story, not `settings:set` | wizard |
+| `wizard:changed` / `wizard:output` | main → renderer | the same view / installer text with terminal codes removed, never logged | wizard |
 | `recorder:devices` | renderer → main | `[{ deviceId, label }]`; the recorder enumerates, at load and on a device change, and main fills the Microphone menu (S3.6). S6.6 moves this to the settings screen | recorder |
 | `app:openLogs` | invoke | none | settings |
 | `recorder:port` | main → renderer | a `MessagePort` for frames to the worker; sent again after a worker restart | recorder |
@@ -468,7 +471,7 @@ export const Settings = z.object({
 | `DELIVERY_GARBLED` | the submitted prompt doesn't contain the text | "Claude received something different" | Claude is interrupted; check what it got before going on |
 | `HOOKS_FAILED` | the hook server or its files can't be set up | "VoiceUp's status hooks could not start" | restart VoiceUp; voice disabled |
 | `STARTING_SLOW` | 30 s in `starting` | "Waiting for Claude to start" | finish any prompt in the terminal, otherwise check the hooks |
-| `CLAUDE_TOO_OLD` | `claude --version` below the minimum constant | "Claude Code needs updating" | shows the update command |
+| `CLAUDE_TOO_OLD` | `claude --version` below `MIN_CLAUDE_VERSION` | "Claude Code needs updating" | shows `claude update`, then Check again |
 | `CLAUDE_NOT_LOGGED_IN` | sign-in step incomplete, or `StopFailure` with an authentication error | "Claude isn't signed in" | sign in inside the terminal |
 | `API_KEY_SET` | `ANTHROPIC_API_KEY` in the environment | "An API key overrides your subscription and bills the API" | explains how to remove it; continue allowed |
 | `CHROME_NOT_DETECTED` | Claude reports the extension is missing | "Claude can't reach your browser" | restart the browser and Claude, or `/chrome` → Reconnect |

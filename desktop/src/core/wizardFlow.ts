@@ -1,4 +1,4 @@
-import type { WizardView } from '../shared/ipcChannels'
+import type { WizardProgress } from '../shared/ipcChannels'
 
 /** In the order of the plan (S6.2). The folder comes first because sign-in needs one to start in. */
 const STEPS = [
@@ -46,7 +46,11 @@ export class WizardFlow {
     return [...this.finishedSteps]
   }
 
-  get view(): WizardView {
+  get currentStep(): string {
+    return STEPS[this.index].id
+  }
+
+  get view(): WizardProgress {
     return {
       steps: STEPS.map(({ id, title, detail }) => ({
         id,

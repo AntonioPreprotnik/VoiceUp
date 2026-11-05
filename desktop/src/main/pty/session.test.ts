@@ -19,7 +19,7 @@ let folderA: string
 let folderB: string
 let window: BrowserWindow
 
-function createSession(projectDir: string | null = null): ClaudeSession {
+function createSession(projectDir: string | null = null, version = '2.1.318'): ClaudeSession {
   const defaults = defaultSettings()
   return new ClaudeSession({
     window: window as unknown as RealBrowserWindow,
@@ -30,6 +30,7 @@ function createSession(projectDir: string | null = null): ClaudeSession {
       launched: () => undefined,
       exited: () => undefined
     },
+    readVersion: () => Promise.resolve(version),
     resolveCommand: () => Promise.resolve({ file: 'claude.exe', args: [] })
   })
 }
@@ -216,6 +217,7 @@ describe('when Claude Code is not installed', () => {
         launched: () => undefined,
         exited: () => undefined
       },
+      readVersion: () => Promise.resolve('2.1.318'),
       resolveCommand: () =>
         Promise.resolve(claude.installed ? { file: 'claude.exe', args: [] } : null)
     })
@@ -413,5 +415,20 @@ describe('changing folder', () => {
     await session.changeFolder()
     expect(spawned).toHaveLength(1)
     expect(lastPty().options['cwd']).toBe(folderA)
+  })
+})
+
+describe('when Claude Code is too old', () => {
+  it('tells the window, with the update command, and does not start it', async () => {
+    const session = createSession(settingsDir, '2.0.0')
+    session.host.resize({ cols: 80, rows: 24 })
+    await vi.waitFor(() => {
+      expect(window.webContents.sent.at(-1)?.[1]).toMatchObject({
+        title: 'Claude Code needs updating',
+        command: 'claude update',
+        exitCode: null
+      })
+    })
+    expect(spawned).toEqual([])
   })
 })

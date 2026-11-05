@@ -64,6 +64,13 @@ vi.mock('./models/manager', async (importOriginal) => ({
   }
 }))
 
+vi.mock('./pty/claudeVersion', () => ({
+  readClaudeVersion: () => Promise.resolve('2.1.318')
+}))
+vi.mock('./pty/resolveClaude', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./pty/resolveClaude')>()),
+  resolveClaude: () => Promise.resolve({ file: 'claude.exe', args: [] })
+}))
 vi.mock('electron', () => import('../../test/fakes/electron'))
 vi.mock('electron-log/main', () => import('../../test/fakes/electronLog'))
 vi.mock('node-pty', () => import('../../test/fakes/nodePty'))
@@ -235,6 +242,10 @@ describe('the first-run wizard', () => {
     })
     const window = wizard()
     if (window === undefined) throw new Error('No wizard window')
+    // Its Claude Code step has to find Claude before Continue does anything.
+    await vi.waitFor(() => {
+      expect(window.webContents.sent.at(-1)?.[1]).toMatchObject({ canContinue: true })
+    })
     return window
   }
 

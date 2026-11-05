@@ -19,6 +19,8 @@ type RendererChannel =
   | typeof Channels.wizardGet
   | typeof Channels.wizardNext
   | typeof Channels.wizardBack
+  | typeof Channels.wizardClaudeCheck
+  | typeof Channels.wizardClaudeInstall
 
 /** The window kinds allowed to send each renderer-to-main channel (TECH_SPEC §6.1). */
 export const SENDERS: Readonly<Record<RendererChannel, readonly WindowKind[]>> = {
@@ -38,5 +40,7 @@ export const SENDERS: Readonly<Record<RendererChannel, readonly WindowKind[]>> =
   [Channels.recorderDevices]: ['recorder'],
   [Channels.wizardGet]: ['wizard'],
   [Channels.wizardNext]: ['wizard'],
-  [Channels.wizardBack]: ['wizard']
+  [Channels.wizardBack]: ['wizard'],
+  [Channels.wizardClaudeCheck]: ['wizard'],
+  [Channels.wizardClaudeInstall]: ['wizard']
 }

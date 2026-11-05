@@ -492,7 +492,7 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 - AC: onboarding test asks Claude to open a web page and confirms it worked.
 - AC: if Claude Code reports the extension is not detected, show the documented fixes: restart Chrome and Claude, or run `/chrome` → Reconnect.
 
-**[ ] S6.10 Show the browser.** As a user, I want to see what Claude is doing in my browser. Added during M4 at Antonio's request and built ahead of S6.2 (decision note S6.10).
+**[x] S6.10 Show the browser.** As a user, I want to see what Claude is doing in my browser. Added during M4 at Antonio's request and built ahead of S6.2 (decision note S6.10).
 
 - AC: with `claude.showBrowser` set to a browser, that browser comes to the front and takes the keyboard when the first Claude in Chrome action of a command finishes. It is off by default.
 - AC: other tools never move it; it moves at most once per command; it never moves while Claude is asking for permission or input.

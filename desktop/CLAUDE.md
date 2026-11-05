@@ -47,6 +47,7 @@ Exact versions only. Confirmed with `npm view` on 2026-11-02: Electron 45.2.1, e
 - Only the speech worker may load `sherpa-onnx-node`, which lint enforces. To run the engine for real, on a real recording: `VOICEUP_TEST_MODELS=<folder> VOICEUP_TEST_RECORDINGS=<folder> npm test`; CI skips this.
 - Main-process tests use the fake in `test/fakes/electron.ts`, which records the order of effects. It proves ordering and policy, not that Electron behaves: the packaged smoke test covers that.
 - Same-origin Vite HMR works under `connect-src 'self'`; the CSP needs no `ws:` entry in dev.
+- Test the installer only on a renamed build: add `--config.productName=VoiceUpTest --config.appId=app.voiceup.s61test --config.extraMetadata.name=VoiceUpTest --config.directories.output=<elsewhere>` to electron-builder. A real one shares `%APPDATA%VoiceUp` with your daily copy, and its uninstaller can delete that folder. A separate output folder also avoids `dist/win-unpacked`, which is locked while the daily copy runs.
 - electron-builder does not bundle: run `npm run build` first, or it packages a stale `out/`.
 - Plain `tsc --noEmit` checks nothing here: the root `tsconfig.json` has `files: []` and only references the two projects. Use `npm run typecheck`.
 - Import rules live in `eslint.import-rules.mjs`, as an allowlist per folder. A new allowed package goes there and in the table in `test/lint/import-rules.test.ts`.

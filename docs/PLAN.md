@@ -443,7 +443,7 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 
 *Goal: a friend double-clicks one `.exe` and ends up talking to Claude, with no terminal knowledge.*
 
-**[ ] S6.1 Installer.** As a user, I want a normal Windows install.
+**[x] S6.1 Installer.** As a user, I want a normal Windows install.
 
 - AC: `electron-builder` NSIS, per-user install (no admin), Start menu entry, clean uninstaller that offers to delete downloaded models and settings.
 - AC: installer size stays small because models are not bundled.

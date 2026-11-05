@@ -52,6 +52,9 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npx electron-builder --win --publish never
+      - name: Check installer size
+        shell: bash
+        run: node scripts/check-installer-size.mjs dist/*.exe
       - name: Read fuses back
         run: node scripts/check-fuses.mjs dist/win-unpacked/VoiceUp.exe
       - name: Smoke test

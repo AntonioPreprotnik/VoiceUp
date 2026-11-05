@@ -23,6 +23,8 @@ nsis:
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true
+  createStartMenuShortcut: true
+  include: build/installer.nsh
 # Security baseline rule 10. Read back by scripts/check-fuses.mjs: keep the two in sync.
 electronFuses:
   runAsNode: false

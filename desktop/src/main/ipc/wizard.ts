@@ -11,6 +11,7 @@ export interface WizardActions {
   back(): WizardView
   checkClaude(): WizardView
   installClaude(): WizardView
+  chooseFolder(): WizardView
 }
 
 type WizardChannel =
@@ -19,10 +20,12 @@ type WizardChannel =
   | typeof Channels.wizardBack
   | typeof Channels.wizardClaudeCheck
   | typeof Channels.wizardClaudeInstall
+  | typeof Channels.wizardChooseFolder
 
 /**
- * The wizard page can read its progress, move through the steps and ask for the fixed Claude Code
- * install. It can't choose what runs, and nothing here changes any other setting (TECH_SPEC §6.1).
+ * The wizard page can read its progress, move through the steps, ask for the fixed Claude Code
+ * install and open the folder picker. It can't choose what runs or supply a path, and nothing here
+ * changes any other setting (TECH_SPEC §6.1).
  */
 export function registerWizardIpc(actions: WizardActions): void {
   const handle = (channel: WizardChannel, act: () => WizardView): void => {
@@ -40,4 +43,5 @@ export function registerWizardIpc(actions: WizardActions): void {
   handle(Channels.wizardBack, () => actions.back())
   handle(Channels.wizardClaudeCheck, () => actions.checkClaude())
   handle(Channels.wizardClaudeInstall, () => actions.installClaude())
+  handle(Channels.wizardChooseFolder, () => actions.chooseFolder())
 }

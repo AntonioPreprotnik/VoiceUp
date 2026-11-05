@@ -29,6 +29,7 @@ import { installProcessErrorLogging } from './processErrors'
 import { registerAppScheme, serveAppProtocol } from './protocol'
 import { readClaudeVersion } from './pty/claudeVersion'
 import { installScript, runInstaller } from './pty/installClaude'
+import { isDirectory, pickProjectFolder } from './pty/projectFolder'
 import { resolveClaude, system32Path } from './pty/resolveClaude'
 import { ClaudeSession } from './pty/session'
 import { loadSettings, saveSettings } from './settings/store'
@@ -437,7 +438,9 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
         },
         findClaude: () => resolveClaude(app.isPackaged),
         readClaudeVersion,
-        runInstaller: (onOutput) => runInstaller(installScript(app.isPackaged), onOutput)
+        runInstaller: (onOutput) => runInstaller(installScript(app.isPackaged), onOutput),
+        chooseFolder: pickProjectFolder,
+        isFolder: isDirectory
       })
       await loadRenderer(wizardWindow, 'wizard')
     })

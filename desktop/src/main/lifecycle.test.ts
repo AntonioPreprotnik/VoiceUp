@@ -230,7 +230,8 @@ describe('settings and logging at startup', () => {
 
 describe('the first-run wizard', () => {
   const STEP_COUNT = 6
-  const settingsFile = (): string => join(app.getPath('userData'), 'settings.json')
+  const userDataDir = (): string => app.getPath('userData')
+  const settingsFile = (): string => join(userDataDir(), 'settings.json')
   const saved = (): { wizard: { done: boolean; completed: string[] } } =>
     JSON.parse(readFileSync(settingsFile(), 'utf8')) as never
 
@@ -242,6 +243,18 @@ describe('the first-run wizard', () => {
     })
     const window = wizard()
     if (window === undefined) throw new Error('No wizard window')
+    // Choosing the folder through the real path: main allows it on any step.
+    dialog.answers.push(userDataDir())
+    ipcMain.handlers.get('wizard:chooseFolder')?.(
+      {
+        sender: { id: window.webContents.id },
+        senderFrame: { url: 'app://voiceup/wizard/index.html' }
+      },
+      {}
+    )
+    await vi.waitFor(() => {
+      expect(readFileSync(settingsFile(), 'utf8')).toContain('"projectDir": "')
+    })
     // Its Claude Code step has to find Claude before Continue does anything.
     await vi.waitFor(() => {
       expect(window.webContents.sent.at(-1)?.[1]).toMatchObject({ canContinue: true })

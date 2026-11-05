@@ -73,7 +73,8 @@
         flex-direction: column;
         min-height: 0;
       }
-      #claude-command {
+      #claude-command,
+      #folder-path {
         display: block;
         margin: 0 0 8px;
         padding: 6px 10px;
@@ -143,6 +144,13 @@
       <h1 id="title"></h1>
       <p id="detail"></p>
       <p id="notice" hidden>This step isn't ready yet, so you can just continue.</p>
+      <div id="folder" hidden>
+        <p id="folder-message"></p>
+        <code id="folder-path" hidden></code>
+        <p class="actions">
+          <button id="folder-choose" type="button">Choose folder</button>
+        </p>
+      </div>
       <div id="claude" hidden>
         <p id="claude-message"></p>
         <code id="claude-command" hidden></code>

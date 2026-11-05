@@ -2,7 +2,7 @@ import type { BrowserWindow } from 'electron'
 import type { ClaudeCommand } from '../core/claudeCommand'
 import { ClaudeStep } from '../core/claudeStep'
 import { WizardFlow } from '../core/wizardFlow'
-import { Channels, type WizardView } from '../shared/ipcChannels'
+import { Channels, type FolderStepStatus, type WizardView } from '../shared/ipcChannels'
 import type { Settings } from '../shared/settings'
 import { registerWizardIpc } from './ipc/wizard'
 import { log } from './log'
@@ -19,6 +19,9 @@ export interface WizardOptions {
   readonly findClaude: () => Promise<ClaudeCommand | null>
   readonly readClaudeVersion: (command: ClaudeCommand) => Promise<string | null>
   readonly runInstaller: (onOutput: (text: string) => void) => RunningInstall
+  /** The Windows folder picker. Null if the user cancels. */
+  readonly chooseFolder: (window: BrowserWindow, current: string | null) => Promise<string | null>
+  readonly isFolder: (path: string) => boolean
 }
 
 /** Opens the first-run wizard, with its progress saved after each step. The caller loads the page. */
@@ -29,7 +32,9 @@ export function openWizard({
   onAbandoned,
   findClaude,
   readClaudeVersion,
-  runInstaller
+  runInstaller,
+  chooseFolder,
+  isFolder
 }: WizardOptions): BrowserWindow {
   const flow = new WizardFlow(settings.wizard.completed)
   const window = createWindow('wizard')
@@ -59,10 +64,23 @@ export function openWizard({
     }
   })
 
-  const canContinue = (): boolean => flow.currentStep !== 'claudeCode' || claudeStep.canContinue
+  const folder = (): FolderStepStatus => {
+    const path = settings.claude.projectDir
+    return { path, missing: path !== null && !isFolder(path) }
+  }
+
+  const canContinue = (): boolean => {
+    if (flow.currentStep === 'claudeCode') return claudeStep.canContinue
+    if (flow.currentStep === 'projectFolder') {
+      const { path, missing } = folder()
+      return path !== null && !missing
+    }
+    return true
+  }
   const view = (): WizardView => ({
     ...flow.view,
     claude: claudeStep.status,
+    folder: folder(),
     canContinue: canContinue()
   })
 
@@ -72,6 +90,23 @@ export function openWizard({
       save(settings)
     } catch (error: unknown) {
       log.error('Could not save the setup progress; it applies to this run only', error)
+    }
+  }
+
+  let choosing = false
+  const chooseProjectFolder = async (): Promise<void> => {
+    if (choosing) return
+    choosing = true
+    try {
+      const chosen = await chooseFolder(window, settings.claude.projectDir)
+      if (chosen === null) return
+      settings.claude = { ...settings.claude, projectDir: chosen }
+      persist()
+      send(Channels.wizardChanged, view())
+    } catch (error: unknown) {
+      log.error('Could not ask for a project folder', error)
+    } finally {
+      choosing = false
     }
   }
 
@@ -99,6 +134,10 @@ export function openWizard({
     },
     installClaude: () => {
       void claudeStep.install()
+      return view()
+    },
+    chooseFolder: () => {
+      void chooseProjectFolder()
       return view()
     }
   })

@@ -1,5 +1,4 @@
-import { statSync } from 'node:fs'
-import { app, dialog, type BrowserWindow } from 'electron'
+import type { BrowserWindow } from 'electron'
 import type { ClaudeCommand } from '../../core/claudeCommand'
 import { adjustFontSize, type FontSizeChange } from '../../core/fontSize'
 import { MESSAGES } from '../../core/messages'
@@ -10,6 +9,7 @@ import type { ModelId } from '../../shared/models'
 import type { LaunchExtras } from '../hooks/link'
 import { saveSettings } from '../settings/store'
 import { PtyHost } from './host'
+import { isDirectory, pickProjectFolder } from './projectFolder'
 
 export interface ClaudeSessionOptions {
   readonly window: BrowserWindow
@@ -22,15 +22,6 @@ export interface ClaudeSessionOptions {
     prepareLaunch(cwd: string): Promise<LaunchExtras>
     launched(): void
     exited(): void
-  }
-}
-
-function isDirectory(path: string): boolean {
-  try {
-    return statSync(path).isDirectory()
-  } catch {
-    // Missing or unreadable: the caller logs it and asks for another folder.
-    return false
   }
 }
 
@@ -127,15 +118,8 @@ export class ClaudeSession {
     })
   }
 
-  private async pickFolder(): Promise<string | null> {
-    const { window } = this.options
-    if (window.isDestroyed()) return null
-    const { canceled, filePaths } = await dialog.showOpenDialog(window, {
-      title: 'Choose a project folder for Claude Code',
-      defaultPath: this.settings.claude.projectDir ?? app.getPath('home'),
-      properties: ['openDirectory']
-    })
-    return canceled ? null : (filePaths.at(0) ?? null)
+  private pickFolder(): Promise<string | null> {
+    return pickProjectFolder(this.options.window, this.settings.claude.projectDir)
   }
 
   private remember(folder: string): void {

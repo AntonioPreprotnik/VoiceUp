@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { _electron, expect, test, type ElectronApplication, type Page } from '@playwright/test'
@@ -38,6 +38,32 @@ async function windowAt(path: string): Promise<Page> {
 
 const hasWindowAt = (path: string): boolean =>
   app.windows().some((page) => page.url().includes(path))
+
+const savedProjectDir = (): unknown =>
+  (
+    JSON.parse(readFileSync(join(dir, 'settings.json'), 'utf8')) as {
+      claude: { projectDir: unknown }
+    }
+  ).claude.projectDir
+
+/** The Windows picker can't be clicked from here, so only it is replaced. Null means cancel. */
+async function stubPicker(answer: string | null): Promise<void> {
+  await app.evaluate(({ dialog }, folder) => {
+    const stubbed = globalThis as unknown as { voiceupPickerUses: number }
+    stubbed.voiceupPickerUses = 0
+    dialog.showOpenDialog = () => {
+      stubbed.voiceupPickerUses++
+      return Promise.resolve(
+        folder === null
+          ? { canceled: true, filePaths: [] }
+          : { canceled: false, filePaths: [folder] }
+      )
+    }
+  }, answer)
+}
+
+const pickerUses = (): Promise<number> =>
+  app.evaluate(() => (globalThis as unknown as { voiceupPickerUses: number }).voiceupPickerUses)
 
 const savedWizard = (): unknown =>
   (JSON.parse(readFileSync(join(dir, 'settings.json'), 'utf8')) as { wizard: unknown }).wizard
@@ -95,16 +121,72 @@ test('a new user walks through the wizard, resumes after quitting, then reaches 
   expect(savedWizard()).toMatchObject({ done: true })
 })
 
-test('an empty data folder starts it, and it does not come back after finishing', async () => {
+test('a new user chooses a folder in the wizard, and Claude starts there with no second picker', async () => {
   app = await launch()
   const wizard = await windowAt('wizard')
-  for (let step = 0; step < 6; step++) await wizard.locator('#continue').click()
-  await windowAt('terminal')
+  await stubPicker(dir)
+  await wizard.locator('#continue').click()
+  await expect(wizard.locator('#title')).toHaveText('Project folder')
+  await expect(wizard.locator('#continue')).toBeDisabled()
+  await expect(wizard.locator('#folder-path')).toBeHidden()
+
+  await wizard.locator('#folder-choose').click()
+  await expect(wizard.locator('#folder-path')).toHaveText(dir)
+  await expect(wizard.locator('#folder-choose')).toHaveText('Change folder')
+  expect(savedProjectDir()).toBe(dir)
+
+  for (let step = 0; step < 5; step++) await wizard.locator('#continue').click()
+  const terminal = await windowAt('terminal')
+  await expect(terminal.locator('#status-label')).toHaveText('Ready', { timeout: 20000 })
+  expect(await pickerUses()).toBe(1)
   await app.close()
 
   app = await launch()
   await windowAt('terminal')
   expect(hasWindowAt('wizard')).toBe(false)
+})
+
+test('cancelling the picker changes nothing', async () => {
+  writeFileSync(
+    join(dir, 'settings.json'),
+    JSON.stringify({ version: 1, wizard: { done: false, completed: ['claudeCode'] } })
+  )
+  app = await launch()
+  const wizard = await windowAt('wizard')
+  await stubPicker(null)
+  await wizard.locator('#folder-choose').click()
+  await expect.poll(pickerUses).toBe(1)
+  await expect(wizard.locator('#continue')).toBeDisabled()
+  await expect(wizard.locator('#folder-path')).toBeHidden()
+  expect(savedProjectDir()).toBeNull()
+})
+
+test('a saved folder is shown and can be kept, and a deleted one has to be replaced', async () => {
+  const kept = join(dir, 'kept')
+  mkdirSync(kept)
+  writeFileSync(
+    join(dir, 'settings.json'),
+    JSON.stringify({
+      version: 1,
+      claude: { projectDir: kept },
+      wizard: { done: false, completed: ['claudeCode'] }
+    })
+  )
+  app = await launch()
+  const wizard = await windowAt('wizard')
+  await expect(wizard.locator('#folder-path')).toHaveText(kept)
+  await expect(wizard.locator('#continue')).toBeEnabled()
+
+  const closed = new Promise((resolve) => app.process().once('exit', resolve))
+  await wizard.close()
+  await closed
+  rmSync(kept, { recursive: true })
+
+  app = await launch()
+  const again = await windowAt('wizard')
+  await expect(again.locator('#folder-message')).toContainText('no longer exists')
+  await expect(again.locator('#folder-path')).toHaveText(kept)
+  await expect(again.locator('#continue')).toBeDisabled()
 })
 
 test('it installs Claude when asked, shows the output, and only then lets you continue', async () => {

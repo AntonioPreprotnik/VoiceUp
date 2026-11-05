@@ -1,7 +1,11 @@
 import type { BrowserWindow } from 'electron'
 import type { ClaudeCommand } from '../core/claudeCommand'
 import { ClaudeStep } from '../core/claudeStep'
+import { MESSAGES } from '../core/messages'
+import { SignInStep } from '../core/signInStep'
+import type { ClaudeState } from '../core/state/reducer'
 import { WizardFlow } from '../core/wizardFlow'
+import type { HookMessage } from '../shared/hooks'
 import { Channels, type FolderStepStatus, type WizardView } from '../shared/ipcChannels'
 import type { Settings } from '../shared/settings'
 import { registerWizardIpc } from './ipc/wizard'
@@ -22,6 +26,21 @@ export interface WizardOptions {
   /** The Windows folder picker. Null if the user cancels. */
   readonly chooseFolder: (window: BrowserWindow, current: string | null) => Promise<string | null>
   readonly isFolder: (path: string) => boolean
+  /** Starts Claude in the terminal beside this window. Called once, on reaching Sign in. */
+  readonly startClaude: (window: BrowserWindow) => void
+  readonly restartClaude: () => void
+  /** Sends text to Claude through the send gate. */
+  readonly deliver: (text: string) => void
+  readonly discardDelivery: () => void
+  readonly promptDirty: () => boolean
+  readonly schedule: (callback: () => void, ms: number) => () => void
+  readonly apiKeySet: boolean
+}
+
+export interface Wizard {
+  readonly window: BrowserWindow
+  onClaudeState(state: ClaudeState): void
+  onHook(message: HookMessage): void
 }
 
 /** Opens the first-run wizard, with its progress saved after each step. The caller loads the page. */
@@ -34,8 +53,15 @@ export function openWizard({
   readClaudeVersion,
   runInstaller,
   chooseFolder,
-  isFolder
-}: WizardOptions): BrowserWindow {
+  isFolder,
+  startClaude,
+  restartClaude,
+  deliver,
+  discardDelivery,
+  promptDirty,
+  schedule,
+  apiKeySet
+}: WizardOptions): Wizard {
   const flow = new WizardFlow(settings.wizard.completed)
   const window = createWindow('wizard')
   // The app menu acts on a session and the speech model, which wait until the wizard is finished.
@@ -64,6 +90,24 @@ export function openWizard({
     }
   })
 
+  const signIn = new SignInStep({
+    deliver,
+    discard: discardDelivery,
+    promptDirty,
+    schedule,
+    onChange: () => {
+      send(Channels.wizardChanged, view())
+    }
+  })
+
+  let claudeStarted = false
+  const enteredStep = (): void => {
+    if (claudeStarted || flow.currentStep !== 'signIn') return
+    if (flow.completed.includes('signIn')) return
+    claudeStarted = true
+    startClaude(window)
+  }
+
   const folder = (): FolderStepStatus => {
     const path = settings.claude.projectDir
     return { path, missing: path !== null && !isFolder(path) }
@@ -75,12 +119,15 @@ export function openWizard({
       const { path, missing } = folder()
       return path !== null && !missing
     }
+    if (flow.currentStep === 'signIn') return signIn.isDone || flow.completed.includes('signIn')
     return true
   }
   const view = (): WizardView => ({
     ...flow.view,
     claude: claudeStep.status,
     folder: folder(),
+    signIn: signIn.status,
+    apiKeyWarning: apiKeySet ? MESSAGES.API_KEY_SET : null,
     canContinue: canContinue()
   })
 
@@ -102,6 +149,8 @@ export function openWizard({
       if (chosen === null) return
       settings.claude = { ...settings.claude, projectDir: chosen }
       persist()
+      // Claude runs in one folder for its whole session, so going back to change it restarts it.
+      if (claudeStarted) restartClaude()
       send(Channels.wizardChanged, view())
     } catch (error: unknown) {
       log.error('Could not ask for a project folder', error)
@@ -114,6 +163,7 @@ export function openWizard({
     view,
     back: () => {
       flow.back()
+      enteredStep()
       return view()
     },
     next: () => {
@@ -125,6 +175,8 @@ export function openWizard({
         log.info('Setup finished')
         onFinished()
         window.close()
+      } else {
+        enteredStep()
       }
       return view()
     },
@@ -139,6 +191,14 @@ export function openWizard({
     chooseFolder: () => {
       void chooseProjectFolder()
       return view()
+    },
+    testClaude: () => {
+      signIn.test()
+      return view()
+    },
+    restartClaude: () => {
+      if (claudeStarted) restartClaude()
+      return view()
     }
   })
 
@@ -147,5 +207,14 @@ export function openWizard({
     if (!flow.finished) onAbandoned()
   })
   void claudeStep.check()
-  return window
+  enteredStep()
+  return {
+    window,
+    onClaudeState: (state) => {
+      signIn.onClaudeState(state)
+    },
+    onHook: (message) => {
+      signIn.onHook(message)
+    }
+  }
 }

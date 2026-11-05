@@ -91,6 +91,7 @@
       }
       .actions {
         display: flex;
+        flex-wrap: wrap;
         gap: 8px;
       }
       #claude-output {
@@ -106,6 +107,13 @@
           monospace;
         white-space: pre-wrap;
         overflow-wrap: anywhere;
+      }
+      ul {
+        margin: 0 0 8px;
+        padding-left: 20px;
+      }
+      #sign-in-key {
+        color: #f5c26b;
       }
       #error {
         color: #f48771;
@@ -123,6 +131,7 @@
         background: #2c2c30;
         color: inherit;
         font: inherit;
+        white-space: nowrap;
       }
       button:focus-visible {
         outline: 2px solid #4ec9b0;
@@ -149,6 +158,25 @@
         <code id="folder-path" hidden></code>
         <p class="actions">
           <button id="folder-choose" type="button">Choose folder</button>
+        </p>
+      </div>
+      <div id="sign-in" hidden>
+        <p id="sign-in-key" hidden></p>
+        <p>Claude Code is running in the terminal window. Follow what it asks there:</p>
+        <ul>
+          <li>
+            If it asks whether you trust this folder, read the question and answer it yourself.
+            Choosing No closes Claude, and you can restart it here.
+          </li>
+          <li>
+            If it asks you to log in, follow its steps. It opens your browser, and VoiceUp never
+            sees your password or keys.
+          </li>
+        </ul>
+        <p id="sign-in-message"></p>
+        <p class="actions">
+          <button id="sign-in-test" type="button">Test Claude</button>
+          <button id="sign-in-restart" type="button">Restart Claude</button>
         </p>
       </div>
       <div id="claude" hidden>

@@ -4,8 +4,9 @@ import { defaultSettings } from '../core/settingsMigrate'
 import type { ClaudeCommand } from '../core/claudeCommand'
 import type { RunningInstall } from './pty/installClaude'
 import { Channels, type WizardResult, type WizardView } from '../shared/ipcChannels'
+import type { HookMessage } from '../shared/hooks'
 import type { Settings } from '../shared/settings'
-import { openWizard } from './wizard'
+import { openWizard, type Wizard } from './wizard'
 import { createWindow } from './windows/factory'
 
 vi.mock('electron', () => import('../../test/fakes/electron'))
@@ -21,6 +22,13 @@ const stopInstaller = vi.fn()
 const runInstaller = vi.fn<(onOutput: (text: string) => void) => RunningInstall>()
 const chooseFolder = vi.fn<(window: unknown, current: string | null) => Promise<string | null>>()
 const isFolder = vi.fn<(path: string) => boolean>()
+const startClaude = vi.fn()
+const restartClaude = vi.fn()
+const deliver = vi.fn<(text: string) => void>()
+const discardDelivery = vi.fn()
+const promptDirty = vi.fn<() => boolean>()
+let apiKeySet = false
+let wizard: Wizard
 let settings: Settings
 let wizardEvent: unknown
 let window: BrowserWindow
@@ -46,7 +54,7 @@ function terminalEvent(): unknown {
 }
 
 function open(): void {
-  openWizard({
+  wizard = openWizard({
     settings,
     save,
     onFinished,
@@ -55,7 +63,14 @@ function open(): void {
     readClaudeVersion,
     runInstaller,
     chooseFolder,
-    isFolder
+    isFolder,
+    startClaude,
+    restartClaude,
+    deliver,
+    discardDelivery,
+    promptDirty,
+    schedule: () => () => undefined,
+    apiKeySet
   })
   const created = BrowserWindow.instances.at(-1)
   if (created === undefined) throw new Error('No window was created')
@@ -71,6 +86,8 @@ beforeEach(() => {
   vi.resetAllMocks()
   settings = defaultSettings()
   settings.claude.projectDir = 'C:\\work'
+  apiKeySet = false
+  promptDirty.mockReturnValue(false)
   isFolder.mockReturnValue(true)
   chooseFolder.mockResolvedValue(null)
   findClaude.mockResolvedValue({ file: 'claude.exe', args: [] })
@@ -84,6 +101,112 @@ async function openReady(): Promise<void> {
     expect(invoke(Channels.wizardGet, wizardEvent)?.canContinue).toBe(true)
   })
 }
+
+describe('the Sign in step', () => {
+  const stopHook = (hook_event_name: string): HookMessage =>
+    ({ kind: 'hook', hook: { hook_event_name } }) as unknown as HookMessage
+
+  function atSignIn(): void {
+    settings.wizard.completed = ['claudeCode', 'projectFolder']
+    open()
+    expect(invoke(Channels.wizardGet, wizardEvent)?.steps[2]?.id).toBe('signIn')
+    expect(invoke(Channels.wizardGet, wizardEvent)?.index).toBe(2)
+  }
+
+  it('does not start Claude on the steps before it', async () => {
+    await openReady()
+    invoke(Channels.wizardNext, wizardEvent)
+    expect(startClaude).not.toHaveBeenCalled()
+  })
+
+  it('starts Claude once on reaching it, by moving there', async () => {
+    await openReady()
+    invoke(Channels.wizardNext, wizardEvent)
+    invoke(Channels.wizardNext, wizardEvent)
+    expect(startClaude).toHaveBeenCalledOnce()
+    invoke(Channels.wizardBack, wizardEvent)
+    invoke(Channels.wizardNext, wizardEvent)
+    expect(startClaude).toHaveBeenCalledOnce()
+  })
+
+  it('starts Claude when resuming on it', () => {
+    atSignIn()
+    expect(startClaude).toHaveBeenCalledOnce()
+  })
+
+  it('does not start Claude again for a step already done', () => {
+    settings.wizard.completed = ['claudeCode', 'projectFolder', 'signIn']
+    open()
+    invoke(Channels.wizardBack, wizardEvent)
+    expect(startClaude).not.toHaveBeenCalled()
+    expect(invoke(Channels.wizardGet, wizardEvent)?.canContinue).toBe(true)
+  })
+
+  it('refuses Continue until the test has passed', () => {
+    atSignIn()
+    wizard.onClaudeState('idle')
+    expect(invoke(Channels.wizardNext, wizardEvent)?.index).toBe(2)
+    invoke(Channels.wizardTestClaude, wizardEvent)
+    expect(deliver).toHaveBeenCalledWith('reply with OK')
+    expect(invoke(Channels.wizardNext, wizardEvent)?.index).toBe(2)
+    wizard.onHook(stopHook('UserPromptSubmit'))
+    wizard.onHook(stopHook('Stop'))
+    expect(invoke(Channels.wizardGet, wizardEvent)?.canContinue).toBe(true)
+    expect(invoke(Channels.wizardNext, wizardEvent)?.index).toBe(3)
+  })
+
+  it('sends nothing until asked, and nothing before Claude is idle', () => {
+    atSignIn()
+    invoke(Channels.wizardTestClaude, wizardEvent)
+    wizard.onClaudeState('idle')
+    expect(deliver).not.toHaveBeenCalled()
+  })
+
+  it('ignores any text sent by the page', () => {
+    atSignIn()
+    wizard.onClaudeState('idle')
+    const answer = result(Channels.wizardTestClaude, wizardEvent, { text: 'delete everything' })
+    expect(answer).toEqual({ ok: false, code: 'WIZARD_REFUSED' })
+    expect(deliver).not.toHaveBeenCalled()
+  })
+
+  it('tells the page when Claude changes', () => {
+    atSignIn()
+    wizard.onClaudeState('idle')
+    expect(window.webContents.sent.at(-1)?.[1]).toMatchObject({ signIn: { status: 'ready' } })
+  })
+
+  it('restarts Claude when asked, but only once it was started', async () => {
+    await openReady()
+    invoke(Channels.wizardRestartClaude, wizardEvent)
+    expect(restartClaude).not.toHaveBeenCalled()
+    atSignIn()
+    invoke(Channels.wizardRestartClaude, wizardEvent)
+    expect(restartClaude).toHaveBeenCalledOnce()
+  })
+
+  it('restarts Claude when the folder changes after it started', async () => {
+    atSignIn()
+    invoke(Channels.wizardBack, wizardEvent)
+    chooseFolder.mockResolvedValue('C:\\other')
+    invoke(Channels.wizardChooseFolder, wizardEvent)
+    await vi.waitFor(() => {
+      expect(restartClaude).toHaveBeenCalledOnce()
+    })
+  })
+
+  it('warns about an API key without blocking, and never carries the key', () => {
+    apiKeySet = true
+    atSignIn()
+    const view = invoke(Channels.wizardGet, wizardEvent)
+    expect(view?.apiKeyWarning?.title).toContain('API key')
+  })
+
+  it('has no warning with no API key', () => {
+    atSignIn()
+    expect(invoke(Channels.wizardGet, wizardEvent)?.apiKeyWarning).toBeNull()
+  })
+})
 
 describe('the Project folder step', () => {
   const CHOSEN = 'C:\\chosen'
@@ -282,6 +405,7 @@ describe('openWizard', () => {
   })
 
   it('finishes from the last step: saved first, then the app goes on and the window closes', async () => {
+    settings.wizard.completed = ['signIn']
     await openReady()
     const order: string[] = []
     save.mockImplementation(() => {
@@ -301,6 +425,7 @@ describe('openWizard', () => {
   })
 
   it('finishes only once when Continue is pressed again', async () => {
+    settings.wizard.completed = ['signIn']
     await openReady()
     for (let step = 0; step < STEP_COUNT + 2; step++) invoke(Channels.wizardNext, wizardEvent, {})
     expect(onFinished).toHaveBeenCalledOnce()
@@ -323,7 +448,9 @@ describe.each([
   Channels.wizardBack,
   Channels.wizardClaudeCheck,
   Channels.wizardClaudeInstall,
-  Channels.wizardChooseFolder
+  Channels.wizardChooseFolder,
+  Channels.wizardTestClaude,
+  Channels.wizardRestartClaude
 ])('%s', (channel) => {
   it('refuses any other window, and changes nothing', () => {
     open()

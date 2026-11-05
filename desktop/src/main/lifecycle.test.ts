@@ -235,8 +235,15 @@ describe('the first-run wizard', () => {
   const saved = (): { wizard: { done: boolean; completed: string[] } } =>
     JSON.parse(readFileSync(settingsFile(), 'utf8')) as never
 
-  async function freshStart(): Promise<BrowserWindow> {
+  async function freshStart({ signedIn = false } = {}): Promise<BrowserWindow> {
     rmSync(settingsFile())
+    if (signedIn) {
+      // Past the step that needs a running Claude, which has its own tests here and end to end.
+      writeFileSync(
+        settingsFile(),
+        JSON.stringify({ version: 1, wizard: { done: false, completed: ['signIn'] } })
+      )
+    }
     startApp({ argv: [] })
     await vi.waitFor(() => {
       expect(wizard()?.loadedUrl).toBe('app://voiceup/wizard/index.html')
@@ -286,7 +293,7 @@ describe('the first-run wizard', () => {
   })
 
   it('opens the terminal when finished, and not again on the next start', async () => {
-    const window = await freshStart()
+    const window = await freshStart({ signedIn: true })
     press(window, STEP_COUNT)
     await settle()
     expect(onlyWindow().loadedUrl).toBe('app://voiceup/terminal/index.html')
@@ -296,7 +303,7 @@ describe('the first-run wizard', () => {
   })
 
   it('keeps the finished state when a later change saves the settings', async () => {
-    const window = await freshStart()
+    const window = await freshStart({ signedIn: true })
     press(window, STEP_COUNT)
     await settle()
     interface Item {
@@ -319,8 +326,20 @@ describe('the first-run wizard', () => {
     expect(saved().wizard).toEqual({ done: false, completed: ['claudeCode', 'projectFolder'] })
   })
 
+  it('starts Claude beside it at Sign in, with voice and the model download still waiting', async () => {
+    const window = await freshStart()
+    press(window, 2)
+    await vi.waitFor(() => {
+      expect(onlyWindow().loadedUrl).toBe('app://voiceup/terminal/index.html')
+    })
+    expect(onlyWindow().bounds).toMatchObject({ x: 0, y: 0, width: 1360 })
+    expect(window.bounds).toMatchObject({ x: 1360, width: 560 })
+    expect(calls).not.toContain('hotkey')
+    expect(fakeModels.installs).toEqual([])
+  })
+
   it('does not put the app menu back while open, then shows what it missed', async () => {
-    await freshStart()
+    await freshStart({ signedIn: true })
     const recorder = BrowserWindow.instances.at(1)
     const event = {
       sender: { id: recorder?.webContents.id },

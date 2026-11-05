@@ -65,6 +65,14 @@ async function stubPicker(answer: string | null): Promise<void> {
 const pickerUses = (): Promise<number> =>
   app.evaluate(() => (globalThis as unknown as { voiceupPickerUses: number }).voiceupPickerUses)
 
+/** On the Sign in step: Claude starts by itself, and the test needs a click. */
+async function passSignIn(wizard: Page): Promise<void> {
+  await expect(wizard.locator('#title')).toHaveText('Sign in')
+  await expect(wizard.locator('#continue')).toBeDisabled()
+  await wizard.locator('#sign-in-test').click({ timeout: 20000 })
+  await expect(wizard.locator('#sign-in-message')).toContainText('signed in', { timeout: 20000 })
+}
+
 const savedWizard = (): unknown =>
   (JSON.parse(readFileSync(join(dir, 'settings.json'), 'utf8')) as { wizard: unknown }).wizard
 
@@ -108,6 +116,7 @@ test('a new user walks through the wizard, resumes after quitting, then reaches 
   await expect(wizard.locator('#position')).toHaveText('Step 3 of 6')
   await expect(wizard.locator('li[data-done="true"]')).toHaveCount(2)
 
+  await passSignIn(wizard)
   for (const title of ['Speech model', 'Claude in Chrome', 'Microphone and hotkey']) {
     await wizard.locator('#continue').click()
     await expect(wizard.locator('#title')).toHaveText(title)
@@ -135,7 +144,11 @@ test('a new user chooses a folder in the wizard, and Claude starts there with no
   await expect(wizard.locator('#folder-choose')).toHaveText('Change folder')
   expect(savedProjectDir()).toBe(dir)
 
-  for (let step = 0; step < 5; step++) await wizard.locator('#continue').click()
+  await wizard.locator('#continue').click()
+  await passSignIn(wizard)
+  for (let step = 0; step < 3; step++) await wizard.locator('#continue').click()
+  await expect(wizard.locator('#continue')).toHaveText('Finish')
+  await wizard.locator('#continue').click()
   const terminal = await windowAt('terminal')
   await expect(terminal.locator('#status-label')).toHaveText('Ready', { timeout: 20000 })
   expect(await pickerUses()).toBe(1)
@@ -187,6 +200,36 @@ test('a saved folder is shown and can be kept, and a deleted one has to be repla
   await expect(again.locator('#folder-message')).toContainText('no longer exists')
   await expect(again.locator('#folder-path')).toHaveText(kept)
   await expect(again.locator('#continue')).toBeDisabled()
+})
+
+test('Sign in starts Claude beside the wizard, and only the test passes it', async () => {
+  const log = join(dir, 'prompts.txt')
+  writeFileSync(
+    join(dir, 'settings.json'),
+    JSON.stringify({
+      version: 1,
+      claude: { projectDir: dir },
+      wizard: { done: false, completed: ['claudeCode', 'projectFolder'] }
+    })
+  )
+  app = await launch({ VOICEUP_FAKE_LIVE: log, ANTHROPIC_API_KEY: 'not-a-real-key' })
+  const wizard = await windowAt('wizard')
+  await expect(wizard.locator('#title')).toHaveText('Sign in')
+  await expect(wizard.locator('#sign-in-key')).toContainText('bills the API')
+  await expect(wizard.locator('body')).not.toContainText('not-a-real-key')
+  const terminal = await windowAt('terminal')
+  await expect(terminal.locator('#status-label')).toHaveText('Ready', { timeout: 20000 })
+  // Ready alone sends nothing: the test is the user's click.
+  await expect(wizard.locator('#sign-in-test')).toBeEnabled()
+  expect(existsSync(log)).toBe(false)
+  await expect(wizard.locator('#continue')).toBeDisabled()
+
+  await wizard.locator('#sign-in-test').click()
+  await expect(wizard.locator('#sign-in-message')).toContainText('signed in', { timeout: 20000 })
+  expect(readFileSync(log, 'utf8').trim()).toBe('reply with OK')
+  await expect(wizard.locator('#continue')).toBeEnabled()
+  await wizard.locator('#continue').click()
+  await expect(wizard.locator('#title')).toHaveText('Speech model')
 })
 
 test('it installs Claude when asked, shows the output, and only then lets you continue', async () => {

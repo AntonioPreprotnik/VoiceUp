@@ -12,6 +12,8 @@ export interface WizardActions {
   checkClaude(): WizardView
   installClaude(): WizardView
   chooseFolder(): WizardView
+  testClaude(): WizardView
+  restartClaude(): WizardView
 }
 
 type WizardChannel =
@@ -21,11 +23,13 @@ type WizardChannel =
   | typeof Channels.wizardClaudeCheck
   | typeof Channels.wizardClaudeInstall
   | typeof Channels.wizardChooseFolder
+  | typeof Channels.wizardTestClaude
+  | typeof Channels.wizardRestartClaude
 
 /**
  * The wizard page can read its progress, move through the steps, ask for the fixed Claude Code
- * install and open the folder picker. It can't choose what runs or supply a path, and nothing here
- * changes any other setting (TECH_SPEC §6.1).
+ * install, open the folder picker, send the fixed test prompt and restart Claude. It can't choose
+ * what runs, supply a path or choose the prompt's text, and nothing here changes any other setting (TECH_SPEC §6.1).
  */
 export function registerWizardIpc(actions: WizardActions): void {
   const handle = (channel: WizardChannel, act: () => WizardView): void => {
@@ -44,4 +48,6 @@ export function registerWizardIpc(actions: WizardActions): void {
   handle(Channels.wizardClaudeCheck, () => actions.checkClaude())
   handle(Channels.wizardClaudeInstall, () => actions.installClaude())
   handle(Channels.wizardChooseFolder, () => actions.chooseFolder())
+  handle(Channels.wizardTestClaude, () => actions.testClaude())
+  handle(Channels.wizardRestartClaude, () => actions.restartClaude())
 }

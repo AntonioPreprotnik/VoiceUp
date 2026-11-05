@@ -3,8 +3,12 @@
 
 /** A press this soon after the preview appears was meant for what came before: it can't send. */
 export const LATE_PRESS_GUARD_MS = 300
+/** Noticing the box and deciding, which take the same time however long the text is. */
+export const BASE_COUNTDOWN_MS = 2500
 /** However short the text, there is time to read it and react. */
 export const MIN_COUNTDOWN_MS = 3500
+/** About what the box can show: longer would only wait on text that can't be seen. */
+export const MAX_COUNTDOWN_MS = 15000
 
 export interface PreviewSettings {
   /** For each word, so there is time to read it. 0 sends at once, unless alwaysConfirm is on. */
@@ -49,7 +53,10 @@ export class PreviewWindow {
     this.text = text
     this.startedAt = this.options.now()
     if (alwaysConfirm) return { kind: 'showing', countdownMs: null }
-    const countdownMs = Math.max(MIN_COUNTDOWN_MS, previewMs * wordCount(text))
+    const countdownMs = Math.min(
+      MAX_COUNTDOWN_MS,
+      Math.max(MIN_COUNTDOWN_MS, BASE_COUNTDOWN_MS + previewMs * wordCount(text))
+    )
     this.cancelTimer = this.options.schedule(() => {
       this.finish()
     }, countdownMs)

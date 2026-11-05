@@ -83,7 +83,7 @@ Seven processes at runtime; only the main process holds authority, and it is the
 6. Spawn `claude` in the PTY; state = `starting` until `SessionStart` arrives.
 7. Register the global hotkey; report failure if taken.
 
-If `settings.wizard.done` is false, the wizard window opens after step 5 and steps 6 and 7 wait until it finishes, along with the model download. The terminal window exists but stays hidden, because its page isn't loaded, and loading that page is what starts Claude. Closing the wizard quits the app, and it reopens at the first unfinished step.
+If `settings.wizard.done` is false, the wizard window opens after step 5, and step 7 and the model download wait until it finishes. The terminal window exists but stays hidden until its page loads, and loading that page is what starts Claude. That happens at the Sign in step, with the two windows side by side, or at Finish if Sign in was already done. Closing the wizard quits the app, and it reopens at the first unfinished step.
 
 **Shutdown order** (`before-quit`): unregister shortcuts → remove the tray icon → stop recording → `kill()` the PTY and wait up to 2 s → stop the worker → close the hook server → delete the per-launch hook files → flush logs. A watchdog force-exits after 5 s so a hung child never keeps the app alive.
 
@@ -370,7 +370,7 @@ Every boundary has one zod schema in `shared/`, imported by both sides; nothing 
 | `recorder:error` | renderer → main | `{ recordingId, code }`; `code` is `MIC_DENIED`, `MIC_MISSING` or `MIC_FAILED` | recorder |
 | `settings:get` / `settings:set` | invoke | → `Settings` / `Partial<Settings>` → `Result` | settings |
 | `models:status` / `models:download` | invoke + `models:progress` events | `{ id }` → status | settings, wizard |
-| `wizard:get` / `wizard:next` / `wizard:back` / `wizard:claudeCheck` / `wizard:claudeInstall` / `wizard:chooseFolder` | invoke | `{}` → `{ ok: true, data: { steps: [{ id, title, detail, done }], index, claude, folder, canContinue } }` or `{ ok: false, code: 'WIZARD_REFUSED' }`. The page can only read and move through its steps, ask for the fixed install and open the folder picker. It can't choose what runs or supply a path. Main refuses `next` when `canContinue` is false. A step that needs a setting gets its own narrow channel with its story, not `settings:set` | wizard |
+| `wizard:get` / `wizard:next` / `wizard:back` / `wizard:claudeCheck` / `wizard:claudeInstall` / `wizard:chooseFolder` / `wizard:testClaude` / `wizard:restartClaude` | invoke | `{}` → `{ ok: true, data: { steps: [{ id, title, detail, done }], index, claude, folder, signIn, apiKeyWarning, canContinue } }` or `{ ok: false, code: 'WIZARD_REFUSED' }`. The page can only read and move through its steps, ask for the fixed install, open the folder picker, send the fixed test prompt and restart Claude. It can't choose what runs, supply a path or choose the prompt's text. Main refuses `next` when `canContinue` is false. A step that needs a setting gets its own narrow channel with its story, not `settings:set` | wizard |
 | `wizard:changed` / `wizard:output` | main → renderer | the same view / installer text with terminal codes removed, never logged | wizard |
 | `recorder:devices` | renderer → main | `[{ deviceId, label }]`; the recorder enumerates, at load and on a device change, and main fills the Microphone menu (S3.6). S6.6 moves this to the settings screen | recorder |
 | `app:openLogs` | invoke | none | settings |

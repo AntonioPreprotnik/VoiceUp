@@ -60,6 +60,10 @@ export class BrowserWindow extends EventEmitter {
     this.title = title
   }
 
+  getBounds(): unknown {
+    return this.bounds ?? { x: 0, y: 0, width: 720, height: 480 }
+  }
+
   menuRemoved = false
 
   removeMenu(): void {
@@ -308,6 +312,9 @@ class FakeUtilityProcess extends EventEmitter {
 export const screen = {
   getCursorScreenPoint(): { x: number; y: number } {
     return { x: 0, y: 0 }
+  },
+  getDisplayMatching(): { workArea: { x: number; y: number; width: number; height: number } } {
+    return { workArea: { x: 0, y: 0, width: 1920, height: 1040 } }
   },
   getDisplayNearestPoint(): { workArea: { x: number; y: number; width: number; height: number } } {
     return { workArea: { x: 0, y: 0, width: 1920, height: 1040 } }

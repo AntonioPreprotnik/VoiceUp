@@ -1,6 +1,7 @@
 import type {
   ClaudeStepStatus,
   FolderStepStatus,
+  SignInStatus,
   WizardApi,
   WizardResult,
   WizardView
@@ -46,6 +47,11 @@ const folder = element('folder')
 const folderMessage = element('folder-message')
 const folderPath = element('folder-path')
 const chooseFolder = button('folder-choose')
+const signIn = element('sign-in')
+const signInKey = element('sign-in-key')
+const signInMessage = element('sign-in-message')
+const testClaude = button('sign-in-test')
+const restartClaude = button('sign-in-restart')
 
 /** What the step says. */
 function claudeText(state: ClaudeStepStatus): string {
@@ -93,6 +99,32 @@ function drawFolder({ path, missing }: FolderStepStatus): void {
   chooseFolder.textContent = path === null || missing ? 'Choose folder' : 'Change folder'
 }
 
+function signInText(state: SignInStatus): string {
+  switch (state.status) {
+    case 'waiting':
+      return 'Waiting for Claude to be ready. If it has finished and nothing changes here, restart it.'
+    case 'ready':
+      return 'Claude is ready. Test Claude sends it "reply with OK", which uses a tiny bit of your Claude usage.'
+    case 'testing':
+      return "Waiting for Claude's reply…"
+    case 'done':
+      return 'Claude replied, so you are signed in.'
+    case 'failed':
+      return `${state.title}. ${state.detail}`
+  }
+}
+
+function drawSignIn(view: WizardView): void {
+  const state = view.signIn
+  signInMessage.textContent = signInText(state)
+  signInKey.textContent =
+    view.apiKeyWarning === null ? '' : `${view.apiKeyWarning.title}. ${view.apiKeyWarning.detail}`
+  signInKey.hidden = view.apiKeyWarning === null
+  testClaude.disabled = !(state.status === 'ready' || (state.status === 'failed' && state.canTest))
+  testClaude.hidden = state.status === 'done'
+  restartClaude.hidden = state.status === 'done' || state.status === 'testing'
+}
+
 function draw(view: WizardView): void {
   steps.replaceChildren(
     ...view.steps.map((step, index) => {
@@ -111,7 +143,10 @@ function draw(view: WizardView): void {
   claude.hidden = !onClaude
   const onFolder = step.id === 'projectFolder'
   folder.hidden = !onFolder
-  notice.hidden = onClaude || onFolder
+  const onSignIn = step.id === 'signIn'
+  signIn.hidden = !onSignIn
+  notice.hidden = onClaude || onFolder || onSignIn
+  if (onSignIn) drawSignIn(view)
   if (onClaude) drawClaude(view.claude)
   if (onFolder) drawFolder(view.folder)
   back.disabled = view.index === 0
@@ -153,6 +188,12 @@ check.addEventListener('click', () => {
 })
 chooseFolder.addEventListener('click', () => {
   void run(() => window.voiceupWizard.chooseFolder())
+})
+testClaude.addEventListener('click', () => {
+  void run(() => window.voiceupWizard.testClaude())
+})
+restartClaude.addEventListener('click', () => {
+  void run(() => window.voiceupWizard.restartClaude())
 })
 window.voiceupWizard.onChanged(draw)
 window.voiceupWizard.onOutput((text) => {

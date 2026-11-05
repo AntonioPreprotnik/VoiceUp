@@ -18,6 +18,15 @@ export const MESSAGES = {
     command: UPDATE_COMMAND,
     action: 'Check again'
   },
+  CLAUDE_NOT_LOGGED_IN: {
+    title: "Claude isn't signed in",
+    detail: 'Log in inside the terminal window, then test again.'
+  },
+  API_KEY_SET: {
+    title: 'An API key overrides your subscription and bills the API',
+    detail:
+      'ANTHROPIC_API_KEY is set on this PC. To use your subscription, remove it from your environment variables and restart VoiceUp. You can also continue with it.'
+  },
   CLAUDE_EXITED: {
     title: 'Claude Code stopped',
     detail: 'Restart the session to continue.',

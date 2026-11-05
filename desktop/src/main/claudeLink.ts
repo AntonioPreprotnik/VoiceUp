@@ -4,8 +4,10 @@ import { BrowserFollow } from '../core/browserFollow'
 import { Delivery } from '../core/delivery/delivery'
 import { MESSAGES } from '../core/messages'
 import type { ShutdownSteps } from '../core/shutdown'
+import type { ClaudeState } from '../core/state/reducer'
 import { statusView } from '../core/state/status'
 import { ClaudeStateTracker } from '../core/state/tracker'
+import type { HookMessage } from '../shared/hooks'
 import type { Settings } from '../shared/settings'
 import { showBrowser } from './browser/showBrowser'
 import { HookLink } from './hooks/link'
@@ -30,6 +32,9 @@ export interface ClaudeLinkOptions {
   /** Writes to Claude's terminal. */
   readonly write: (data: string) => void
   readonly steps: ShutdownSteps
+  /** For the wizard, while it is open. */
+  readonly onClaudeState: (state: ClaudeState) => void
+  readonly onHook: (message: HookMessage) => void
 }
 
 export interface ClaudeLink {
@@ -47,7 +52,9 @@ export function createClaudeLink({
   parentWindow,
   showWindow,
   write,
-  steps
+  steps,
+  onClaudeState,
+  onHook
 }: ClaudeLinkOptions): ClaudeLink {
   const claudeState = new ClaudeStateTracker({
     schedule,
@@ -56,6 +63,7 @@ export function createClaudeLink({
       publishStatus()
       claudeStatus.notify(previous, state)
       delivery.kick()
+      onClaudeState(state)
     },
     onEffect: (effect) => {
       // Only a short code from Claude. Anything else might quote more than it should.
@@ -105,6 +113,7 @@ export function createClaudeLink({
       }
       claudeState.onHook(message)
       delivery.onHook(message)
+      onHook(message)
       const browser = settings.claude.showBrowser
       if (browser !== 'off' && browserFollow.onHook(message, claudeState.state)) {
         void showBrowser(browser)

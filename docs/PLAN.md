@@ -471,6 +471,7 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 - AC: step completes when a test prompt (e.g. "reply with OK") produces a `Stop` hook event.
 - AC: the first launch in a new project folder shows Claude Code's own workspace-trust prompt; the wizard explains it, and voice stays blocked (state `starting`) until the user accepts and `SessionStart` arrives.
 - AC: if `ANTHROPIC_API_KEY` is set in the environment, warn that it overrides the subscription login and would bill the API.
+- Open: a real first login needs a clean machine, so this stays unticked until then. It should also show whether `SessionStart` arrives after login without a restart. In 11 real test runs on a signed-in account, 1 lost its test prompt and went to `unknown`, cause not found: the run's log was lost. The wizard now reports this at once. Watch for it.
 
 **[ ] S6.5 Model and mic test.** As a new user, I want to know voice works before I rely on it.
 

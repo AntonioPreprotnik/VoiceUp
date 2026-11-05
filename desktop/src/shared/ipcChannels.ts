@@ -31,6 +31,8 @@ export const Channels = {
   wizardClaudeCheck: 'wizard:claudeCheck',
   wizardClaudeInstall: 'wizard:claudeInstall',
   wizardChooseFolder: 'wizard:chooseFolder',
+  wizardTestClaude: 'wizard:testClaude',
+  wizardRestartClaude: 'wizard:restartClaude',
   wizardChanged: 'wizard:changed',
   wizardOutput: 'wizard:output'
 } as const
@@ -138,9 +140,25 @@ export interface FolderStepStatus {
   readonly missing: boolean
 }
 
+/** The Sign in step. Claude's own screens stay in the terminal: this only watches its hooks. */
+export type SignInStatus =
+  | { readonly status: 'waiting' }
+  | { readonly status: 'ready' }
+  | { readonly status: 'testing' }
+  | { readonly status: 'done' }
+  | {
+      readonly status: 'failed'
+      readonly title: string
+      readonly detail: string
+      readonly canTest: boolean
+    }
+
 export interface WizardView extends WizardProgress {
   readonly claude: ClaudeStepStatus
   readonly folder: FolderStepStatus
+  readonly signIn: SignInStatus
+  /** A warning to show on the Sign in step, never the key itself. */
+  readonly apiKeyWarning: { readonly title: string; readonly detail: string } | null
   /** Main refuses Continue when this is false. */
   readonly canContinue: boolean
 }
@@ -158,6 +176,9 @@ export interface WizardApi {
   installClaude(): Promise<WizardResult>
   /** Opens the Windows folder picker. The page can't supply a path. */
   chooseFolder(): Promise<WizardResult>
+  /** Sends the fixed test prompt. The page can't choose the text. */
+  testClaude(): Promise<WizardResult>
+  restartClaude(): Promise<WizardResult>
   /** Returns the function that unsubscribes. */
   onChanged(listener: (view: WizardView) => void): () => void
   /** The installer's output, as it arrives. Returns the function that unsubscribes. */

@@ -1,5 +1,6 @@
 import { join } from 'node:path'
-import { app, session, type BrowserWindow } from 'electron'
+import { app, screen, session, type BrowserWindow } from 'electron'
+import { sideBySide } from '../core/sideBySide'
 import type { ShutdownSteps } from '../core/shutdown'
 import { parseSmokeTestPath } from '../core/smokeTest'
 import { RecorderDevices } from '../shared/ipc'
@@ -24,7 +25,8 @@ import { ClaudeSession } from './pty/session'
 import { loadSettings, saveSettings } from './settings/store'
 import { runSmokeTest } from './smokeTest'
 import { createVoice } from './voice'
-import { openWizard } from './wizard'
+import { schedule } from './schedule'
+import { openWizard, type Wizard } from './wizard'
 import { createWindow, loadRenderer, windowKindOf } from './windows/factory'
 
 function failStartup(error: unknown): void {
@@ -69,6 +71,7 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
 
   let mainWindow: BrowserWindow | undefined
   let wizardWindow: BrowserWindow | undefined
+  let wizard: Wizard | undefined
   // The terminal stays blank and hidden until the wizard is finished, so never bring it up before.
   const focusFront = (): void => {
     const front = wizardWindow ?? mainWindow
@@ -110,7 +113,13 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
         write: (data) => {
           claude.host.write(data)
         },
-        steps
+        steps,
+        onClaudeState: (state) => {
+          wizard?.onClaudeState(state)
+        },
+        onHook: (message) => {
+          wizard?.onHook(message)
+        }
       })
       // Step 5: the speech worker that the hidden window streams to.
       const { recording, models } = createVoice({
@@ -196,8 +205,11 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
         app.quit()
       })
       // Loading this page is what starts Claude, and the window shows once it has loaded.
+      let terminalLoad: Promise<void> | undefined
+      const loadTerminal = (): Promise<void> =>
+        (terminalLoad ??= loadRenderer(terminalWindow, 'terminal'))
       const openTerminal = async (): Promise<void> => {
-        await loadRenderer(terminalWindow, 'terminal')
+        await loadTerminal()
         // The e2e tests have no model and no network, so nothing downloads for them.
         if (exposeForE2e(delivery, claudeState)) return
         // After the load, which would otherwise replace the title showing the progress.
@@ -215,26 +227,53 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
         await openTerminal()
         return
       }
-      wizardWindow = openWizard({
+      wizard = openWizard({
         settings,
         save: (changed) => {
           saveSettings(app.getPath('userData'), changed)
         },
         onFinished: () => {
           wizardWindow = undefined
+          wizard = undefined
           rebuildMenu()
           openTerminal().catch(failStartup)
         },
         onAbandoned: () => {
           wizardWindow = undefined
+          wizard = undefined
           app.quit()
         },
         findClaude: () => resolveClaude(app.isPackaged),
         readClaudeVersion,
         runInstaller: (onOutput) => runInstaller(installScript(app.isPackaged), onOutput),
         chooseFolder: pickProjectFolder,
-        isFolder: isDirectory
+        isFolder: isDirectory,
+        startClaude: (window) => {
+          const { terminal, wizard: beside } = sideBySide(
+            screen.getDisplayMatching(window.getBounds()).workArea
+          )
+          terminalWindow.setBounds(terminal)
+          window.setBounds(beside)
+          loadTerminal().catch(failStartup)
+        },
+        restartClaude: () => {
+          claude.host.restart().catch((error: unknown) => {
+            log.error('Could not restart Claude', error)
+          })
+        },
+        deliver: (text) => {
+          delivery.deliver(text)
+        },
+        discardDelivery: () => {
+          delivery.discard()
+        },
+        promptDirty: () => claudeState.promptDirty,
+        schedule,
+        // Whether it is set, and never its value.
+        apiKeySet: (process.env['ANTHROPIC_API_KEY'] ?? '') !== ''
       })
+      wizard.onClaudeState(claudeState.state)
+      wizardWindow = wizard.window
       await loadRenderer(wizardWindow, 'wizard')
     })
     .catch(failStartup)

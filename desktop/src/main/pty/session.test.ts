@@ -7,6 +7,8 @@ import { BrowserWindow, dialog, resetFakes } from '../../../test/fakes/electron'
 import fakeLog from '../../../test/fakes/electronLog'
 import { lastPty, resetFakePty, spawned } from '../../../test/fakes/nodePty'
 import { defaultSettings } from '../../core/settingsMigrate'
+import { saveSettings } from '../settings/store'
+import { SettingsStore } from '../settings/settingsStore'
 import { ClaudeSession } from './session'
 
 vi.mock('electron', () => import('../../../test/fakes/electron'))
@@ -23,8 +25,12 @@ function createSession(projectDir: string | null = null, version = '2.1.318'): C
   const defaults = defaultSettings()
   return new ClaudeSession({
     window: window as unknown as RealBrowserWindow,
-    settings: { ...defaults, claude: { ...defaults.claude, projectDir } },
-    settingsDir,
+    settings: new SettingsStore(
+      { ...defaults, claude: { ...defaults.claude, projectDir } },
+      (saved) => {
+        saveSettings(settingsDir, saved)
+      }
+    ),
     hooks: {
       prepareLaunch: () => Promise.resolve({ args: [], env: {} }),
       launched: () => undefined,
@@ -210,8 +216,12 @@ describe('when Claude Code is not installed', () => {
     const defaults = defaultSettings()
     const session = new ClaudeSession({
       window: window as unknown as RealBrowserWindow,
-      settings: { ...defaults, claude: { ...defaults.claude, projectDir: folderA } },
-      settingsDir,
+      settings: new SettingsStore(
+        { ...defaults, claude: { ...defaults.claude, projectDir: folderA } },
+        (saved) => {
+          saveSettings(settingsDir, saved)
+        }
+      ),
       hooks: {
         prepareLaunch: () => Promise.resolve({ args: [], env: {} }),
         launched: () => undefined,

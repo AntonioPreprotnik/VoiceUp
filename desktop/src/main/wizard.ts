@@ -14,17 +14,15 @@ import {
   type ModelStepStatus,
   type WizardView
 } from '../shared/ipcChannels'
-import type { Settings } from '../shared/settings'
 import { registerWizardIpc } from './ipc/wizard'
 import { log } from './log'
 import type { ModelStatus } from './models/controller'
 import type { RunningInstall } from './pty/installClaude'
+import type { SettingsStore } from './settings/settingsStore'
 import { createWindow } from './windows/factory'
 
 export interface WizardOptions {
-  /** The app's own settings object, changed in place so later saves keep the progress. */
-  readonly settings: Settings
-  readonly save: (settings: Settings) => void
+  readonly settings: SettingsStore
   readonly onFinished: () => void
   /** The user closed the window before finishing. */
   readonly onAbandoned: () => void
@@ -68,7 +66,6 @@ export interface Wizard {
 /** Opens the first-run wizard, with its progress saved after each step. The caller loads the page. */
 export function openWizard({
   settings,
-  save,
   onFinished,
   onAbandoned,
   findClaude,
@@ -87,7 +84,7 @@ export function openWizard({
   startHotkey,
   hotkey
 }: WizardOptions): Wizard {
-  const flow = new WizardFlow(settings.wizard.completed)
+  const flow = new WizardFlow(settings.current.wizard.completed)
   const window = createWindow('wizard')
   // The app menu acts on a session and the speech model, which wait until the wizard is finished.
   // The caller must also not reinstall it while this is open: Electron would put it back here.
@@ -168,7 +165,7 @@ export function openWizard({
   })
 
   const folder = (): FolderStepStatus => {
-    const path = settings.claude.projectDir
+    const path = settings.current.claude.projectDir
     return { path, missing: path !== null && !isFolder(path) }
   }
 
@@ -196,12 +193,10 @@ export function openWizard({
   })
 
   const persist = (): void => {
-    settings.wizard = { done: flow.finished, completed: [...flow.completed] }
-    try {
-      save(settings)
-    } catch (error: unknown) {
-      log.error('Could not save the setup progress; it applies to this run only', error)
-    }
+    settings.update((current) => ({
+      ...current,
+      wizard: { done: flow.finished, completed: [...flow.completed] }
+    }))
   }
 
   let choosing = false
@@ -209,10 +204,12 @@ export function openWizard({
     if (choosing) return
     choosing = true
     try {
-      const chosen = await chooseFolder(window, settings.claude.projectDir)
+      const chosen = await chooseFolder(window, settings.current.claude.projectDir)
       if (chosen === null) return
-      settings.claude = { ...settings.claude, projectDir: chosen }
-      persist()
+      settings.update((current) => ({
+        ...current,
+        claude: { ...current.claude, projectDir: chosen }
+      }))
       // Claude runs in one folder for its whole session, so going back to change it restarts it.
       if (claudeStarted) restartClaude()
       send(Channels.wizardChanged, view())

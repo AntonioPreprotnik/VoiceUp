@@ -5,19 +5,19 @@ import type { Delivery } from '../core/delivery/delivery'
 import { MESSAGES, type MessageCode } from '../core/messages'
 import { RecordingToggle } from '../core/recordingToggle'
 import type { ShutdownSteps } from '../core/shutdown'
-import type { Settings } from '../shared/settings'
 import { escapeKey } from './hotkey'
 import { log } from './log'
 import { loadManifest, ModelController, modelTitle } from './models/controller'
 import { ModelManager } from './models/manager'
 import type { Overlay } from './overlay'
+import type { SettingsStore } from './settings/settingsStore'
 import { RecordingController, type RecordingOptions } from './speech/recording'
 import { SpeechSupervisor } from './speech/supervisor'
 import { workerInit } from './speech/workerInit'
 import { loadRenderer } from './windows/factory'
 
 export interface VoiceOptions {
-  readonly settings: Settings
+  readonly settings: SettingsStore
   readonly overlay: Overlay
   readonly recorderWindow: BrowserWindow
   readonly delivery: Delivery
@@ -90,9 +90,9 @@ export function createVoice({
     },
     recorder: recorderWindow.webContents,
     getDeviceId: micDeviceId,
-    minWords: settings.speech.minWords,
+    minWords: settings.current.speech.minWords,
     voiceBlock,
-    previewSettings: () => settings.delivery,
+    previewSettings: () => settings.current.delivery,
     delivery: {
       get holding() {
         return delivery.holding
@@ -129,7 +129,7 @@ export function createVoice({
       root: join(app.getPath('userData'), 'models'),
       fetch: (url, init) => net.fetch(url, init)
     }),
-    modelId: settings.speech.modelId,
+    modelId: settings.current.speech.modelId,
     onStatus: (status) => {
       onModelStatus()
       const window = progressWindow()
@@ -145,7 +145,7 @@ export function createVoice({
     onReady: (model) => {
       // Whatever is being recorded can't be finished by a worker about to go.
       recording.cancel()
-      speech.restart(workerInit(settings.speech, model))
+      speech.restart(workerInit(settings.current.speech, model))
       rebuildMenu()
       onModelStatus()
     },
@@ -154,7 +154,7 @@ export function createVoice({
       onModelStatus()
     }
   })
-  speech.start(workerInit(settings.speech, models.installedModel()))
+  speech.start(workerInit(settings.current.speech, models.installedModel()))
   steps.worker ??= () => speech.stop()
 
   // After the load: a port sent earlier arrives before the preload listens, and is lost.

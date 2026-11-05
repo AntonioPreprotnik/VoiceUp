@@ -22,6 +22,7 @@ import { installScript, runInstaller } from './pty/installClaude'
 import { isDirectory, pickProjectFolder } from './pty/projectFolder'
 import { resolveClaude } from './pty/resolveClaude'
 import { ClaudeSession } from './pty/session'
+import { SettingsStore } from './settings/settingsStore'
 import { loadSettings, saveSettings } from './settings/store'
 import { runSmokeTest } from './smokeTest'
 import { createVoice } from './voice'
@@ -96,16 +97,20 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
         return
       }
 
+      // The one copy of the settings from here on. Nothing reads the loaded object again.
+      const store = new SettingsStore(settings, (changed) => {
+        saveSettings(app.getPath('userData'), changed)
+      })
       const terminalWindow = createWindow('terminal')
       mainWindow = terminalWindow
       const recorderWindow = createWindow('recorder', { showWhenReady: false })
       const overlayWindow = createWindow('overlay', { showWhenReady: false })
-      const overlay = new Overlay({ window: overlayWindow, sounds: settings.ui.sounds })
+      const overlay = new Overlay({ window: overlayWindow, sounds: store.current.ui.sounds })
       loadRenderer(overlayWindow, 'overlay').catch((error: unknown) => {
         log.error('Could not load the overlay window', error)
       })
       const { claudeState, delivery, hooks, publishStatus } = createClaudeLink({
-        settings,
+        settings: store,
         overlay,
         terminalWindow,
         parentWindow: () => mainWindow,
@@ -123,7 +128,7 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
       })
       // Step 5: the speech worker that the hidden window streams to.
       const { recording, models } = createVoice({
-        settings,
+        settings: store,
         overlay,
         recorderWindow,
         delivery,
@@ -152,8 +157,7 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
       // Step 6: Claude itself starts at the renderer's first size, so it never draws at a wrong one.
       const claude = new ClaudeSession({
         window: mainWindow,
-        settings,
-        settingsDir: app.getPath('userData'),
+        settings: store,
         resolveCommand: () => resolveClaude(app.isPackaged),
         readVersion: readClaudeVersion,
         hooks: {
@@ -184,7 +188,7 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
         // Change folder, which starts Claude. Rebuilt when the wizard finishes.
         // Checked by the saved state, not the window: the wizard can change the menu while it is still
         // opening, as a download it resumes reports progress.
-        if (!settings.wizard.done) return
+        if (!store.current.wizard.done) return
         installAppMenu({
           changeFolder: () => claude.changeFolder(),
           changeFontSize: (change) => {
@@ -227,7 +231,7 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
       let hotkeyOn: boolean | undefined
       const startHotkey = (): boolean => {
         steps.shortcuts ??= unregisterHotkeys
-        hotkeyOn ??= registerHotkey(settings.hotkey, () => {
+        hotkeyOn ??= registerHotkey(store.current.hotkey, () => {
           recording.press()
         })
         return hotkeyOn
@@ -240,17 +244,14 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
         models.ensure()
 
         // Step 7: the global hotkey, last, so a press always finds everything running.
-        if (!startHotkey()) reportHotkeyTaken(terminalWindow, settings.hotkey)
+        if (!startHotkey()) reportHotkeyTaken(terminalWindow, store.current.hotkey)
       }
-      if (settings.wizard.done) {
+      if (store.current.wizard.done) {
         await openTerminal()
         return
       }
       wizard = openWizard({
-        settings,
-        save: (changed) => {
-          saveSettings(app.getPath('userData'), changed)
-        },
+        settings: store,
         onFinished: () => {
           wizardWindow = undefined
           wizard = undefined
@@ -298,7 +299,7 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
           chosenModel: () => models.chosenModel()
         },
         startHotkey,
-        hotkey: settings.hotkey
+        hotkey: store.current.hotkey
       })
       wizard.onClaudeState(claudeState.state)
       wizardWindow = wizard.window

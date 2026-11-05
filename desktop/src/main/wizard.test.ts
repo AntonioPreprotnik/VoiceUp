@@ -7,6 +7,7 @@ import type { RunningInstall } from './pty/installClaude'
 import { Channels, type WizardResult, type WizardView } from '../shared/ipcChannels'
 import type { HookMessage } from '../shared/hooks'
 import type { Settings } from '../shared/settings'
+import { SettingsStore } from './settings/settingsStore'
 import { openWizard, type Wizard } from './wizard'
 import { createWindow } from './windows/factory'
 
@@ -35,6 +36,7 @@ const ensureModel = vi.fn()
 const startHotkey = vi.fn<() => boolean>()
 let wizard: Wizard
 let settings: Settings
+let store: SettingsStore
 let wizardEvent: unknown
 let window: BrowserWindow
 
@@ -59,9 +61,9 @@ function terminalEvent(): unknown {
 }
 
 function open(): void {
+  store = new SettingsStore(settings, save)
   wizard = openWizard({
-    settings,
-    save,
+    settings: store,
     onFinished,
     onAbandoned,
     findClaude,
@@ -381,7 +383,7 @@ describe('the Project folder step', () => {
     await vi.waitFor(() => {
       expect(save).toHaveBeenCalledOnce()
     })
-    expect(settings.claude.projectDir).toBe(CHOSEN)
+    expect(store.current.claude.projectDir).toBe(CHOSEN)
     expect(window.webContents.sent.at(-1)?.[0]).toBe(Channels.wizardChanged)
     expect(invoke(Channels.wizardGet, wizardEvent)?.canContinue).toBe(true)
   })
@@ -396,7 +398,7 @@ describe('the Project folder step', () => {
     await atFolderStep()
     invoke(Channels.wizardChooseFolder, wizardEvent)
     await new Promise((resolve) => setImmediate(resolve))
-    expect(settings.claude.projectDir).toBe('C:\\work')
+    expect(store.current.claude.projectDir).toBe('C:\\work')
     expect(save).not.toHaveBeenCalled()
   })
 
@@ -415,7 +417,7 @@ describe('the Project folder step', () => {
     const answer = result(Channels.wizardChooseFolder, wizardEvent, { path: 'C:\\evil' })
     expect(answer).toEqual({ ok: false, code: 'WIZARD_REFUSED' })
     expect(chooseFolder).not.toHaveBeenCalled()
-    expect(settings.claude.projectDir).toBe('C:\\work')
+    expect(store.current.claude.projectDir).toBe('C:\\work')
   })
 
   it('survives a picker that fails', async () => {
@@ -511,7 +513,7 @@ describe('openWizard', () => {
     await openReady()
     invoke(Channels.wizardNext, wizardEvent, {})
     expect(save).toHaveBeenCalledOnce()
-    expect(settings.wizard).toEqual({ done: false, completed: ['claudeCode'] })
+    expect(store.current.wizard).toEqual({ done: false, completed: ['claudeCode'] })
   })
 
   it('does not save when only going back', async () => {
@@ -544,7 +546,7 @@ describe('openWizard', () => {
       order.push('closed')
     })
     for (let step = 0; step < STEP_COUNT; step++) invoke(Channels.wizardNext, wizardEvent, {})
-    expect(settings.wizard.done).toBe(true)
+    expect(store.current.wizard.done).toBe(true)
     expect(order.slice(-3)).toEqual(['save', 'finished', 'closed'])
     expect(onFinished).toHaveBeenCalledOnce()
     expect(onAbandoned).not.toHaveBeenCalled()
@@ -564,7 +566,7 @@ describe('openWizard', () => {
     window.close()
     expect(onAbandoned).toHaveBeenCalledOnce()
     expect(onFinished).not.toHaveBeenCalled()
-    expect(settings.wizard.completed).toEqual(['claudeCode'])
+    expect(store.current.wizard.completed).toEqual(['claudeCode'])
   })
 })
 

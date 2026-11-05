@@ -8,7 +8,6 @@ import type { ClaudeState } from '../core/state/reducer'
 import { statusView } from '../core/state/status'
 import { ClaudeStateTracker } from '../core/state/tracker'
 import type { HookMessage } from '../shared/hooks'
-import type { Settings } from '../shared/settings'
 import { showBrowser } from './browser/showBrowser'
 import { HookLink } from './hooks/link'
 import { readHookPolicies } from './hooks/policy'
@@ -18,12 +17,13 @@ import { log } from './log'
 import type { Overlay } from './overlay'
 import { system32Path } from './pty/resolveClaude'
 import { schedule } from './schedule'
+import type { SettingsStore } from './settings/settingsStore'
 import { ClaudeStatus } from './status'
 
 const QUEUE_PREVIEW_CHARS = 80
 
 export interface ClaudeLinkOptions {
-  readonly settings: Settings
+  readonly settings: SettingsStore
   readonly overlay: Overlay
   readonly terminalWindow: BrowserWindow
   /** The window a message box belongs to, if one is still open. */
@@ -73,7 +73,7 @@ export function createClaudeLink({
   })
   const claudeStatus = new ClaudeStatus({
     window: terminalWindow,
-    notifications: settings.ui.notifications,
+    notifications: settings.current.ui.notifications,
     reArm: () => {
       claudeState.reArm()
     },
@@ -114,7 +114,7 @@ export function createClaudeLink({
       claudeState.onHook(message)
       delivery.onHook(message)
       onHook(message)
-      const browser = settings.claude.showBrowser
+      const browser = settings.current.claude.showBrowser
       if (browser !== 'off' && browserFollow.onHook(message, claudeState.state)) {
         void showBrowser(browser)
       }
@@ -151,8 +151,8 @@ export function createClaudeLink({
     overlay,
     escape: escapeKey,
     settings: () => ({
-      queueEnabled: settings.delivery.queue,
-      maxQueue: settings.delivery.maxQueue
+      queueEnabled: settings.current.delivery.queue,
+      maxQueue: settings.current.delivery.maxQueue
     }),
     onQueueChange: () => {
       publishStatus()

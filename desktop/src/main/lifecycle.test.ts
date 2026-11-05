@@ -137,7 +137,6 @@ describe('startup', () => {
       'getPath:userData',
       'speechWorker',
       'load',
-      'getPath:userData',
       'menu',
       'load',
       // The model download starting changes the menu.

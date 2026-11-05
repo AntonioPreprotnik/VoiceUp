@@ -3,19 +3,17 @@ import type { ClaudeCommand } from '../../core/claudeCommand'
 import { adjustFontSize, type FontSizeChange } from '../../core/fontSize'
 import { MESSAGES } from '../../core/messages'
 import { Channels, type SessionExit } from '../../shared/ipcChannels'
-import type { Settings } from '../../shared/settings'
 import { log } from '../log'
 import type { ModelId } from '../../shared/models'
+import type { Settings } from '../../shared/settings'
 import type { LaunchExtras } from '../hooks/link'
-import { saveSettings } from '../settings/store'
+import type { SettingsStore } from '../settings/settingsStore'
 import { PtyHost } from './host'
 import { isDirectory, pickProjectFolder } from './projectFolder'
 
 export interface ClaudeSessionOptions {
   readonly window: BrowserWindow
-  readonly settings: Settings
-  /** Where settings.json lives. */
-  readonly settingsDir: string
+  readonly settings: SettingsStore
   readonly resolveCommand: () => Promise<ClaudeCommand | null>
   readonly readVersion: (command: ClaudeCommand) => Promise<string | null>
   readonly hooks: {
@@ -28,10 +26,8 @@ export interface ClaudeSessionOptions {
 /** Claude's session in one window: which folder it runs in, and restarting it there (S1.2). */
 export class ClaudeSession {
   readonly host: PtyHost
-  private settings: Settings
 
   constructor(private readonly options: ClaudeSessionOptions) {
-    this.settings = options.settings
     const { window, hooks } = options
     this.host = new PtyHost({
       send: (data) => {
@@ -126,12 +122,11 @@ export class ClaudeSession {
     this.save({ ...this.settings, claude: { ...this.settings.claude, projectDir: folder } })
   }
 
+  private get settings(): Settings {
+    return this.options.settings.current
+  }
+
   private save(settings: Settings): void {
-    this.settings = settings
-    try {
-      saveSettings(this.options.settingsDir, settings)
-    } catch (error: unknown) {
-      log.error('Could not save settings; the change applies to this run only', error)
-    }
+    this.options.settings.update(() => settings)
   }
 }

@@ -7,5 +7,6 @@ export default defineConfig({
   testMatch: '*.e2e.ts',
   workers: 1,
   timeout: 60000,
-  reporter: 'line'
+  // On CI, failures also become annotations, which can be read without opening the job log.
+  reporter: process.env['CI'] === undefined ? 'line' : [['line'], ['github']]
 })

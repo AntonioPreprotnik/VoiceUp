@@ -1,28 +1,17 @@
-import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
-import { app, dialog, net, session, type BrowserWindow } from 'electron'
-import { BrowserFollow } from '../core/browserFollow'
-import { MESSAGES } from '../core/messages'
-import { RecordingToggle } from '../core/recordingToggle'
-import { runShutdown, type ShutdownSteps } from '../core/shutdown'
-import { Delivery } from '../core/delivery/delivery'
+import { app, session, type BrowserWindow } from 'electron'
+import type { ShutdownSteps } from '../core/shutdown'
 import { parseSmokeTestPath } from '../core/smokeTest'
-import { statusView } from '../core/state/status'
-import { ClaudeStateTracker } from '../core/state/tracker'
 import { RecorderDevices } from '../shared/ipc'
 import { Channels, type MicDevice } from '../shared/ipcChannels'
-import { showBrowser } from './browser/showBrowser'
-import { HookLink } from './hooks/link'
-import { readHookPolicies } from './hooks/policy'
-import { escapeKey, registerHotkey, reportHotkeyTaken, unregisterHotkeys } from './hotkey'
+import { installShutdown } from './appShutdown'
+import { createClaudeLink } from './claudeLink'
+import { registerHotkey, reportHotkeyTaken, unregisterHotkeys } from './hotkey'
 import { exposeForE2e } from './e2eHook'
-import { registerStatusIpc } from './ipc/status'
 import { on, registerTerminalIpc } from './ipc/terminal'
 import { registerTerminalUiIpc } from './ipc/terminalUi'
 import { initLogging, log, setLogLevel } from './log'
 import { installAppMenu } from './menu'
-import { loadManifest, ModelController, modelTitle } from './models/controller'
-import { ModelManager } from './models/manager'
 import { Overlay } from './overlay'
 import { installPermissions } from './permissions'
 import { installProcessErrorLogging } from './processErrors'
@@ -30,20 +19,13 @@ import { registerAppScheme, serveAppProtocol } from './protocol'
 import { readClaudeVersion } from './pty/claudeVersion'
 import { installScript, runInstaller } from './pty/installClaude'
 import { isDirectory, pickProjectFolder } from './pty/projectFolder'
-import { resolveClaude, system32Path } from './pty/resolveClaude'
+import { resolveClaude } from './pty/resolveClaude'
 import { ClaudeSession } from './pty/session'
 import { loadSettings, saveSettings } from './settings/store'
-import { RecordingController } from './speech/recording'
-import { SpeechSupervisor } from './speech/supervisor'
-import { workerInit } from './speech/workerInit'
-import { schedule } from './schedule'
 import { runSmokeTest } from './smokeTest'
-import { ClaudeStatus } from './status'
+import { createVoice } from './voice'
 import { openWizard } from './wizard'
 import { createWindow, loadRenderer, windowKindOf } from './windows/factory'
-
-const SHUTDOWN_WATCHDOG_MS = 5000
-const QUEUE_PREVIEW_CHARS = 80
 
 function failStartup(error: unknown): void {
   log.error('Startup failed', error)
@@ -54,29 +36,6 @@ function focusWindow(window: BrowserWindow): void {
   if (window.isMinimized()) window.restore()
   window.show()
   window.focus()
-}
-
-/** TECH_SPEC §3 shutdown. A watchdog force-exits so a hung child never keeps the app alive. */
-function installShutdown(steps: ShutdownSteps): void {
-  let shuttingDown = false
-  app.on('before-quit', (event) => {
-    // Electron would quit right after this handler; app.exit below ends the process instead.
-    event.preventDefault()
-    if (shuttingDown) return
-    shuttingDown = true
-
-    const watchdog = setTimeout(() => {
-      log.error(`Shutdown still running after ${String(SHUTDOWN_WATCHDOG_MS)} ms, forcing exit`)
-      app.exit(1)
-    }, SHUTDOWN_WATCHDOG_MS)
-
-    void runShutdown(steps, (step, error) => {
-      log.error(`Shutdown step ${step} failed`, error)
-    }).then(() => {
-      clearTimeout(watchdog)
-      app.exit(0)
-    })
-  })
 }
 
 export interface StartOptions {
@@ -142,196 +101,30 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
       loadRenderer(overlayWindow, 'overlay').catch((error: unknown) => {
         log.error('Could not load the overlay window', error)
       })
-      const claudeState = new ClaudeStateTracker({
-        schedule,
-        onChange: (state, previous) => {
-          log.debug(`Claude state: ${previous} -> ${state}`)
-          publishStatus()
-          claudeStatus.notify(previous, state)
-          delivery.kick()
-        },
-        onEffect: (effect) => {
-          // Only a short code from Claude. Anything else might quote more than it should.
-          const code = /^[a-z_]{1,40}$/.test(effect.error ?? '') ? effect.error : 'other'
-          log.warn(`Claude's turn failed: ${String(code)}`)
-        }
-      })
-      const claudeStatus = new ClaudeStatus({
-        window: terminalWindow,
-        notifications: settings.ui.notifications,
-        reArm: () => {
-          claudeState.reArm()
-        },
-        showWindow: focusFront,
-        quit: () => {
-          app.quit()
-        }
-      })
-      steps.tray ??= () => {
-        claudeStatus.destroy()
-      }
-      const publishStatus = (): void => {
-        const queue = delivery.queued.map(({ id, text }) => ({
-          id,
-          preview: text.trim().slice(0, QUEUE_PREVIEW_CHARS)
-        }))
-        claudeStatus.show(statusView(claudeState.state, hooks.voiceBlock, queue))
-      }
-      registerStatusIpc(
-        () => claudeStatus.current,
-        () => {
-          claudeState.reArm()
-        },
-        (id) => {
-          delivery.cancelQueued(id)
-        }
-      )
-      // Step 4: stale files go, then the hook server and this launch's hook files.
-      const browserFollow = new BrowserFollow()
-      const hooks = new HookLink({
-        runDir: join(app.getPath('userData'), 'run'),
-        curlPath: system32Path('curl.exe'),
-        readPolicies: (projectDir) => readHookPolicies({ projectDir }),
-        onMessage: (message) => {
-          if (message.kind === 'hook' && message.hook.hook_event_name === 'SessionStart') {
-            log.info('Claude session started')
-          }
-          claudeState.onHook(message)
-          delivery.onHook(message)
-          const browser = settings.claude.showBrowser
-          if (browser !== 'off' && browserFollow.onHook(message, claudeState.state)) {
-            void showBrowser(browser)
-          }
-        },
-        onUnavailable: (code, setting) => {
-          publishStatus()
-          const { title, detail } = MESSAGES[code]
-          if (mainWindow === undefined) return
-          dialog
-            .showMessageBox(mainWindow, {
-              type: 'warning',
-              title: 'VoiceUp',
-              message: title,
-              detail: setting === null ? detail : `Setting: ${setting}. ${detail}`
-            })
-            .catch((error: unknown) => {
-              log.error('Could not show the hooks message', error)
-            })
-        },
-        onStartingSlow: () => {
-          overlay.failed('STARTING_SLOW')
-        }
-      })
-      steps.hookServer ??= () => hooks.stopServer()
-      steps.hookFiles ??= () => {
-        hooks.removeFiles()
-      }
-      // Step 5: the speech worker that the hidden window streams to.
-      const recording = new RecordingController({
-        toggle: new RecordingToggle(randomUUID),
-        sendToWorker: (command) => {
-          speech.send(command)
-        },
-        workerRunning: () => speech.running,
-        restartWorker: () => {
-          speech.restart()
-        },
-        recorder: recorderWindow.webContents,
-        getDeviceId: () => claude.micDeviceId,
-        minWords: settings.speech.minWords,
-        voiceBlock: () => hooks.voiceBlock,
-        previewSettings: () => settings.delivery,
-        delivery: {
-          get holding() {
-            return delivery.holding
-          },
-          deliver: (text) => {
-            delivery.deliver(text)
-          },
-          retry: () => {
-            delivery.retry()
-          }
-        },
+      const { claudeState, delivery, hooks, publishStatus } = createClaudeLink({
+        settings,
         overlay,
-        escape: escapeKey
-      })
-      const delivery = new Delivery({
-        claude: claudeState,
+        terminalWindow,
+        parentWindow: () => mainWindow,
+        showWindow: focusFront,
         write: (data) => {
-          // Never through onInput: this isn't the user's typing.
           claude.host.write(data)
         },
-        schedule,
+        steps
+      })
+      // Step 5: the speech worker that the hidden window streams to.
+      const { recording, models } = createVoice({
+        settings,
         overlay,
-        escape: escapeKey,
-        settings: () => ({
-          queueEnabled: settings.delivery.queue,
-          maxQueue: settings.delivery.maxQueue
-        }),
-        onQueueChange: () => {
-          publishStatus()
-        },
-        onBlocked: (reason) => {
-          log.info(`Voice text blocked: ${reason}`)
-        }
-      })
-      publishStatus()
-      const speech = new SpeechSupervisor({
-        onEvent: (event) => {
-          if (event.type === 'ready') log.info(`Speech worker ready in ${String(event.loadMs)} ms`)
-          if (event.type === 'error')
-            log.warn(`Speech worker error: ${event.code}: ${event.message}`)
-          recording.onWorkerEvent(event)
-        },
-        onCrash: () => {
-          recording.workerLost()
-        },
-        onGaveUp: () => {
-          log.error(MESSAGES.WORKER_CRASHED.title)
-          overlay.failed('WORKER_CRASHED')
-        }
-      })
-      let shownPhase = 'idle'
-      const models = new ModelController({
-        manifest: loadManifest(),
-        manager: new ModelManager({
-          root: join(app.getPath('userData'), 'models'),
-          fetch: (url, init) => net.fetch(url, init)
-        }),
-        modelId: settings.speech.modelId,
-        onStatus: (status) => {
-          if (mainWindow === undefined) return
-          mainWindow.setTitle(modelTitle(status))
-          mainWindow.setProgressBar(status.phase === 'installing' ? status.percent / 100 : -1)
-          // The menu has no percentage, so it changes only with the phase.
-          if (status.phase !== shownPhase) {
-            shownPhase = status.phase
-            rebuildMenu()
-          }
-        },
-        onReady: (model) => {
-          // Whatever is being recorded can't be finished by a worker about to go.
-          recording.cancel()
-          speech.restart(workerInit(settings.speech, model))
+        recorderWindow,
+        delivery,
+        voiceBlock: () => hooks.voiceBlock,
+        micDeviceId: () => claude.micDeviceId,
+        progressWindow: () => mainWindow,
+        rebuildMenu: () => {
           rebuildMenu()
         },
-        onFailed: (code) => {
-          overlay.failed(code)
-        }
-      })
-      speech.start(workerInit(settings.speech, models.installedModel()))
-      steps.worker ??= () => speech.stop()
-
-      // After the load: a port sent earlier arrives before the preload listens, and is lost.
-      recorderWindow.webContents.once('did-finish-load', () => {
-        speech.connectRecorder(recorderWindow.webContents)
-      })
-      // The hidden window has nowhere else to report a problem. It never logs audio or text.
-      recorderWindow.webContents.on('console-message', ({ level, message }) => {
-        if (level === 'warning' || level === 'error') log.warn(`Recorder: ${message}`)
-      })
-      loadRenderer(recorderWindow, 'recorder').catch((error: unknown) => {
-        log.error('Could not load the recorder window', error)
+        steps
       })
 
       // Step 6: Claude itself starts at the renderer's first size, so it never draws at a wrong one.

@@ -22,6 +22,9 @@ function launch(env: Record<string, string> = {}): Promise<ElectronApplication> 
       VOICEUP_E2E: '1',
       VOICEUP_CLAUDE_CMD: JSON.stringify([process.execPath, FAKE]),
       CLAUDE_CONFIG_DIR: dir,
+      // Live, so the fake answers what is typed. A replayed scenario answers on a fixed clock,
+      // which only matches a click by luck, and not on a slower machine.
+      VOICEUP_FAKE_LIVE: join(dir, 'prompts.txt'),
       ...env
     }
   })

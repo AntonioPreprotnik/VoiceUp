@@ -83,6 +83,8 @@ Seven processes at runtime; only the main process holds authority, and it is the
 6. Spawn `claude` in the PTY; state = `starting` until `SessionStart` arrives.
 7. Register the global hotkey; report failure if taken.
 
+If `settings.wizard.done` is false, the wizard window opens after step 5 and steps 6 and 7 wait until it finishes, along with the model download. The terminal window exists but stays hidden, because its page isn't loaded, and loading that page is what starts Claude. Closing the wizard quits the app, and it reopens at the first unfinished step.
+
 **Shutdown order** (`before-quit`): unregister shortcuts → remove the tray icon → stop recording → `kill()` the PTY and wait up to 2 s → stop the worker → close the hook server → delete the per-launch hook files → flush logs. A watchdog force-exits after 5 s so a hung child never keeps the app alive.
 
 **One voice command, step by step:**
@@ -364,8 +366,9 @@ Every boundary has one zod schema in `shared/`, imported by both sides; nothing 
 | `overlay:sound` | main → renderer | `start` or `stop`; generated tones, off with `ui.sounds` | overlay |
 | `recorder:start` / `recorder:stop` | main → renderer | `{ recordingId, deviceId }` / `{ recordingId }` | recorder |
 | `recorder:error` | renderer → main | `{ recordingId, code }`; `code` is `MIC_DENIED`, `MIC_MISSING` or `MIC_FAILED` | recorder |
-| `settings:get` / `settings:set` | invoke | → `Settings` / `Partial<Settings>` → `Result` | settings, wizard |
+| `settings:get` / `settings:set` | invoke | → `Settings` / `Partial<Settings>` → `Result` | settings |
 | `models:status` / `models:download` | invoke + `models:progress` events | `{ id }` → status | settings, wizard |
+| `wizard:get` / `wizard:next` / `wizard:back` | invoke | `{}` → `{ ok: true, data: { steps: [{ id, title, detail, done }], index } }` or `{ ok: false, code: 'WIZARD_REFUSED' }`. The page can only read and move through its steps; a step that needs a setting gets its own narrow channel with its story, not `settings:set` | wizard |
 | `recorder:devices` | renderer → main | `[{ deviceId, label }]`; the recorder enumerates, at load and on a device change, and main fills the Microphone menu (S3.6). S6.6 moves this to the settings screen | recorder |
 | `app:openLogs` | invoke | none | settings |
 | `recorder:port` | main → renderer | a `MessagePort` for frames to the worker; sent again after a worker restart | recorder |
@@ -434,6 +437,10 @@ export const Settings = z.object({
     sounds: z.boolean().default(true),
     notifications: z.boolean().default(true),  // only while the window isn't focused
     startWithWindows: z.boolean().default(false),
+  }).prefault({}),
+  wizard: z.object({
+    done: z.boolean().default(true),  // a brand-new file says false; a file without this section predates the wizard
+    completed: z.array(z.string().max(64)).max(64).default([]),  // strings, so another version's step can't invalidate the file
   }).prefault({}),
   logLevel: z.enum(['error', 'warn', 'info', 'debug']).default('info'),
 });

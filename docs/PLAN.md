@@ -448,7 +448,7 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 - AC: `electron-builder` NSIS, per-user install (no admin), Start menu entry, clean uninstaller that offers to delete downloaded models and settings.
 - AC: installer size stays small because models are not bundled.
 
-**[ ] S6.2 First-run wizard shell.** As a new user, I want a guided setup that I can resume if I quit halfway.
+**[x] S6.2 First-run wizard shell.** As a new user, I want a guided setup that I can resume if I quit halfway.
 
 - AC: steps: Claude Code → Project folder → Sign in → Speech model → Claude in Chrome → Microphone and hotkey test; progress saved per step. The folder comes before sign-in because Claude needs a working folder to start.
 

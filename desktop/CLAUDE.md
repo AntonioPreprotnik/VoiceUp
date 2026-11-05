@@ -49,6 +49,7 @@ Exact versions only. Confirmed with `npm view` on 2026-11-02: Electron 45.2.1, e
 - Same-origin Vite HMR works under `connect-src 'self'`; the CSP needs no `ws:` entry in dev.
 - Test the installer only on a renamed build: add `--config.productName=VoiceUpTest --config.appId=app.voiceup.s61test --config.extraMetadata.name=VoiceUpTest --config.directories.output=<elsewhere>` to electron-builder. A real one shares `%APPDATA%\VoiceUp` with your daily copy, and its uninstaller can delete that folder. A separate output folder also avoids `dist/win-unpacked`, which is locked while the daily copy runs.
 - To run the real browser raise, which moves your browser to the front: `VOICEUP_TEST_SHOW_BROWSER=brave npx vitest run test/integration/show-browser.test.ts`; CI skips this.
+- A fresh settings file starts the wizard; a file with no `wizard` section counts as set up, so existing copies skip it. To see it without touching your own settings, run with `--user-data-dir=<empty folder>`.
 - electron-builder does not bundle: run `npm run build` first, or it packages a stale `out/`.
 - Plain `tsc --noEmit` checks nothing here: the root `tsconfig.json` has `files: []` and only references the two projects. Use `npm run typecheck`.
 - Import rules live in `eslint.import-rules.mjs`, as an allowlist per folder. A new allowed package goes there and in the table in `test/lint/import-rules.test.ts`.

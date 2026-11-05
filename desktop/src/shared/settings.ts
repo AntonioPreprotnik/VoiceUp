@@ -42,6 +42,17 @@ export const Settings = z.object({
       startWithWindows: z.boolean().default(false)
     })
     .prefault({}),
+  wizard: z
+    .object({
+      /**
+       * True by default, because a file without this section was written before the wizard existed.
+       * A brand-new file says false: see defaultSettings.
+       */
+      done: z.boolean().default(true),
+      /** Strings, not an enum: a step from another version must not make the whole file unusable. */
+      completed: z.array(z.string().max(64)).max(64).default([])
+    })
+    .prefault({}),
   logLevel: z.enum(['error', 'warn', 'info', 'debug']).default('info')
 })
 

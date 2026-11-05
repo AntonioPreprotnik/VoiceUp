@@ -33,6 +33,10 @@ const WINDOWS = {
     options: {},
     // Never shown, and it has to keep capturing while hidden, with no click to allow audio.
     webPreferences: { backgroundThrottling: false, autoplayPolicy: 'no-user-gesture-required' }
+  },
+  wizard: {
+    preload: 'wizard.js',
+    options: { width: 720, height: 480, minWidth: 560, minHeight: 360, backgroundColor: '#1e1e20' }
   }
 } satisfies Record<
   string,

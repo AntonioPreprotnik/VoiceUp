@@ -1,3 +1,4 @@
+import { WizardAction } from './ipc'
 import { describe, expect, it } from 'vitest'
 import { chunkInput } from './chunkInput'
 import { MAX_TERM_INPUT_CHARS, SessionRestart, TermAck, TermInput, TermResize } from './ipc'
@@ -63,5 +64,15 @@ describe('chunkInput', () => {
 
   it('still makes progress when the limit fits only half a pair', () => {
     expect(chunkInput('😀', 1).join('')).toBe('😀')
+  })
+})
+
+describe('WizardAction', () => {
+  it('accepts an empty object', () => {
+    expect(WizardAction.safeParse({}).success).toBe(true)
+  })
+
+  it.each([[undefined], [null], ['x'], [{ hotkey: 'Alt+V' }]])('rejects %j', (payload) => {
+    expect(WizardAction.safeParse(payload).success).toBe(false)
   })
 })

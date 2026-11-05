@@ -29,13 +29,14 @@ import { installProcessErrorLogging } from './processErrors'
 import { registerAppScheme, serveAppProtocol } from './protocol'
 import { resolveClaude, system32Path } from './pty/resolveClaude'
 import { ClaudeSession } from './pty/session'
-import { loadSettings } from './settings/store'
+import { loadSettings, saveSettings } from './settings/store'
 import { RecordingController } from './speech/recording'
 import { SpeechSupervisor } from './speech/supervisor'
 import { workerInit } from './speech/workerInit'
 import { schedule } from './schedule'
 import { runSmokeTest } from './smokeTest'
 import { ClaudeStatus } from './status'
+import { openWizard } from './wizard'
 import { createWindow, loadRenderer, windowKindOf } from './windows/factory'
 
 const SHUTDOWN_WATCHDOG_MS = 5000
@@ -105,9 +106,13 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
   registerAppScheme()
 
   let mainWindow: BrowserWindow | undefined
-  app.on('second-instance', () => {
-    if (mainWindow !== undefined) focusWindow(mainWindow)
-  })
+  let wizardWindow: BrowserWindow | undefined
+  // The terminal stays blank and hidden until the wizard is finished, so never bring it up before.
+  const focusFront = (): void => {
+    const front = wizardWindow ?? mainWindow
+    if (front !== undefined) focusWindow(front)
+  }
+  app.on('second-instance', focusFront)
   app.on('window-all-closed', () => {
     app.quit()
   })
@@ -154,9 +159,7 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
         reArm: () => {
           claudeState.reArm()
         },
-        showWindow: () => {
-          focusWindow(terminalWindow)
-        },
+        showWindow: focusFront,
         quit: () => {
           app.quit()
         }
@@ -358,6 +361,9 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
       registerTerminalUiIpc(mainWindow, () => claude.fontSize)
       let microphones: readonly MicDevice[] = []
       const rebuildMenu = (): void => {
+        // Electron applies this to every window, which would undo the wizard's removeMenu and offer
+        // Change folder, which starts Claude. Rebuilt when the wizard finishes.
+        if (wizardWindow !== undefined) return
         installAppMenu({
           changeFolder: () => claude.changeFolder(),
           changeFontSize: (change) => {
@@ -392,19 +398,42 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
         mainWindow = undefined
         app.quit()
       })
-      await loadRenderer(mainWindow, 'terminal')
-      // The e2e tests have no model and no network, so nothing downloads for them.
-      if (exposeForE2e(delivery, claudeState)) return
-      // After the load, which would otherwise replace the title showing the progress.
-      models.ensure()
+      // Loading this page is what starts Claude, and the window shows once it has loaded.
+      const openTerminal = async (): Promise<void> => {
+        await loadRenderer(terminalWindow, 'terminal')
+        // The e2e tests have no model and no network, so nothing downloads for them.
+        if (exposeForE2e(delivery, claudeState)) return
+        // After the load, which would otherwise replace the title showing the progress.
+        models.ensure()
 
-      // Step 7: the global hotkey, last, so a press always finds everything running.
-      const { hotkey } = settings
-      steps.shortcuts ??= unregisterHotkeys
-      const registered = registerHotkey(hotkey, () => {
-        recording.press()
+        // Step 7: the global hotkey, last, so a press always finds everything running.
+        const { hotkey } = settings
+        steps.shortcuts ??= unregisterHotkeys
+        const registered = registerHotkey(hotkey, () => {
+          recording.press()
+        })
+        if (!registered) reportHotkeyTaken(terminalWindow, hotkey)
+      }
+      if (settings.wizard.done) {
+        await openTerminal()
+        return
+      }
+      wizardWindow = openWizard({
+        settings,
+        save: (changed) => {
+          saveSettings(app.getPath('userData'), changed)
+        },
+        onFinished: () => {
+          wizardWindow = undefined
+          rebuildMenu()
+          openTerminal().catch(failStartup)
+        },
+        onAbandoned: () => {
+          wizardWindow = undefined
+          app.quit()
+        }
       })
-      if (!registered) reportHotkeyTaken(mainWindow, hotkey)
+      await loadRenderer(wizardWindow, 'wizard')
     })
     .catch(failStartup)
 }

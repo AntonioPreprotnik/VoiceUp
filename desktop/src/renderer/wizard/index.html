@@ -1,0 +1,112 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>VoiceUp setup</title>
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; media-src 'self' blob:"
+    />
+    <style>
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+      body {
+        display: flex;
+        background: #1e1e20;
+        color: #f0f0f0;
+        font:
+          15px/1.5 'Segoe UI',
+          sans-serif;
+      }
+      #steps {
+        flex: 0 0 210px;
+        margin: 0;
+        padding: 24px 16px;
+        list-style: none;
+        background: #161618;
+      }
+      #steps li {
+        padding: 6px 8px;
+        border-radius: 6px;
+        color: #a8a8a8;
+      }
+      #steps li[aria-current='step'] {
+        background: #2c2c30;
+        color: #f0f0f0;
+      }
+      #steps li[data-done='true']::before {
+        content: '✓ ';
+        color: #4ec9b0;
+      }
+      main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        padding: 24px 32px;
+      }
+      #position {
+        margin: 0;
+        color: #a8a8a8;
+        font-size: 13px;
+      }
+      h1 {
+        margin: 4px 0 12px;
+        font-size: 24px;
+        font-weight: 600;
+      }
+      p {
+        margin: 0 0 8px;
+      }
+      #notice {
+        color: #a8a8a8;
+      }
+      #error {
+        color: #f48771;
+      }
+      nav {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: auto;
+      }
+      button {
+        padding: 6px 20px;
+        border: 1px solid #55555a;
+        border-radius: 6px;
+        background: #2c2c30;
+        color: inherit;
+        font: inherit;
+      }
+      button:focus-visible {
+        outline: 2px solid #4ec9b0;
+        outline-offset: 2px;
+      }
+      button:disabled {
+        opacity: 0.45;
+      }
+      #continue {
+        border-color: #4ec9b0;
+        background: #1f6f5f;
+      }
+    </style>
+  </head>
+  <body>
+    <ol id="steps"></ol>
+    <main>
+      <p id="position"></p>
+      <h1 id="title"></h1>
+      <p id="detail"></p>
+      <p id="notice">This step isn't ready yet, so you can just continue.</p>
+      <p id="error" hidden></p>
+      <nav>
+        <button id="back" type="button">Back</button>
+        <button id="continue" type="button">Continue</button>
+      </nav>
+    </main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

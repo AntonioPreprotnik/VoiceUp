@@ -33,6 +33,8 @@ export const Channels = {
   wizardChooseFolder: 'wizard:chooseFolder',
   wizardTestClaude: 'wizard:testClaude',
   wizardRestartClaude: 'wizard:restartClaude',
+  wizardRetryModel: 'wizard:retryModel',
+  wizardSkipMicTest: 'wizard:skipMicTest',
   wizardChanged: 'wizard:changed',
   wizardOutput: 'wizard:output'
 } as const
@@ -153,7 +155,28 @@ export type SignInStatus =
       readonly canTest: boolean
     }
 
+/** The Speech model step. */
+export interface ModelStepStatus {
+  readonly label: string
+  /** As shown, such as "239 MB". */
+  readonly size: string
+  readonly phase: 'waiting' | 'downloading' | 'unpacking' | 'ready' | 'failed'
+  readonly percent: number
+}
+
+/** The Microphone and hotkey step. What was heard is shown only here: it never goes to Claude. */
+export interface MicStepStatus {
+  readonly hotkey: string
+  /** Null until the step has tried to turn the hotkey on. */
+  readonly hotkeyOn: boolean | null
+  readonly heard: string | null
+  readonly problem: { readonly title: string; readonly detail: string } | null
+  readonly skipped: boolean
+}
+
 export interface WizardView extends WizardProgress {
+  readonly model: ModelStepStatus
+  readonly mic: MicStepStatus
   readonly claude: ClaudeStepStatus
   readonly folder: FolderStepStatus
   readonly signIn: SignInStatus
@@ -179,6 +202,8 @@ export interface WizardApi {
   /** Sends the fixed test prompt. The page can't choose the text. */
   testClaude(): Promise<WizardResult>
   restartClaude(): Promise<WizardResult>
+  retryModel(): Promise<WizardResult>
+  skipMicTest(): Promise<WizardResult>
   /** Returns the function that unsubscribes. */
   onChanged(listener: (view: WizardView) => void): () => void
   /** The installer's output, as it arrives. Returns the function that unsubscribes. */

@@ -1,6 +1,8 @@
 import type {
   ClaudeStepStatus,
   FolderStepStatus,
+  MicStepStatus,
+  ModelStepStatus,
   SignInStatus,
   WizardApi,
   WizardResult,
@@ -52,6 +54,15 @@ const signInKey = element('sign-in-key')
 const signInMessage = element('sign-in-message')
 const testClaude = button('sign-in-test')
 const restartClaude = button('sign-in-restart')
+const model = element('model')
+const modelMessage = element('model-message')
+const modelProgress = element('model-progress') as HTMLProgressElement
+const modelRetry = button('model-retry')
+const mic = element('mic')
+const micMessage = element('mic-message')
+const micHeard = element('mic-heard')
+const micProblem = element('mic-problem')
+const micSkip = button('mic-skip')
 
 /** What the step says. */
 function claudeText(state: ClaudeStepStatus): string {
@@ -125,6 +136,37 @@ function drawSignIn(view: WizardView): void {
   restartClaude.hidden = state.status === 'done' || state.status === 'testing'
 }
 
+function drawModel(state: ModelStepStatus): void {
+  const name = `${state.label}, ${state.size}`
+  modelMessage.textContent =
+    state.phase === 'ready'
+      ? `The speech model is installed: ${state.label}.`
+      : state.phase === 'failed'
+        ? 'Speech model download failed. Check your connection and try again. It carries on from where it stopped.'
+        : state.phase === 'unpacking'
+          ? `Unpacking ${name}…`
+          : state.phase === 'downloading'
+            ? `Downloading ${name}. VoiceUp turns speech into text on this PC, so nothing you say leaves it.`
+            : `Getting ready to download ${name}…`
+  const busy = state.phase === 'downloading' || state.phase === 'unpacking'
+  modelProgress.hidden = !busy
+  modelProgress.value = state.percent
+  modelRetry.hidden = state.phase !== 'failed'
+}
+
+function drawMic(state: MicStepStatus): void {
+  micMessage.textContent =
+    state.hotkeyOn === false
+      ? `Another app is using ${state.hotkey}, so VoiceUp can't. Close that app and open VoiceUp again, or skip the test.`
+      : `Press ${state.hotkey} and say: hello Claude. VoiceUp shows what it heard here, and sends nothing to Claude.`
+  micHeard.textContent = state.heard === null ? '' : `Heard: “${state.heard}”`
+  micHeard.hidden = state.heard === null
+  micProblem.textContent =
+    state.problem === null ? '' : `${state.problem.title}. ${state.problem.detail}`
+  micProblem.hidden = state.problem === null
+  micSkip.hidden = state.heard !== null || state.skipped
+}
+
 function draw(view: WizardView): void {
   steps.replaceChildren(
     ...view.steps.map((step, index) => {
@@ -145,8 +187,14 @@ function draw(view: WizardView): void {
   folder.hidden = !onFolder
   const onSignIn = step.id === 'signIn'
   signIn.hidden = !onSignIn
-  notice.hidden = onClaude || onFolder || onSignIn
+  const onModel = step.id === 'speechModel'
+  model.hidden = !onModel
+  const onMic = step.id === 'micAndHotkey'
+  mic.hidden = !onMic
+  notice.hidden = onClaude || onFolder || onSignIn || onModel || onMic
   if (onSignIn) drawSignIn(view)
+  if (onModel) drawModel(view.model)
+  if (onMic) drawMic(view.mic)
   if (onClaude) drawClaude(view.claude)
   if (onFolder) drawFolder(view.folder)
   back.disabled = view.index === 0
@@ -194,6 +242,12 @@ testClaude.addEventListener('click', () => {
 })
 restartClaude.addEventListener('click', () => {
   void run(() => window.voiceupWizard.restartClaude())
+})
+modelRetry.addEventListener('click', () => {
+  void run(() => window.voiceupWizard.retryModel())
+})
+micSkip.addEventListener('click', () => {
+  void run(() => window.voiceupWizard.skipMicTest())
 })
 window.voiceupWizard.onChanged(draw)
 window.voiceupWizard.onOutput((text) => {

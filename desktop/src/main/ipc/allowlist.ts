@@ -24,6 +24,8 @@ type RendererChannel =
   | typeof Channels.wizardChooseFolder
   | typeof Channels.wizardTestClaude
   | typeof Channels.wizardRestartClaude
+  | typeof Channels.wizardRetryModel
+  | typeof Channels.wizardSkipMicTest
 
 /** The window kinds allowed to send each renderer-to-main channel (TECH_SPEC §6.1). */
 export const SENDERS: Readonly<Record<RendererChannel, readonly WindowKind[]>> = {
@@ -48,5 +50,7 @@ export const SENDERS: Readonly<Record<RendererChannel, readonly WindowKind[]>> =
   [Channels.wizardClaudeInstall]: ['wizard'],
   [Channels.wizardChooseFolder]: ['wizard'],
   [Channels.wizardTestClaude]: ['wizard'],
-  [Channels.wizardRestartClaude]: ['wizard']
+  [Channels.wizardRestartClaude]: ['wizard'],
+  [Channels.wizardRetryModel]: ['wizard'],
+  [Channels.wizardSkipMicTest]: ['wizard']
 }

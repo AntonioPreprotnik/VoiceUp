@@ -115,6 +115,21 @@
       #sign-in-key {
         color: #f5c26b;
       }
+      #model-progress {
+        width: 100%;
+        height: 10px;
+        margin: 0 0 12px;
+        accent-color: #4ec9b0;
+      }
+      #mic-heard {
+        padding: 8px 10px;
+        border-radius: 6px;
+        background: #111113;
+        font-size: 17px;
+      }
+      #mic-problem {
+        color: #f48771;
+      }
       #error {
         color: #f48771;
       }
@@ -177,6 +192,21 @@
         <p class="actions">
           <button id="sign-in-test" type="button">Test Claude</button>
           <button id="sign-in-restart" type="button">Restart Claude</button>
+        </p>
+      </div>
+      <div id="model" hidden>
+        <p id="model-message"></p>
+        <progress id="model-progress" max="100" value="0" hidden></progress>
+        <p class="actions">
+          <button id="model-retry" type="button" hidden>Try again</button>
+        </p>
+      </div>
+      <div id="mic" hidden>
+        <p id="mic-message"></p>
+        <p id="mic-heard" hidden></p>
+        <p id="mic-problem" hidden></p>
+        <p class="actions">
+          <button id="mic-skip" type="button" hidden>Skip the test</button>
         </p>
       </div>
       <div id="claude" hidden>

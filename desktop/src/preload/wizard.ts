@@ -17,6 +17,8 @@ const Channels = {
   wizardChooseFolder: 'wizard:chooseFolder',
   wizardTestClaude: 'wizard:testClaude',
   wizardRestartClaude: 'wizard:restartClaude',
+  wizardRetryModel: 'wizard:retryModel',
+  wizardSkipMicTest: 'wizard:skipMicTest',
   wizardChanged: 'wizard:changed',
   wizardOutput: 'wizard:output'
 } as const satisfies Partial<typeof SharedChannels>
@@ -34,6 +36,8 @@ const api: WizardApi = {
   testClaude: () => ipcRenderer.invoke(Channels.wizardTestClaude, {}) as Promise<WizardResult>,
   restartClaude: () =>
     ipcRenderer.invoke(Channels.wizardRestartClaude, {}) as Promise<WizardResult>,
+  retryModel: () => ipcRenderer.invoke(Channels.wizardRetryModel, {}) as Promise<WizardResult>,
+  skipMicTest: () => ipcRenderer.invoke(Channels.wizardSkipMicTest, {}) as Promise<WizardResult>,
   onChanged: (listener) => {
     const handler = (_event: unknown, view: WizardView): void => {
       listener(view)

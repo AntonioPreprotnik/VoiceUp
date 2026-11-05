@@ -11,7 +11,7 @@ import { log } from './log'
 import { loadManifest, ModelController, modelTitle } from './models/controller'
 import { ModelManager } from './models/manager'
 import type { Overlay } from './overlay'
-import { RecordingController } from './speech/recording'
+import { RecordingController, type RecordingOptions } from './speech/recording'
 import { SpeechSupervisor } from './speech/supervisor'
 import { workerInit } from './speech/workerInit'
 import { loadRenderer } from './windows/factory'
@@ -27,6 +27,11 @@ export interface VoiceOptions {
   readonly progressWindow: () => BrowserWindow | undefined
   readonly rebuildMenu: () => void
   readonly steps: ShutdownSteps
+  /** See RecordingOptions.divert. */
+  readonly divert: () => ((text: string) => void) | null
+  /** Something went wrong with voice, as the overlay also shows. */
+  readonly onVoiceFailed: (code: MessageCode) => void
+  readonly onModelStatus: () => void
 }
 
 export interface Voice {
@@ -44,8 +49,36 @@ export function createVoice({
   micDeviceId,
   progressWindow,
   rebuildMenu,
-  steps
+  steps,
+  divert,
+  onVoiceFailed,
+  onModelStatus
 }: VoiceOptions): Voice {
+  // The overlay, which also tells the wizard's microphone test what went wrong.
+  const watched: RecordingOptions['overlay'] = {
+    recordingStarted: () => {
+      overlay.recordingStarted()
+    },
+    level: (rms) => {
+      overlay.level(rms)
+    },
+    speechEnded: () => {
+      overlay.speechEnded()
+    },
+    preview: (text, countdownMs) => {
+      overlay.preview(text, countdownMs)
+    },
+    finished: () => {
+      overlay.finished()
+    },
+    cancelled: () => {
+      overlay.cancelled()
+    },
+    failed: (code) => {
+      overlay.failed(code)
+      onVoiceFailed(code)
+    }
+  }
   const recording = new RecordingController({
     toggle: new RecordingToggle(randomUUID),
     sendToWorker: (command) => {
@@ -71,8 +104,9 @@ export function createVoice({
         delivery.retry()
       }
     },
-    overlay,
-    escape: escapeKey
+    overlay: watched,
+    escape: escapeKey,
+    divert
   })
   const speech = new SpeechSupervisor({
     onEvent: (event) => {
@@ -97,6 +131,7 @@ export function createVoice({
     }),
     modelId: settings.speech.modelId,
     onStatus: (status) => {
+      onModelStatus()
       const window = progressWindow()
       if (window === undefined) return
       window.setTitle(modelTitle(status))
@@ -112,9 +147,11 @@ export function createVoice({
       recording.cancel()
       speech.restart(workerInit(settings.speech, model))
       rebuildMenu()
+      onModelStatus()
     },
     onFailed: (code) => {
       overlay.failed(code)
+      onModelStatus()
     }
   })
   speech.start(workerInit(settings.speech, models.installedModel()))

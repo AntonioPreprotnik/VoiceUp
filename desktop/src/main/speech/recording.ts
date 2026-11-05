@@ -36,6 +36,11 @@ export interface RecordingOptions {
   }
   /** Esc, held only while there is something to cancel (TECH_SPEC §4.4). */
   readonly escape: { hold(onPress: () => void): void; release(): void }
+  /**
+   * Where a transcript goes instead of Claude, such as the wizard's microphone test, or null for
+   * Claude. A diverted transcript skips the preview, since nothing is sent.
+   */
+  readonly divert?: () => ((text: string) => void) | null
   readonly overlay: Pick<
     Overlay,
     'recordingStarted' | 'level' | 'speechEnded' | 'preview' | 'finished' | 'cancelled' | 'failed'
@@ -171,6 +176,13 @@ export class RecordingController {
       log.info('TRANSCRIPT_DROPPED: nothing usable in the transcript')
       overlay.failed('TRANSCRIPT_DROPPED')
       escape.release()
+      return
+    }
+    const divert = this.options.divert?.() ?? null
+    if (divert !== null) {
+      overlay.finished()
+      escape.release()
+      divert(text)
       return
     }
     const started = this.preview.start(text, previewSettings())

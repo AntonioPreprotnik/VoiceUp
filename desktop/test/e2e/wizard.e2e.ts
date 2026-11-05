@@ -142,9 +142,9 @@ test('a failed install says so, and can be tried again', async () => {
   await expect(wizard.locator('#claude-install')).toHaveText('Try again')
   await expect(wizard.locator('#claude-output')).toContainText('no connection')
   // The last lines explain the failure, and the buttons appearing makes the box shorter.
-  const hiddenBelow = await wizard
-    .locator('#claude-output')
-    .evaluate((box) => box.scrollHeight - box.clientHeight - box.scrollTop)
+  const hiddenBelow = await wizard.evaluate<number>(
+    "(() => { const box = document.getElementById('claude-output'); return box.scrollHeight - box.clientHeight - box.scrollTop })()"
+  )
   expect(hiddenBelow).toBeLessThanOrEqual(1)
   await expect(wizard.locator('#continue')).toBeDisabled()
 })

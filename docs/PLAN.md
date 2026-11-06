@@ -481,7 +481,7 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 
 - AC: hotkey, mic, model, silence/max length, preview delay, queue on/off, sounds, start with Windows, log level; every field validated; "Reset to defaults".
 
-**[ ] S6.7 Code signing decision.** As a friend, I don't want scary SmartScreen warnings, or I want to know why they appear.
+**[x] S6.7 Code signing decision.** As a friend, I don't want scary SmartScreen warnings, or I want to know why they appear.
 
 - AC: decision note: sign (OV certificate cost and process) vs unsigned with a one-page "More info → Run anyway" guide for friends.
 
@@ -717,7 +717,7 @@ The biggest risk is outside your control: Anthropic's subscription-use policy an
 - [x] Repo: public on GitHub; auto-update via GitHub Releases.
 - [x] Platform: Windows only.
 - [x] Busy behavior default: queue.
-- [ ] Code signing: pay for a certificate or ship unsigned (S6.7).
+- [x] Code signing: ship unsigned for now, with `SHA256SUMS.txt` and the `docs/install.md` guide; revisit when more people use it (S6.7, `docs/decisions/S6.7-code-signing.md`).
 - [x] Final app name: VoiceUp.
 
 **For v1.2:**

@@ -477,7 +477,7 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 
 - AC: model download (S4.3) with progress; then "Press the hotkey and say: hello Claude", showing the transcript without sending it.
 
-**[ ] S6.6 Settings screen.** As a user, I want to change things later.
+**[x] S6.6 Settings screen.** As a user, I want to change things later.
 
 - AC: hotkey, mic, model, silence/max length, preview delay, queue on/off, sounds, start with Windows, log level; every field validated; "Reset to defaults".
 

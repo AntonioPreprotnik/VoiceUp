@@ -13,6 +13,8 @@ export interface ClaudeStatusOptions {
   readonly notifications: boolean
   readonly openSettings: () => void
   readonly reArm: () => void
+  /** Ticked: the hotkey is off until it is unticked (S7.1). */
+  readonly pauseListening: (paused: boolean) => void
   readonly showWindow: () => void
   readonly quit: () => void
 }
@@ -25,6 +27,7 @@ export class ClaudeStatus {
   private notice: Notification | undefined
 
   private notifications: boolean
+  private paused = false
 
   constructor(private readonly options: ClaudeStatusOptions) {
     this.notifications = options.notifications
@@ -50,9 +53,7 @@ export class ClaudeStatus {
     ) {
       return
     }
-    const waiting = view.queue.length === 0 ? '' : ` (${String(view.queue.length)} queued)`
-    this.tray.setToolTip(`VoiceUp: ${view.label}${waiting}`)
-    this.tray.setContextMenu(this.menu(view))
+    this.refreshTray(view)
     const { window } = this.options
     if (!window.isDestroyed()) window.webContents.send(Channels.stateChanged, view)
   }
@@ -61,19 +62,44 @@ export class ClaudeStatus {
     this.notifications = on
   }
 
+  /** The menu's tick and the tooltip follow it, so a paused hotkey is never a mystery. */
+  setListeningPaused(paused: boolean): void {
+    this.paused = paused
+    if (this.view !== undefined) this.refreshTray(this.view)
+  }
+
+  /** Once, when the window first goes to the tray, so closing it doesn't look like quitting. */
+  stillRunning(): void {
+    this.showNotice({
+      title: 'VoiceUp is still running',
+      body: 'Click the tray icon to open it, or right-click it to quit.'
+    })
+  }
+
   /** Only when the user isn't already looking at it. */
   notify(previous: ClaudeState, state: ClaudeState): void {
-    const { window, showWindow } = this.options
+    const { window } = this.options
     if (!this.notifications || window.isDestroyed() || window.isFocused()) return
     const notice = noticeFor(previous, state)
-    if (notice === null || !Notification.isSupported()) return
+    if (notice !== null) this.showNotice(notice)
+  }
+
+  private showNotice(notice: { title: string; body: string }): void {
+    if (!this.notifications || !Notification.isSupported()) return
     try {
       this.notice = new Notification(notice)
-      this.notice.on('click', showWindow)
+      this.notice.on('click', this.options.showWindow)
       this.notice.show()
     } catch (error: unknown) {
       log.warn('Could not show a notification', error)
     }
+  }
+
+  private refreshTray(view: StatusView): void {
+    const waiting = view.queue.length === 0 ? '' : ` (${String(view.queue.length)} queued)`
+    const paused = this.paused ? ', listening paused' : ''
+    this.tray.setToolTip(`VoiceUp: ${view.label}${waiting}${paused}`)
+    this.tray.setContextMenu(this.menu(view))
   }
 
   destroy(): void {
@@ -89,11 +115,19 @@ export class ClaudeStatus {
   }
 
   private menu(view: StatusView): Menu {
-    const { reArm, showWindow, quit, openSettings } = this.options
+    const { reArm, showWindow, quit, openSettings, pauseListening } = this.options
     return Menu.buildFromTemplate([
-      { label: view.label, enabled: false },
+      { label: this.paused ? `${view.label} (listening paused)` : view.label, enabled: false },
       { type: 'separator' },
       { label: 'Show VoiceUp', click: showWindow },
+      {
+        label: 'Pause listening',
+        type: 'checkbox',
+        checked: this.paused,
+        click: (item) => {
+          pauseListening(item.checked)
+        }
+      },
       { label: 'Re-arm voice', enabled: view.canReArm, click: reArm },
       { label: 'Settings...', click: openSettings },
       { type: 'separator' },

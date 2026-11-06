@@ -70,8 +70,15 @@ export class BrowserWindow extends EventEmitter {
     this.menuRemoved = true
   }
 
+  /** Like Electron: a 'close' listener can cancel it, and only then does 'closed' not follow. */
   close(): void {
-    this.emit('closed')
+    const close = { cancelled: false }
+    this.emit('close', {
+      preventDefault: () => {
+        close.cancelled = true
+      }
+    })
+    if (!close.cancelled) this.emit('closed')
   }
 
   isFocused(): boolean {
@@ -108,6 +115,7 @@ export class BrowserWindow extends EventEmitter {
 
   hide(): void {
     this.hideCount++
+    this.visible = false
   }
 
   setBounds(bounds: unknown): void {

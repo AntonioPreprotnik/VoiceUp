@@ -68,7 +68,10 @@ export function installAppMenu(actions?: SessionMenuActions): void {
               click: () => {
                 actions.openSettings()
               }
-            }
+            },
+            { type: 'separator' },
+            // Closing the window only hides it in the tray (S7.1). No shortcut: keys belong to Claude.
+            { label: 'Quit VoiceUp', role: 'quit', registerAccelerator: false }
           ]
         }
   const help: MenuItemConstructorOptions = {

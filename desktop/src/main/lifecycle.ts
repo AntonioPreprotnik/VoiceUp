@@ -8,6 +8,7 @@ import { Channels, type ChromeBrowser, type MicDevice } from '../shared/ipcChann
 import { installShutdown } from './appShutdown'
 import { createClaudeLink } from './claudeLink'
 import { registerHotkey, reportHotkeyTaken, unregisterHotkey, unregisterHotkeys } from './hotkey'
+import { Listening } from '../core/listening'
 import { exposeForE2e } from './e2eHook'
 import { on, registerTerminalIpc } from './ipc/terminal'
 import { registerTerminalUiIpc } from './ipc/terminalUi'
@@ -36,6 +37,14 @@ import { createWindow, loadRenderer, windowKindOf } from './windows/factory'
 function failStartup(error: unknown): void {
   log.error('Startup failed', error)
   app.exit(1)
+}
+
+/** Windows passes this when it starts VoiceUp at sign-in, so the window stays in the tray. */
+export const BACKGROUND_FLAG = '--background'
+
+/** An unpackaged build would add electron.exe to the startup list, so only a packaged one does. */
+function applyStartWithWindows(on: boolean): void {
+  if (app.isPackaged) app.setLoginItemSettings({ openAtLogin: on, args: [BACKGROUND_FLAG] })
 }
 
 function focusWindow(window: BrowserWindow): void {
@@ -104,7 +113,10 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
       const store = new SettingsStore(settings, (changed) => {
         saveSettings(app.getPath('userData'), changed)
       })
-      const terminalWindow = createWindow('terminal')
+      // Started by Windows at sign-in (S7.1): straight to the tray, with Claude and the hotkey ready.
+      const background = argv.includes(BACKGROUND_FLAG) && store.current.wizard.done
+      if (background) log.info('Started in the background')
+      const terminalWindow = createWindow('terminal', { showWhenReady: !background })
       mainWindow = terminalWindow
       const recorderWindow = createWindow('recorder', { showWhenReady: false })
       const overlayWindow = createWindow('overlay', { showWhenReady: false })
@@ -112,7 +124,15 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
       loadRenderer(overlayWindow, 'overlay').catch((error: unknown) => {
         log.error('Could not load the overlay window', error)
       })
-      const { claudeState, delivery, hooks, publishStatus, setNotifications } = createClaudeLink({
+      const {
+        claudeState,
+        delivery,
+        hooks,
+        publishStatus,
+        setNotifications,
+        setListeningPaused,
+        stillRunning
+      } = createClaudeLink({
         settings: store,
         overlay,
         terminalWindow,
@@ -120,6 +140,19 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
         showWindow: focusFront,
         openSettings: () => {
           openSettings()
+        },
+        pauseListening: (paused) => {
+          if (paused) {
+            listening.pause()
+            log.info('Listening paused')
+          } else if (listening.resume()) {
+            log.info('Listening resumed')
+          } else {
+            log.warn('HOTKEY_TAKEN: the hotkey could not be had back after a pause')
+            reportHotkeyTaken(terminalWindow, store.current.hotkey)
+          }
+          setListeningPaused(listening.isPaused)
+          settingsScreen.refresh()
         },
         write: (data) => {
           claude.host.write(data)
@@ -211,7 +244,29 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
         microphones = devices
         settingsScreen.refresh()
       })
-      // Closing the terminal quits. window-all-closed can't do it: the hidden recorder stays open.
+      // Closing the terminal hides it in the tray once set up (S7.1), and Claude keeps running.
+      // Quit, signing out and shutting down still quit. During setup, closing still quits.
+      let quitting = false
+      let toldStillRunning = false
+      app.on('before-quit', () => {
+        quitting = true
+      })
+      const endingSession = (): void => {
+        quitting = true
+      }
+      terminalWindow.on('query-session-end', endingSession)
+      terminalWindow.on('session-end', endingSession)
+      terminalWindow.on('close', (event) => {
+        if (quitting || !store.current.wizard.done) return
+        event.preventDefault()
+        terminalWindow.hide()
+        log.info('Window hidden in the tray')
+        if (!toldStillRunning) {
+          toldStillRunning = true
+          stillRunning()
+        }
+      })
+      // window-all-closed can't quit: the hidden recorder stays open.
       mainWindow.once('closed', () => {
         mainWindow = undefined
         app.quit()
@@ -220,30 +275,27 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
       let terminalLoad: Promise<void> | undefined
       const loadTerminal = (): Promise<void> =>
         (terminalLoad ??= loadRenderer(terminalWindow, 'terminal'))
-      // Once only: the wizard's microphone test may have turned it on already.
-      let hotkeyOn: boolean | undefined
-      const startHotkey = (): boolean => {
-        steps.shortcuts ??= unregisterHotkeys
-        hotkeyOn ??= registerHotkey(store.current.hotkey, () => {
-          recording.press()
-        })
-        return hotkeyOn
-      }
-      const pressHotkey = (): void => {
-        recording.press()
-      }
-      /** The new one on, then the old one off. If it can't be had, the old one stays on. */
-      const changeHotkey = (next: string): boolean => {
-        const previous = store.current.hotkey
-        if (hotkeyOn === true) unregisterHotkey(previous)
-        if (registerHotkey(next, pressHotkey)) {
+      const listening = new Listening({
+        register: (accelerator) => {
           steps.shortcuts ??= unregisterHotkeys
-          hotkeyOn = true
+          return registerHotkey(accelerator, () => {
+            recording.press()
+          })
+        },
+        unregister: unregisterHotkey,
+        hotkey: () => store.current.hotkey,
+        cancelRecording: () => {
+          recording.cancel()
+        }
+      })
+      // Once only: the wizard's microphone test may have turned it on already.
+      const startHotkey = (): boolean => listening.start()
+      const changeHotkey = (next: string): boolean => {
+        if (listening.change(next)) {
           log.info('Hotkey changed')
           return true
         }
         log.warn('HOTKEY_TAKEN: the new hotkey could not be registered')
-        if (hotkeyOn === true && !registerHotkey(previous, pressHotkey)) hotkeyOn = false
         return false
       }
       const settingsScreen = new SettingsScreen({
@@ -255,7 +307,7 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
           models.ensure()
         },
         changeHotkey,
-        hotkeyOn: () => hotkeyOn === true,
+        hotkeyOn: () => listening.hotkeyOn,
         canStartWithWindows: app.isPackaged
       })
       // Not during setup: the wizard owns these choices until it finishes.
@@ -271,8 +323,7 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
           setNotifications(next.ui.notifications)
         }
         if (next.ui.startWithWindows !== previous.ui.startWithWindows) {
-          // An unpackaged build would add electron.exe to the startup list.
-          if (app.isPackaged) app.setLoginItemSettings({ openAtLogin: next.ui.startWithWindows })
+          applyStartWithWindows(next.ui.startWithWindows)
           log.info(`Start with Windows: ${next.ui.startWithWindows ? 'on' : 'off'}`)
         }
         if (next.speech.modelId !== previous.speech.modelId) {
@@ -284,6 +335,8 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
           applySpeechSettings()
         }
       })
+      // Brings an entry from before S7.1 up to date, with the flag that keeps the window hidden.
+      if (store.current.ui.startWithWindows) applyStartWithWindows(true)
       const openTerminal = async (): Promise<void> => {
         await loadTerminal()
         // The e2e tests have no model and no network, so nothing downloads for them.

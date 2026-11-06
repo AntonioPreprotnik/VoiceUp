@@ -159,6 +159,11 @@ class FakeApp extends EventEmitter {
     return '0.0.0-test'
   }
 
+  /** No default browser, so setup picks by what it finds. */
+  getApplicationNameForProtocol(): string {
+    return ''
+  }
+
   getPath(name: string): string {
     calls.push(`getPath:${name}`)
     return name === 'logs' ? join(pathRoot, 'logs') : pathRoot

@@ -60,6 +60,10 @@ export interface WizardOptions {
     find(): readonly BrowserFinding[]
     /** Opens the fixed Web Store page in that browser. */
     open(browser: ChromeBrowser): void
+    /** Windows' default browser, if it is one of ours. */
+    defaultBrowser(): ChromeBrowser | null
+    /** Starts the browser for the browser test if it isn't running. Opens no page. */
+    openForTest(): Promise<'started' | 'running' | 'none'>
   }
   /** Whether the running Claude was started with --chrome. */
   readonly launchedWithChrome: () => boolean
@@ -136,7 +140,7 @@ export function openWizard({
     }
   })
 
-  const chromeStep = new ChromeStep()
+  const chromeStep = new ChromeStep(browsers.defaultBrowser())
   const checkChrome = (): boolean => chromeStep.update(browsers.find())
 
   let claudeStarted = false
@@ -158,14 +162,26 @@ export function openWizard({
       restartClaude()
       return 'restart'
     },
+    openBrowser: () => browsers.openForTest(),
     deliver,
     discard: discardDelivery,
     promptDirty,
     schedule,
     onChange: () => {
+      logBrowserTest()
       send(Channels.wizardChanged, view())
     }
   })
+  // Fixed wording only: never anything Claude wrote.
+  let loggedTest = 'ready'
+  const logBrowserTest = (): void => {
+    const status = browserTest.status
+    if (status.status === loggedTest) return
+    loggedTest = status.status
+    if (status.status === 'testing') log.info('Setup: browser test sent')
+    else if (status.status === 'passed') log.info('Setup: browser test passed')
+    else if (status.status === 'failed') log.warn(`Setup: browser test failed: ${status.title}`)
+  }
   let hotkeyOn: boolean | null = null
   let heard: string | null = null
   let micProblem: MicStepStatus['problem'] = null

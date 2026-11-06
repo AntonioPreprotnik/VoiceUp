@@ -39,6 +39,8 @@ const startHotkey = vi.fn<() => boolean>()
 let browsersFound: BrowserFinding[] = []
 const openStore = vi.fn()
 let launchedWithChrome = false
+/** Lets the browser check, which is a promise, finish. */
+const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0))
 let wizard: Wizard
 let settings: Settings
 let store: SettingsStore
@@ -90,7 +92,12 @@ function open(): void {
     },
     startHotkey,
     hotkey: 'Control+Shift+Space',
-    browsers: { find: () => browsersFound, open: openStore },
+    browsers: {
+      find: () => browsersFound,
+      open: openStore,
+      defaultBrowser: () => null,
+      openForTest: () => Promise.resolve('running')
+    },
     launchedWithChrome: () => launchedWithChrome
   })
   const created = BrowserWindow.instances.at(-1)
@@ -136,8 +143,9 @@ describe('the Claude in Chrome step', () => {
     wizard.onHook(parseHook(String(body['hook_event_name']), JSON.stringify(body)))
   }
   /** As in the recorded run: Claude starts with browser control, and its navigate opens the page. */
-  function passBrowserTest(): void {
+  async function passBrowserTest(): Promise<void> {
     invoke(Channels.wizardChromeTest, wizardEvent)
+    await flush()
     wizard.onClaudeState('starting')
     wizard.onClaudeState('idle')
     expect(deliver).toHaveBeenCalledWith(BROWSER_TEST_PROMPT)
@@ -158,7 +166,7 @@ describe('the Claude in Chrome step', () => {
     { browser: 'brave', installed: true, extension: false }
   ]
 
-  it('refuses Continue until the extension is found and the browser test passes', () => {
+  it('refuses Continue until the extension is found and the browser test passes', async () => {
     browsersFound = without
     atChrome()
     expect(invoke(Channels.wizardGet, wizardEvent)?.chrome).toEqual({
@@ -175,16 +183,17 @@ describe('the Claude in Chrome step', () => {
     expect(invoke(Channels.wizardNext, wizardEvent)?.index).toBe(4)
     expect(store.current.claude.browserControl).toBe(false)
 
-    passBrowserTest()
+    await passBrowserTest()
     expect(store.current.claude.browserControl).toBe(true)
     expect(invoke(Channels.wizardGet, wizardEvent)?.browserTest).toEqual({ status: 'passed' })
     expect(invoke(Channels.wizardNext, wizardEvent)?.index).toBe(5)
   })
 
-  it('starts Claude with browser control for the test, or restarts it, or uses it as it is', () => {
+  it('starts Claude with browser control for the test, or restarts it, or uses it as it is', async () => {
     atChrome()
     // Sign in was finished in an earlier run, so Claude isn't running yet.
     invoke(Channels.wizardChromeTest, wizardEvent)
+    await flush()
     expect(startClaude).toHaveBeenCalledOnce()
     expect(invoke(Channels.wizardGet, wizardEvent)?.browserTest).toEqual({ status: 'starting' })
     wizard.onClaudeState('starting')
@@ -198,6 +207,7 @@ describe('the Claude in Chrome step', () => {
 
     // Now it runs, but not with --chrome yet: the test restarts it.
     invoke(Channels.wizardChromeTest, wizardEvent)
+    await flush()
     expect(restartClaude).toHaveBeenCalledOnce()
     wizard.onClaudeState('starting')
     wizard.onClaudeState('idle')
@@ -206,15 +216,17 @@ describe('the Claude in Chrome step', () => {
 
     launchedWithChrome = true
     invoke(Channels.wizardChromeTest, wizardEvent)
+    await flush()
     expect(restartClaude).toHaveBeenCalledOnce()
     expect(deliver).toHaveBeenCalledTimes(3)
     expect(startClaude).toHaveBeenCalledOnce()
   })
 
-  it('runs the browser test only on its step, once the extension is there', () => {
+  it('runs the browser test only on its step, once the extension is there', async () => {
     browsersFound = without
     atChrome()
     invoke(Channels.wizardChromeTest, wizardEvent)
+    await flush()
     expect(startClaude).not.toHaveBeenCalled()
     expect(store.current.claude.browserControl).toBe(false)
   })
@@ -230,7 +242,7 @@ describe('the Claude in Chrome step', () => {
     expect(payload).toMatchObject({ chrome: { status: 'installed', browser: 'chrome' } })
   })
 
-  it('with no browser, says so and waits, and the user can still confirm, then test', () => {
+  it('with no browser, says so and waits, and the user can still confirm, then test', async () => {
     browsersFound = []
     atChrome()
     expect(invoke(Channels.wizardGet, wizardEvent)?.chrome).toEqual({ status: 'noBrowser' })
@@ -239,7 +251,7 @@ describe('the Claude in Chrome step', () => {
       status: 'installed',
       browser: null
     })
-    passBrowserTest()
+    await passBrowserTest()
     expect(invoke(Channels.wizardNext, wizardEvent)?.index).toBe(5)
     expect(store.current.claude.browserControl).toBe(true)
   })

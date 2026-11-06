@@ -492,10 +492,10 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 - AC: detect installation with a read-only existence check for extension ID `fcoeoabgfenejglbffodgkkbkcdhcgfn` in the browser profile's `Extensions` folder, or let the user confirm manually. No other browser data is read. Continue stays off until one of the two, and finishing the step turns on `claude.browserControl` for S6.9.
 - AC: the user signs into the extension with the same Claude account.
 
-**[ ] S6.9 Launch Claude with Chrome.** As a user, I want Claude to use the browser without remembering flags.
+**[x] S6.9 Launch Claude with Chrome.** As a user, I want Claude to use the browser without remembering flags.
 
 - AC: setting "Browser control" (on once S6.8 completes) launches `claude --chrome`; minimum Claude Code version for this is 2.0.73, enforced by the S6.3 version check.
-- AC: onboarding test asks Claude to open a web page and confirms it worked. It passes only when Claude in Chrome's `navigate` reports the page opened: in S6.9 a browser Claude couldn't reach still answered its tool call normally. The step can't be finished without it.
+- AC: onboarding test asks Claude to open a web page and confirms it worked. It passes only when Claude in Chrome's `navigate` reports the page opened: in S6.9 a browser Claude couldn't reach still answered its tool call normally. The step can't be finished without it. The test opens the browser first if it is closed: the default one when it has the extension (Antonio asked for this after a real test failed with Brave closed).
 - AC: if Claude Code reports the extension is not detected, show the documented fixes: restart Chrome and Claude, or run `/chrome` → Reconnect.
 
 **[x] S6.10 Show the browser.** As a user, I want to see what Claude is doing in my browser. Added during M4 at Antonio's request and built ahead of S6.2 (decision note S6.10).

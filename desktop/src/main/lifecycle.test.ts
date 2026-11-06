@@ -75,7 +75,8 @@ vi.mock('./pty/resolveClaude', async (importOriginal) => ({
 vi.mock('./browser/chromeExtension', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./browser/chromeExtension')>()),
   findBrowsers: () => [{ browser: 'chrome', installed: true, extension: true }],
-  openStore: () => true
+  openStore: () => true,
+  openForTest: () => Promise.resolve('running')
 }))
 vi.mock('electron', () => import('../../test/fakes/electron'))
 vi.mock('electron-log/main', () => import('../../test/fakes/electronLog'))

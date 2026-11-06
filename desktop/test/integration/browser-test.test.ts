@@ -18,10 +18,12 @@ function recorded(name: string): HookMessage[] {
 }
 
 const deliver = vi.fn<(text: string) => void>()
+const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0))
 
 function readyTest(): BrowserTest {
   const test = new BrowserTest({
     startWithBrowser: () => 'running',
+    openBrowser: () => Promise.resolve('running'),
     deliver,
     discard: () => undefined,
     promptDirty: () => false,
@@ -33,9 +35,10 @@ function readyTest(): BrowserTest {
 }
 
 describe('the browser test on recorded runs', () => {
-  it('passes on the real run where the page opened', () => {
+  it('passes on the real run where the page opened', async () => {
     const test = readyTest()
     test.start()
+    await flush()
     expect(deliver).toHaveBeenCalledExactlyOnceWith(BROWSER_TEST_PROMPT)
     expect(test.status).toEqual({ status: 'testing' })
     for (const message of recorded('browser-navigate')) test.onHook(message)
@@ -43,9 +46,10 @@ describe('the browser test on recorded runs', () => {
     expect(test.passed).toBe(true)
   })
 
-  it('fails on the real run where the extension was not connected, and says how to fix it', () => {
+  it('fails on the real run where the extension was not connected, and says how to fix it', async () => {
     const test = readyTest()
     test.start()
+    await flush()
     for (const message of recorded('browser-not-connected')) test.onHook(message)
     expect(test.passed).toBe(false)
     expect(test.status).toMatchObject({

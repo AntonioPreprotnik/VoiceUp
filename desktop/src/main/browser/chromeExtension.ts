@@ -1,9 +1,10 @@
-import { spawn } from 'node:child_process'
+import { execFile, spawn } from 'node:child_process'
 import { existsSync, readdirSync } from 'node:fs'
 import { win32 } from 'node:path'
 import type { BrowserFinding } from '../../core/chromeStep'
 import type { ChromeBrowser } from '../../shared/ipcChannels'
 import { log } from '../log'
+import { system32Path } from '../pty/resolveClaude'
 
 // Windows paths on any host, so the tests read the same everywhere.
 const join = (...parts: string[]): string => win32.join(...parts)
@@ -124,4 +125,47 @@ export function openStore(
   launch(program, [STORE_URL])
   log.info(`Opened the Claude in Chrome page in ${browser}`)
   return true
+}
+
+/** Whether a program with this file name is running, from Windows' own task list. */
+export type IsRunning = (exe: string) => Promise<boolean>
+
+const isRunningReal: IsRunning = (exe) =>
+  new Promise((resolve) => {
+    execFile(
+      system32Path('tasklist.exe'),
+      ['/FI', `IMAGENAME eq ${exe}`, '/FO', 'CSV', '/NH'],
+      { windowsHide: true, timeout: 10000 },
+      (error, stdout) => {
+        if (error !== null) {
+          log.warn('Could not read the task list:', error.message)
+          // Unknown: starting the browser again only opens one more window.
+          resolve(false)
+          return
+        }
+        resolve(stdout.toLowerCase().includes(`"${exe.toLowerCase()}"`))
+      }
+    )
+  })
+
+export type BrowserOpened = 'started' | 'running' | 'none'
+
+/**
+ * Before the browser test (S6.9): Claude in Chrome can only connect to a browser that is open, so
+ * this starts the chosen one if it isn't running. It opens no page: Claude does that.
+ */
+export async function openForTest(
+  browser: ChromeBrowser | null,
+  places: Places,
+  disk: Disk = realDisk,
+  isRunning: IsRunning = isRunningReal,
+  launch: Launch = launchDetached
+): Promise<BrowserOpened> {
+  if (browser === null) return 'none'
+  const program = programPaths(browser, places).find((path) => disk.exists(path))
+  if (program === undefined) return 'none'
+  if (await isRunning(BROWSERS[browser].exe)) return 'running'
+  launch(program, [])
+  log.info(`Started ${browser} for the browser test`)
+  return 'started'
 }

@@ -201,9 +201,9 @@ function chromeText(state: ChromeStepStatus): string {
 function browserTestText(state: BrowserTestStatus): string {
   switch (state.status) {
     case 'ready':
-      return 'Now test it. VoiceUp starts Claude with browser control and asks it to open example.com. If Claude asks in the terminal whether to use your browser, or for permission, answer there.'
+      return 'Now test it. VoiceUp opens your browser if it isn’t open, starts Claude with browser control, and asks it to open example.com. If Claude asks in the terminal whether to use your browser, or for permission, answer there.'
     case 'starting':
-      return 'Starting Claude with browser control… If it asks whether to use your browser, choose Yes in the terminal.'
+      return 'Opening your browser and starting Claude with browser control… If Claude asks whether to use your browser, choose Yes in the terminal.'
     case 'testing':
       return 'Waiting for Claude to open the page in your browser…'
     case 'passed':

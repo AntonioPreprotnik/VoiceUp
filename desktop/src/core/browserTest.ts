@@ -8,6 +8,8 @@ export const BROWSER_TEST_PROMPT =
 /** Long enough for a permission question, or Claude's one-time "use my browser" question. */
 const TEST_TIMEOUT_MS = 120000
 const START_TIMEOUT_MS = 120000
+/** Time for a browser VoiceUp just started to load the extension, before Claude needs it. */
+export const BROWSER_WAKE_MS = 5000
 
 /** Claude in Chrome needs Claude Code 2.0.73 or newer (Claude Code's Chrome docs). */
 export const CHROME_MIN_CLAUDE_VERSION = '2.0.73'
@@ -19,6 +21,8 @@ export interface BrowserTestDeps {
    * already has it.
    */
   readonly startWithBrowser: () => 'fresh' | 'restart' | 'running'
+  /** Starts the browser if it isn't running: Claude in Chrome can't connect to a closed one. */
+  readonly openBrowser: () => Promise<'started' | 'running' | 'none'>
   /** Through the send gate, so the text can't land in a prompt or question. */
   readonly deliver: (text: string) => void
   readonly discard: () => void
@@ -42,6 +46,11 @@ export class BrowserTest {
   private claude: ClaudeState = 'starting'
   private phase: 'ready' | 'starting' | 'testing' | 'passed' = 'ready'
   private sawStart = false
+  private claudeReady = false
+  private browserReady = false
+  private cancelWake: (() => void) | undefined
+  /** Each run counts, so an answer from an earlier run can't move a later one on. */
+  private run = 0
   private sawPrompt = false
   private failed: Failure | undefined
   private cancelTimer: (() => void) | undefined
@@ -60,18 +69,33 @@ export class BrowserTest {
   start(): void {
     if (this.phase !== 'ready') return
     this.failed = undefined
+    const run = ++this.run
+    this.phase = 'starting'
     const start = this.deps.startWithBrowser()
-    if (start !== 'running') {
-      this.phase = 'starting'
-      // A restart passes through starting. A fresh start may already be there, with nothing idle.
-      this.sawStart = start === 'fresh'
-      this.setTimer(START_TIMEOUT_MS, () => {
-        this.fail(failure('Claude didn’t start', 'Check the terminal, then test again.'))
+    this.claudeReady = start === 'running'
+    // A restart passes through starting. A fresh start may already be there, with nothing idle.
+    this.sawStart = start === 'fresh'
+    this.browserReady = false
+    this.setTimer(START_TIMEOUT_MS, () => {
+      this.fail(failure('Claude didn’t start', 'Check the terminal, then test again.'))
+    })
+    this.deps.onChange()
+    this.deps
+      .openBrowser()
+      .catch(() => 'none' as const)
+      .then((opened) => {
+        if (run !== this.run || this.phase !== 'starting') return
+        if (opened !== 'started') {
+          this.browserReady = true
+          this.sendWhenReady()
+          return
+        }
+        this.cancelWake = this.deps.schedule(() => {
+          this.browserReady = true
+          this.sendWhenReady()
+        }, BROWSER_WAKE_MS)
       })
-      this.deps.onChange()
-      return
-    }
-    this.send()
+      .catch(() => undefined)
   }
 
   onClaudeState(state: ClaudeState): void {
@@ -79,7 +103,8 @@ export class BrowserTest {
     if (this.phase === 'starting') {
       if (state === 'starting') this.sawStart = true
       // Only a session that started after the restart has browser control.
-      if (state === 'idle' && this.sawStart) this.send()
+      if (state === 'idle' && this.sawStart) this.claudeReady = true
+      this.sendWhenReady()
       return
     }
     if (this.phase === 'testing' && state === 'exited') {
@@ -104,6 +129,10 @@ export class BrowserTest {
     } else if (hook.hook_event_name === 'Stop' || hook.hook_event_name === 'StopFailure') {
       this.fail(notConnected())
     }
+  }
+
+  private sendWhenReady(): void {
+    if (this.phase === 'starting' && this.claudeReady && this.browserReady) this.send()
   }
 
   private send(): void {
@@ -142,6 +171,8 @@ export class BrowserTest {
 
   private fail(failed: Failure): void {
     this.clearTimer()
+    this.cancelWake?.()
+    this.cancelWake = undefined
     this.phase = 'ready'
     this.failed = failed
     this.deps.onChange()

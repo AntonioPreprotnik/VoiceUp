@@ -109,7 +109,13 @@ function draw(view: SettingsView): void {
     // Never under the user's cursor: that would undo what they are typing.
     if (document.activeElement !== input) input.value = String(values[field])
   }
-  for (const field of ['queue', 'sounds', 'notifications', 'startWithWindows'] as const) {
+  for (const field of [
+    'queue',
+    'sounds',
+    'notifications',
+    'startWithWindows',
+    'browserControl'
+  ] as const) {
     ;(element(field) as HTMLInputElement).checked = values[field]
   }
   const start = element('startWithWindows') as HTMLInputElement

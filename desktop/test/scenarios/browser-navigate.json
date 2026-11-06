@@ -1,0 +1,200 @@
+{
+  "name": "browser-navigate",
+  "events": [
+    {
+      "t": 1000,
+      "event": "SessionStart",
+      "body": {
+        "hook_event_name": "SessionStart",
+        "source": "startup"
+      }
+    },
+    {
+      "t": 2690,
+      "input": "<prompt>"
+    },
+    {
+      "t": 2890,
+      "event": "UserPromptSubmit",
+      "body": {
+        "hook_event_name": "UserPromptSubmit",
+        "permission_mode": "default",
+        "prompt": "prompt text"
+      }
+    },
+    {
+      "t": 9614,
+      "event": "PreToolUse",
+      "body": {
+        "hook_event_name": "PreToolUse",
+        "tool_name": "Skill",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 9695,
+      "event": "PostToolUse",
+      "body": {
+        "hook_event_name": "PostToolUse",
+        "tool_name": "Skill",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 10836,
+      "event": "PreToolUse",
+      "body": {
+        "hook_event_name": "PreToolUse",
+        "tool_name": "ToolSearch",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 10911,
+      "event": "PostToolUse",
+      "body": {
+        "hook_event_name": "PostToolUse",
+        "tool_name": "ToolSearch",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 14807,
+      "event": "PreToolUse",
+      "body": {
+        "hook_event_name": "PreToolUse",
+        "tool_name": "mcp__claude-in-chrome__tabs_context_mcp",
+        "permission_mode": "default",
+        "mcp_server": "claude-in-chrome"
+      }
+    },
+    {
+      "t": 18022,
+      "event": "PostToolUse",
+      "body": {
+        "hook_event_name": "PostToolUse",
+        "tool_name": "mcp__claude-in-chrome__tabs_context_mcp",
+        "permission_mode": "default",
+        "mcp_server": "claude-in-chrome",
+        "tool_response": [
+          {
+            "type": "text",
+            "text": "{}"
+          }
+        ]
+      }
+    },
+    {
+      "t": 21114,
+      "event": "PreToolUse",
+      "body": {
+        "hook_event_name": "PreToolUse",
+        "tool_name": "mcp__claude-in-chrome__tabs_create_mcp",
+        "permission_mode": "default",
+        "mcp_server": "claude-in-chrome"
+      }
+    },
+    {
+      "t": 22386,
+      "event": "PostToolUse",
+      "body": {
+        "hook_event_name": "PostToolUse",
+        "tool_name": "mcp__claude-in-chrome__tabs_create_mcp",
+        "permission_mode": "default",
+        "mcp_server": "claude-in-chrome",
+        "tool_response": [
+          {
+            "type": "text",
+            "text": "Created new tab. Tab ID: 1"
+          }
+        ]
+      }
+    },
+    {
+      "t": 25086,
+      "event": "PreToolUse",
+      "body": {
+        "hook_event_name": "PreToolUse",
+        "tool_name": "mcp__claude-in-chrome__navigate",
+        "permission_mode": "default",
+        "mcp_server": "claude-in-chrome"
+      }
+    },
+    {
+      "t": 26400,
+      "event": "PostToolUse",
+      "body": {
+        "hook_event_name": "PostToolUse",
+        "tool_name": "mcp__claude-in-chrome__navigate",
+        "permission_mode": "default",
+        "mcp_server": "claude-in-chrome",
+        "tool_response": [
+          {
+            "type": "text",
+            "text": "Navigated to https://example.com/"
+          }
+        ]
+      }
+    },
+    {
+      "t": 30625,
+      "event": "PreToolUse",
+      "body": {
+        "hook_event_name": "PreToolUse",
+        "tool_name": "mcp__claude-in-chrome__tabs_context_mcp",
+        "permission_mode": "default",
+        "mcp_server": "claude-in-chrome"
+      }
+    },
+    {
+      "t": 30833,
+      "event": "PostToolUse",
+      "body": {
+        "hook_event_name": "PostToolUse",
+        "tool_name": "mcp__claude-in-chrome__tabs_context_mcp",
+        "permission_mode": "default",
+        "mcp_server": "claude-in-chrome",
+        "tool_response": [
+          {
+            "type": "text",
+            "text": "{}"
+          }
+        ]
+      }
+    },
+    {
+      "t": 44565,
+      "event": "PreToolUse",
+      "body": {
+        "hook_event_name": "PreToolUse",
+        "tool_name": "mcp__claude-in-chrome__tabs_close_mcp",
+        "permission_mode": "default",
+        "mcp_server": "claude-in-chrome"
+      }
+    },
+    {
+      "t": 45318,
+      "event": "PostToolUse",
+      "body": {
+        "hook_event_name": "PostToolUse",
+        "tool_name": "mcp__claude-in-chrome__tabs_close_mcp",
+        "permission_mode": "default",
+        "mcp_server": "claude-in-chrome",
+        "tool_response": [
+          {
+            "type": "text",
+            "text": "Closed tab 1. 1 tab(s) remain."
+          }
+        ]
+      }
+    },
+    {
+      "t": 48044,
+      "event": "Stop",
+      "body": {
+        "hook_event_name": "Stop",
+        "background_tasks": []
+      }
+    }
+  ]
+}

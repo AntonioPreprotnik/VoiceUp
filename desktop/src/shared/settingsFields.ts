@@ -16,6 +16,8 @@ export interface EditableSettings {
   readonly sounds: boolean
   readonly notifications: boolean
   readonly startWithWindows: boolean
+  /** Starts Claude with --chrome, from its next start (S6.9). */
+  readonly browserControl: boolean
   readonly logLevel: (typeof LOG_LEVELS)[number]
 }
 

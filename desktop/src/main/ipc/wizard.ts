@@ -24,6 +24,7 @@ export interface WizardActions {
   openChromeStore(browser: ChromeBrowser): WizardView
   checkChrome(): WizardView
   confirmChrome(): WizardView
+  testBrowser(): WizardView
 }
 
 type WizardChannel =
@@ -40,11 +41,12 @@ type WizardChannel =
   | typeof Channels.wizardChromeOpen
   | typeof Channels.wizardChromeCheck
   | typeof Channels.wizardChromeConfirm
+  | typeof Channels.wizardChromeTest
 
 /**
  * The wizard page can read its progress, move through the steps, ask for the fixed Claude Code
- * install, open the folder picker, send the fixed test prompt, restart Claude and open the fixed
- * Web Store page in Chrome or Brave. It can't choose what runs, supply a path or an address, or
+ * install, open the folder picker, send the fixed test prompt, restart Claude, open the fixed
+ * Web Store page in Chrome or Brave and send the fixed browser test. It can't choose what runs, supply a path or an address, or
  * choose the prompt's text, and nothing here changes any other setting (TECH_SPEC §6.1).
  */
 export function registerWizardIpc(actions: WizardActions): void {
@@ -81,4 +83,5 @@ export function registerWizardIpc(actions: WizardActions): void {
   )
   plain(Channels.wizardChromeCheck, () => actions.checkChrome())
   plain(Channels.wizardChromeConfirm, () => actions.confirmChrome())
+  plain(Channels.wizardChromeTest, () => actions.testBrowser())
 }

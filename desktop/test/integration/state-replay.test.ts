@@ -155,6 +155,10 @@ const EXPECTED: Record<string, ClaudeState[]> = {
   'double-esc': ['idle', 'busy', 'idle', 'unknown', 'exited'],
   'login-menu': ['idle', 'unknown', 'busy', 'idle', 'exited'],
   'trust-pending': ['exited'],
+  // Recorded in S6.9 with claude -p --chrome, which ends without an exit. A browser tool that can't
+  // reach the extension is a normal tool call, so neither changes the state's path.
+  'browser-navigate': ['idle', 'busy', 'idle'],
+  'browser-not-connected': ['idle', 'busy', 'idle'],
   'first-run': ['exited']
 }
 

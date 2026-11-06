@@ -6,7 +6,8 @@ import type { BrowserFinding } from '../core/chromeStep'
 import type { ModelStatus } from './models/controller'
 import type { RunningInstall } from './pty/installClaude'
 import { Channels, type WizardResult, type WizardView } from '../shared/ipcChannels'
-import type { HookMessage } from '../shared/hooks'
+import { parseHook, type HookMessage } from '../shared/hooks'
+import { BROWSER_TEST_PROMPT } from '../core/browserTest'
 import type { Settings } from '../shared/settings'
 import { SettingsStore } from './settings/settingsStore'
 import { openWizard, type Wizard } from './wizard'
@@ -37,6 +38,7 @@ const ensureModel = vi.fn()
 const startHotkey = vi.fn<() => boolean>()
 let browsersFound: BrowserFinding[] = []
 const openStore = vi.fn()
+let launchedWithChrome = false
 let wizard: Wizard
 let settings: Settings
 let store: SettingsStore
@@ -88,7 +90,8 @@ function open(): void {
     },
     startHotkey,
     hotkey: 'Control+Shift+Space',
-    browsers: { find: () => browsersFound, open: openStore }
+    browsers: { find: () => browsersFound, open: openStore },
+    launchedWithChrome: () => launchedWithChrome
   })
   const created = BrowserWindow.instances.at(-1)
   if (created === undefined) throw new Error('No window was created')
@@ -129,6 +132,22 @@ async function openReady(): Promise<void> {
 }
 
 describe('the Claude in Chrome step', () => {
+  const hook = (body: Record<string, unknown>): void => {
+    wizard.onHook(parseHook(String(body['hook_event_name']), JSON.stringify(body)))
+  }
+  /** As in the recorded run: Claude starts with browser control, and its navigate opens the page. */
+  function passBrowserTest(): void {
+    invoke(Channels.wizardChromeTest, wizardEvent)
+    wizard.onClaudeState('starting')
+    wizard.onClaudeState('idle')
+    expect(deliver).toHaveBeenCalledWith(BROWSER_TEST_PROMPT)
+    hook({ hook_event_name: 'UserPromptSubmit' })
+    hook({
+      hook_event_name: 'PostToolUse',
+      tool_name: 'mcp__claude-in-chrome__navigate',
+      tool_response: [{ type: 'text', text: 'Navigated to https://example.com/' }]
+    })
+  }
   function atChrome(): void {
     settings.wizard.completed = ['claudeCode', 'projectFolder', 'signIn', 'speechModel']
     open()
@@ -139,7 +158,7 @@ describe('the Claude in Chrome step', () => {
     { browser: 'brave', installed: true, extension: false }
   ]
 
-  it('refuses Continue until the extension is found, then turns on browser control', () => {
+  it('refuses Continue until the extension is found and the browser test passes', () => {
     browsersFound = without
     atChrome()
     expect(invoke(Channels.wizardGet, wizardEvent)?.chrome).toEqual({
@@ -153,9 +172,51 @@ describe('the Claude in Chrome step', () => {
       status: 'installed',
       browser: 'brave'
     })
+    expect(invoke(Channels.wizardNext, wizardEvent)?.index).toBe(4)
     expect(store.current.claude.browserControl).toBe(false)
-    expect(invoke(Channels.wizardNext, wizardEvent)?.index).toBe(5)
+
+    passBrowserTest()
     expect(store.current.claude.browserControl).toBe(true)
+    expect(invoke(Channels.wizardGet, wizardEvent)?.browserTest).toEqual({ status: 'passed' })
+    expect(invoke(Channels.wizardNext, wizardEvent)?.index).toBe(5)
+  })
+
+  it('starts Claude with browser control for the test, or restarts it, or uses it as it is', () => {
+    atChrome()
+    // Sign in was finished in an earlier run, so Claude isn't running yet.
+    invoke(Channels.wizardChromeTest, wizardEvent)
+    expect(startClaude).toHaveBeenCalledOnce()
+    expect(invoke(Channels.wizardGet, wizardEvent)?.browserTest).toEqual({ status: 'starting' })
+    wizard.onClaudeState('starting')
+    wizard.onClaudeState('idle')
+    hook({ hook_event_name: 'UserPromptSubmit' })
+    hook({ hook_event_name: 'Stop' })
+    expect(invoke(Channels.wizardGet, wizardEvent)?.browserTest).toMatchObject({
+      status: 'failed',
+      title: 'Claude couldn’t use your browser'
+    })
+
+    // Now it runs, but not with --chrome yet: the test restarts it.
+    invoke(Channels.wizardChromeTest, wizardEvent)
+    expect(restartClaude).toHaveBeenCalledOnce()
+    wizard.onClaudeState('starting')
+    wizard.onClaudeState('idle')
+    hook({ hook_event_name: 'UserPromptSubmit' })
+    hook({ hook_event_name: 'Stop' })
+
+    launchedWithChrome = true
+    invoke(Channels.wizardChromeTest, wizardEvent)
+    expect(restartClaude).toHaveBeenCalledOnce()
+    expect(deliver).toHaveBeenCalledTimes(3)
+    expect(startClaude).toHaveBeenCalledOnce()
+  })
+
+  it('runs the browser test only on its step, once the extension is there', () => {
+    browsersFound = without
+    atChrome()
+    invoke(Channels.wizardChromeTest, wizardEvent)
+    expect(startClaude).not.toHaveBeenCalled()
+    expect(store.current.claude.browserControl).toBe(false)
   })
 
   it('checks again when the window comes back to the front, and tells the page', () => {
@@ -166,15 +227,19 @@ describe('the Claude in Chrome step', () => {
     window.emit('focus')
     const [channel, payload] = window.webContents.sent.slice(sent).at(-1) ?? []
     expect(channel).toBe(Channels.wizardChanged)
-    expect(payload).toMatchObject({ canContinue: true })
+    expect(payload).toMatchObject({ chrome: { status: 'installed', browser: 'chrome' } })
   })
 
-  it('with no browser, says so and waits, and the user can still confirm', () => {
+  it('with no browser, says so and waits, and the user can still confirm, then test', () => {
     browsersFound = []
     atChrome()
     expect(invoke(Channels.wizardGet, wizardEvent)?.chrome).toEqual({ status: 'noBrowser' })
     expect(invoke(Channels.wizardNext, wizardEvent)?.index).toBe(4)
-    expect(invoke(Channels.wizardChromeConfirm, wizardEvent)?.canContinue).toBe(true)
+    expect(invoke(Channels.wizardChromeConfirm, wizardEvent)?.chrome).toEqual({
+      status: 'installed',
+      browser: null
+    })
+    passBrowserTest()
     expect(invoke(Channels.wizardNext, wizardEvent)?.index).toBe(5)
     expect(store.current.claude.browserControl).toBe(true)
   })
@@ -638,7 +703,7 @@ describe('openWizard', () => {
   })
 
   it('finishes from the last step: saved first, then the app goes on and the window closes', async () => {
-    settings.wizard.completed = ['signIn', 'micAndHotkey']
+    settings.wizard.completed = ['signIn', 'claudeInChrome', 'micAndHotkey']
     await openReady()
     const order: string[] = []
     save.mockImplementation(() => {
@@ -658,7 +723,7 @@ describe('openWizard', () => {
   })
 
   it('finishes only once when Continue is pressed again', async () => {
-    settings.wizard.completed = ['signIn', 'micAndHotkey']
+    settings.wizard.completed = ['signIn', 'claudeInChrome', 'micAndHotkey']
     await openReady()
     for (let step = 0; step < STEP_COUNT + 2; step++) invoke(Channels.wizardNext, wizardEvent, {})
     expect(onFinished).toHaveBeenCalledOnce()
@@ -685,7 +750,11 @@ describe.each([
   Channels.wizardTestClaude,
   Channels.wizardRestartClaude,
   Channels.wizardRetryModel,
-  Channels.wizardSkipMicTest
+  Channels.wizardSkipMicTest,
+  Channels.wizardChromeOpen,
+  Channels.wizardChromeCheck,
+  Channels.wizardChromeConfirm,
+  Channels.wizardChromeTest
 ])('%s', (channel) => {
   it('refuses any other window, and changes nothing', () => {
     open()
@@ -695,7 +764,12 @@ describe.each([
   })
 })
 
-describe.each([Channels.wizardGet, Channels.wizardNext, Channels.wizardBack])('%s', (channel) => {
+describe.each([
+  Channels.wizardGet,
+  Channels.wizardNext,
+  Channels.wizardBack,
+  Channels.wizardChromeTest
+])('%s', (channel) => {
   it.each([[undefined], [{ hotkey: 'Alt+V' }], ['x'], [1]])(
     'refuses a payload of the wrong shape: %j',
     (payload) => {

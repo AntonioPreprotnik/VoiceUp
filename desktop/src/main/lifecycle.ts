@@ -352,7 +352,8 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
           open: (browser) => {
             openStore(browser, browserPlaces(app.isPackaged))
           }
-        }
+        },
+        launchedWithChrome: () => claude.launchedWithChrome
       })
       wizard.onClaudeState(claudeState.state)
       wizardWindow = wizard.window

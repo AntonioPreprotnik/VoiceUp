@@ -10,6 +10,17 @@ const agent = {
   tool_name: z.string().optional()
 }
 
+/** Claude in Chrome's page-opening tool (decision note S6.10, recorded again in S6.9). */
+export const BROWSER_NAVIGATE_TOOL = 'mcp__claude-in-chrome__navigate'
+
+/** Its answer starts "Navigated to <url>" when the page opened (test/scenarios/browser-navigate). */
+function navigated(tool: string | undefined, response: unknown): boolean {
+  if (tool !== BROWSER_NAVIGATE_TOOL || !Array.isArray(response)) return false
+  const first: unknown = response[0]
+  if (typeof first !== 'object' || first === null || !('text' in first)) return false
+  return typeof first.text === 'string' && first.text.startsWith('Navigated to ')
+}
+
 const HookEvent = z.discriminatedUnion('hook_event_name', [
   z.object({ hook_event_name: z.literal('SessionStart'), ...session, source: z.string() }),
   z.object({ hook_event_name: z.literal('SessionEnd'), ...session, reason: z.string() }),
@@ -21,7 +32,18 @@ const HookEvent = z.discriminatedUnion('hook_event_name', [
   }),
   z.object({ hook_event_name: z.literal('PreToolUse'), ...agent }),
   z.object({ hook_event_name: z.literal('PermissionRequest'), ...agent }),
-  z.object({ hook_event_name: z.literal('PostToolUse'), ...agent }),
+  // A browser tool that can't reach the extension still "succeeds", with the error as its text
+  // (S6.9). Only whether a navigation really happened is kept: the rest of the answer, which can
+  // hold page content, is dropped here.
+  z
+    .object({
+      hook_event_name: z.literal('PostToolUse'),
+      ...agent,
+      tool_response: z.unknown().optional()
+    })
+    .transform(({ tool_response: response, ...hook }) =>
+      navigated(hook.tool_name, response) ? { ...hook, navigated: true as const } : hook
+    ),
   z.object({ hook_event_name: z.literal('PostToolUseFailure'), ...agent }),
   z.object({
     hook_event_name: z.literal('Notification'),

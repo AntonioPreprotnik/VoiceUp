@@ -21,18 +21,21 @@ let folderA: string
 let folderB: string
 let window: BrowserWindow
 
+let store: SettingsStore
+
 function createSession(projectDir: string | null = null, version = '2.1.318'): ClaudeSession {
   const defaults = defaultSettings()
+  store = new SettingsStore(
+    { ...defaults, claude: { ...defaults.claude, projectDir } },
+    (saved) => {
+      saveSettings(settingsDir, saved)
+    }
+  )
   return new ClaudeSession({
     window: window as unknown as RealBrowserWindow,
-    settings: new SettingsStore(
-      { ...defaults, claude: { ...defaults.claude, projectDir } },
-      (saved) => {
-        saveSettings(settingsDir, saved)
-      }
-    ),
+    settings: store,
     hooks: {
-      prepareLaunch: () => Promise.resolve({ args: [], env: {} }),
+      prepareLaunch: () => Promise.resolve({ args: ['--settings', 'hooks.json'], env: {} }),
       launched: () => undefined,
       exited: () => undefined
     },
@@ -72,6 +75,23 @@ beforeEach(() => {
 
 afterEach(() => {
   rmSync(root, { recursive: true, force: true })
+})
+
+describe('browser control (S6.9)', () => {
+  it('adds --chrome when it is on, from the next start only', async () => {
+    const session = createSession(folderA)
+    session.host.resize({ cols: 80, rows: 24 })
+    await spawnedCount(1)
+    expect(lastPty().args).toEqual(['--settings', 'hooks.json'])
+    expect(session.launchedWithChrome).toBe(false)
+
+    store.update((current) => ({ ...current, claude: { ...current.claude, browserControl: true } }))
+    expect(session.launchedWithChrome).toBe(false)
+    await session.host.restart()
+    await spawnedCount(2)
+    expect(lastPty().args).toEqual(['--settings', 'hooks.json', '--chrome'])
+    expect(session.launchedWithChrome).toBe(true)
+  })
 })
 
 describe('the first launch', () => {

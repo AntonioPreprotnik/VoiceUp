@@ -1,0 +1,96 @@
+{
+  "name": "browser-not-connected",
+  "events": [
+    {
+      "t": 1000,
+      "event": "SessionStart",
+      "body": {
+        "hook_event_name": "SessionStart",
+        "source": "startup"
+      }
+    },
+    {
+      "t": 2275,
+      "input": "<prompt>"
+    },
+    {
+      "t": 2475,
+      "event": "UserPromptSubmit",
+      "body": {
+        "hook_event_name": "UserPromptSubmit",
+        "permission_mode": "default",
+        "prompt": "prompt text"
+      }
+    },
+    {
+      "t": 5263,
+      "event": "PreToolUse",
+      "body": {
+        "hook_event_name": "PreToolUse",
+        "tool_name": "Skill",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 5391,
+      "event": "PostToolUse",
+      "body": {
+        "hook_event_name": "PostToolUse",
+        "tool_name": "Skill",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 8435,
+      "event": "PreToolUse",
+      "body": {
+        "hook_event_name": "PreToolUse",
+        "tool_name": "ToolSearch",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 8504,
+      "event": "PostToolUse",
+      "body": {
+        "hook_event_name": "PostToolUse",
+        "tool_name": "ToolSearch",
+        "permission_mode": "default"
+      }
+    },
+    {
+      "t": 11030,
+      "event": "PreToolUse",
+      "body": {
+        "hook_event_name": "PreToolUse",
+        "tool_name": "mcp__claude-in-chrome__tabs_context_mcp",
+        "permission_mode": "default",
+        "mcp_server": "claude-in-chrome"
+      }
+    },
+    {
+      "t": 22296,
+      "event": "PostToolUse",
+      "body": {
+        "hook_event_name": "PostToolUse",
+        "tool_name": "mcp__claude-in-chrome__tabs_context_mcp",
+        "permission_mode": "default",
+        "mcp_server": "claude-in-chrome",
+        "tool_response": [
+          {
+            "type": "text",
+            "text": "Browser extension is not connected. Please ensure the Claude browser extension is installed and running (https://claude.ai/chrome), and that you are logged into claude.ai with the same account as Claude Code. If this is your first time connecting to Chrome, you may need to re"
+          }
+        ]
+      }
+    },
+    {
+      "t": 27448,
+      "event": "Stop",
+      "body": {
+        "hook_event_name": "Stop",
+        "background_tasks": []
+      }
+    }
+  ]
+}

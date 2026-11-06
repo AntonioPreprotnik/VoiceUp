@@ -15,6 +15,7 @@ export function editable(settings: Settings): EditableSettings {
     sounds: settings.ui.sounds,
     notifications: settings.ui.notifications,
     startWithWindows: settings.ui.startWithWindows,
+    browserControl: settings.claude.browserControl,
     logLevel: settings.logLevel
   }
 }
@@ -36,6 +37,7 @@ export function withChanges(settings: Settings, changes: Partial<EditableSetting
       maxRecordingSec: next.maxRecordingSec
     },
     delivery: { ...settings.delivery, previewMs: next.previewMs, queue: next.queue },
+    claude: { ...settings.claude, browserControl: next.browserControl },
     ui: {
       ...settings.ui,
       sounds: next.sounds,
@@ -46,9 +48,15 @@ export function withChanges(settings: Settings, changes: Partial<EditableSetting
   }
 }
 
-/** Reset to defaults: the screen's fields only. The folder, setup progress and the rest stay. */
-export function defaultEditable(): EditableSettings {
-  return editable(defaultSettings())
+/**
+ * Reset to defaults: the screen's fields only. The folder, setup progress and the rest stay, and so
+ * does browser control, which setup turned on and the Claude in Chrome step requires.
+ */
+export function defaultEditable(): Omit<EditableSettings, 'browserControl'> {
+  const defaults = Object.entries(editable(defaultSettings())).filter(
+    ([field]) => field !== 'browserControl'
+  )
+  return Object.fromEntries(defaults) as Omit<EditableSettings, 'browserControl'>
 }
 
 const FIELD_BY_PATH: Readonly<Record<string, SettingsField>> = {
@@ -62,6 +70,7 @@ const FIELD_BY_PATH: Readonly<Record<string, SettingsField>> = {
   'ui.sounds': 'sounds',
   'ui.notifications': 'notifications',
   'ui.startWithWindows': 'startWithWindows',
+  'claude.browserControl': 'browserControl',
   logLevel: 'logLevel'
 }
 

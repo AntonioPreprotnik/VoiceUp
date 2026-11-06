@@ -26,6 +26,7 @@ export interface ClaudeSessionOptions {
 /** Claude's session in one window: which folder it runs in, and restarting it there (S1.2). */
 export class ClaudeSession {
   readonly host: PtyHost
+  private chrome = false
 
   constructor(private readonly options: ClaudeSessionOptions) {
     const { window, hooks } = options
@@ -33,7 +34,12 @@ export class ClaudeSession {
       send: (data) => {
         if (!window.isDestroyed()) window.webContents.send(Channels.termData, data)
       },
-      prepareLaunch: (cwd) => hooks.prepareLaunch(cwd),
+      prepareLaunch: async (cwd) => {
+        const extras = await hooks.prepareLaunch(cwd)
+        // Read at each launch: the setting applies from the next start (S6.9).
+        this.chrome = this.settings.claude.browserControl
+        return { ...extras, args: [...extras.args, ...(this.chrome ? ['--chrome'] : [])] }
+      },
       onLaunched: () => {
         hooks.launched()
       },
@@ -56,6 +62,11 @@ export class ClaudeSession {
   private report(exit: SessionExit): void {
     const { window } = this.options
     if (!window.isDestroyed()) window.webContents.send(Channels.sessionExited, exit)
+  }
+
+  /** Whether the running Claude was started with --chrome. */
+  get launchedWithChrome(): boolean {
+    return this.chrome
   }
 
   get fontSize(): number {

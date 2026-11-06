@@ -4,7 +4,7 @@ import { sideBySide } from '../core/sideBySide'
 import type { ShutdownSteps } from '../core/shutdown'
 import { parseSmokeTestPath } from '../core/smokeTest'
 import { RecorderDevices } from '../shared/ipc'
-import { Channels, type MicDevice } from '../shared/ipcChannels'
+import { Channels, type ChromeBrowser, type MicDevice } from '../shared/ipcChannels'
 import { installShutdown } from './appShutdown'
 import { createClaudeLink } from './claudeLink'
 import { registerHotkey, reportHotkeyTaken, unregisterHotkey, unregisterHotkeys } from './hotkey'
@@ -29,7 +29,8 @@ import { runSmokeTest } from './smokeTest'
 import { createVoice } from './voice'
 import { schedule } from './schedule'
 import { openWizard, type Wizard } from './wizard'
-import { browserPlaces, findBrowsers, openStore } from './browser/chromeExtension'
+import { browserPlaces, findBrowsers, openForTest, openStore } from './browser/chromeExtension'
+import { browserForTest, browserFromAppName } from '../core/chromeStep'
 import { createWindow, loadRenderer, windowKindOf } from './windows/factory'
 
 function failStartup(error: unknown): void {
@@ -297,6 +298,9 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
         await openTerminal()
         return
       }
+      // Windows' default browser, by name, so setup uses the one the user browses with.
+      const defaultBrowser = (): ChromeBrowser | null =>
+        browserFromAppName(app.getApplicationNameForProtocol('https://example.com'))
       wizard = openWizard({
         settings: store,
         onFinished: () => {
@@ -351,8 +355,14 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
           find: () => findBrowsers(browserPlaces(app.isPackaged)),
           open: (browser) => {
             openStore(browser, browserPlaces(app.isPackaged))
+          },
+          defaultBrowser,
+          openForTest: () => {
+            const places = browserPlaces(app.isPackaged)
+            return openForTest(browserForTest(findBrowsers(places), defaultBrowser()), places)
           }
-        }
+        },
+        launchedWithChrome: () => claude.launchedWithChrome
       })
       wizard.onClaudeState(claudeState.state)
       wizardWindow = wizard.window

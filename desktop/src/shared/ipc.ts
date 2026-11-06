@@ -26,6 +26,7 @@ export const SettingsChange = z
     sounds: z.boolean(),
     notifications: z.boolean(),
     startWithWindows: z.boolean(),
+    browserControl: z.boolean(),
     logLevel: z.enum(['error', 'warn', 'info', 'debug'])
   })
   .partial()

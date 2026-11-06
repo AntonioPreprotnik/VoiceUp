@@ -22,6 +22,11 @@ export const MESSAGES = {
     title: "Claude isn't signed in",
     detail: 'Log in inside the terminal window, then test again.'
   },
+  BROWSER_NOT_CONNECTED: {
+    title: 'Claude couldn’t use your browser',
+    detail:
+      'Check that Chrome or Brave is open, with the Claude extension turned on and signed in to the same Claude account. Then, in the terminal, type /chrome and choose Reconnect extension. If that doesn’t help, restart the browser and Claude. Then test again.'
+  },
   API_KEY_SET: {
     title: 'An API key overrides your subscription and bills the API',
     detail:

@@ -15,7 +15,7 @@ let app: ElectronApplication
 interface Saved {
   hotkey: string
   delivery: { previewMs: number; queue: boolean }
-  claude: { projectDir: string }
+  claude: { projectDir: string; browserControl: boolean }
   logLevel: string
 }
 
@@ -92,6 +92,10 @@ test('a change is saved as it is made, and a value out of range is refused with 
   await page.locator('#logLevel').selectOption('debug')
   await expect(page.locator('#debug-warning')).toBeVisible()
   await expect.poll(() => saved().logLevel).toBe('debug')
+
+  // Claude starts with --chrome from its next start (S6.9).
+  await page.locator('#browserControl').click()
+  await expect.poll(() => saved().claude.browserControl).toBe(true)
 })
 
 test('a new hotkey is recorded from the keys, and replaces the old one', async () => {
@@ -121,6 +125,7 @@ test('reset puts the screen back and keeps the project folder', async () => {
   await expect(page.locator('#previewMs')).toHaveValue('300')
   expect(saved().delivery.previewMs).toBe(300)
   expect(saved().claude.projectDir).toBe(dir)
+  expect(saved().claude.browserControl).toBe(false)
   // The default hotkey may be held by a daily copy on a developer's PC, which the screen reports.
   expect(['Control+Shift+Space', 'Control+Shift+F10']).toContain(saved().hotkey)
 })

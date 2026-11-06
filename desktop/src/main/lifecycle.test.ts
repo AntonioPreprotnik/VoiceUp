@@ -75,7 +75,8 @@ vi.mock('./pty/resolveClaude', async (importOriginal) => ({
 vi.mock('./browser/chromeExtension', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./browser/chromeExtension')>()),
   findBrowsers: () => [{ browser: 'chrome', installed: true, extension: true }],
-  openStore: () => true
+  openStore: () => true,
+  openForTest: () => Promise.resolve('running')
 }))
 vi.mock('electron', () => import('../../test/fakes/electron'))
 vi.mock('electron-log/main', () => import('../../test/fakes/electronLog'))
@@ -271,12 +272,15 @@ describe('the first-run wizard', () => {
   async function freshStart({ signedIn = false } = {}): Promise<BrowserWindow> {
     rmSync(settingsFile())
     if (signedIn) {
-      // Past the step that needs a running Claude, which has its own tests here and end to end.
+      // Past the steps that need a running Claude, which have their own tests here and end to end.
       writeFileSync(
         settingsFile(),
         JSON.stringify({
           version: 1,
-          wizard: { done: false, completed: ['signIn', 'speechModel', 'micAndHotkey'] }
+          wizard: {
+            done: false,
+            completed: ['signIn', 'speechModel', 'claudeInChrome', 'micAndHotkey']
+          }
         })
       )
     }

@@ -98,6 +98,17 @@ async function passSignIn(wizard: Page): Promise<void> {
   await expect(wizard.locator('#sign-in-message')).toContainText('signed in', { timeout: 20000 })
 }
 
+/** The fake Claude opens the page only when it was started with --chrome. */
+async function passBrowserTest(wizard: Page): Promise<void> {
+  await expect(wizard.locator('#continue')).toBeDisabled()
+  await wizard.locator('#browser-test-run').click({ timeout: 20000 })
+  await expect(wizard.locator('#browser-test-message')).toHaveText(
+    'Claude opened the page, so browser control works.',
+    { timeout: 30000 }
+  )
+  await expect(wizard.locator('#continue')).toBeEnabled()
+}
+
 const savedWizard = (): unknown =>
   (JSON.parse(readFileSync(join(dir, 'settings.json'), 'utf8')) as { wizard: unknown }).wizard
 
@@ -151,10 +162,14 @@ test('a new user walks through the wizard, resumes after quitting, then reaches 
   await expect(wizard.locator('li[data-done="true"]')).toHaveCount(4)
 
   await passSignIn(wizard)
-  for (const title of ['Speech model', 'Claude in Chrome', 'Microphone and hotkey']) {
-    await wizard.locator('#continue').click()
-    await expect(wizard.locator('#title')).toHaveText(title)
-  }
+  await wizard.locator('#continue').click()
+  await expect(wizard.locator('#title')).toHaveText('Speech model')
+  await wizard.locator('#continue').click()
+  await expect(wizard.locator('#title')).toHaveText('Claude in Chrome')
+  // Claude runs from Sign in without --chrome, so the test restarts it with browser control.
+  await passBrowserTest(wizard)
+  await wizard.locator('#continue').click()
+  await expect(wizard.locator('#title')).toHaveText('Microphone and hotkey')
   await expect(wizard.locator('#continue')).toHaveText('Finish')
   await wizard.locator('#continue').click()
 
@@ -329,7 +344,7 @@ test('a Claude that is too old stops a set-up copy, with the update command', as
   await expect(terminal.locator('#session-command-text')).toHaveText('claude update')
 })
 
-test('Claude in Chrome is required: it waits for the extension, then turns on browser control', async () => {
+test('Claude in Chrome is required: it waits for the extension and a browser test that opens a page', async () => {
   const root = join(dir, 'brave-only')
   const extension = fakeBrowser(root, 'BraveSoftware/Brave-Browser', 'brave.exe', false)
   writeFileSync(
@@ -356,11 +371,37 @@ test('Claude in Chrome is required: it waits for the extension, then turns on br
   await expect(wizard.locator('#chrome-message')).toHaveText(
     'Claude in Chrome is installed in Brave.'
   )
-  await expect(wizard.locator('#continue')).toBeEnabled()
   expect(savedBrowserControl()).toBe(false)
+  // Sign in was done in an earlier run, so the test starts Claude itself, with --chrome.
+  await passBrowserTest(wizard)
+  expect(savedBrowserControl()).toBe(true)
   await wizard.locator('#continue').click()
   await expect(wizard.locator('#title')).toHaveText('Microphone and hotkey')
-  expect(savedBrowserControl()).toBe(true)
+})
+
+test('a browser Claude can not reach fails the test, with the documented fixes', async () => {
+  writeFileSync(
+    join(dir, 'settings.json'),
+    JSON.stringify({
+      version: 1,
+      claude: { projectDir: dir },
+      wizard: {
+        done: false,
+        completed: ['claudeCode', 'projectFolder', 'signIn', 'speechModel', 'micAndHotkey']
+      }
+    })
+  )
+  app = await launch({ VOICEUP_FAKE_BROWSER: 'disconnected' })
+  const wizard = await windowAt('wizard')
+  await wizard.locator('#browser-test-run').click({ timeout: 20000 })
+  await expect(wizard.locator('#browser-test-message')).toContainText(
+    'Claude couldn’t use your browser',
+    { timeout: 30000 }
+  )
+  await expect(wizard.locator('#browser-test-message')).toContainText('Reconnect extension')
+  await expect(wizard.locator('#browser-test-restart')).toBeVisible()
+  await expect(wizard.locator('#browser-test-run')).toHaveText('Test again')
+  await expect(wizard.locator('#continue')).toBeDisabled()
 })
 
 test('with neither browser the step says so, and the user can still confirm it by hand', async () => {
@@ -380,5 +421,10 @@ test('with neither browser the step says so, and the user can still confirm it b
   await expect(wizard.locator('#chrome-message')).toContainText('neither is installed')
   await expect(wizard.locator('#continue')).toBeDisabled()
   await wizard.locator('#chrome-confirm').click()
-  await expect(wizard.locator('#continue')).toBeEnabled()
+  await expect(wizard.locator('#chrome-message')).toHaveText(
+    'You said Claude in Chrome is installed.'
+  )
+  await expect(wizard.locator('#browser-test-run')).toBeVisible()
+  // Saying so isn't enough: the browser test still has to pass.
+  await expect(wizard.locator('#continue')).toBeDisabled()
 })

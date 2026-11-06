@@ -1,4 +1,5 @@
 import type {
+  BrowserTestStatus,
   ChromeBrowser,
   ChromeStepStatus,
   ClaudeStepStatus,
@@ -74,6 +75,10 @@ const chromeOpen: Record<ChromeBrowser, HTMLButtonElement> = {
 }
 const chromeCheck = button('chrome-check')
 const chromeConfirm = button('chrome-confirm')
+const browserTest = element('browser-test')
+const browserTestMessage = element('browser-test-message')
+const browserTestRun = button('browser-test-run')
+const browserTestRestart = button('browser-test-restart')
 
 const BROWSER_NAMES: Record<ChromeBrowser, string> = { chrome: 'Chrome', brave: 'Brave' }
 
@@ -193,6 +198,29 @@ function chromeText(state: ChromeStepStatus): string {
   }
 }
 
+function browserTestText(state: BrowserTestStatus): string {
+  switch (state.status) {
+    case 'ready':
+      return 'Now test it. VoiceUp opens your browser if it isn’t open, starts Claude with browser control, and asks it to open example.com. If Claude asks in the terminal whether to use your browser, or for permission, answer there.'
+    case 'starting':
+      return 'Opening your browser and starting Claude with browser control… If Claude asks whether to use your browser, choose Yes in the terminal.'
+    case 'testing':
+      return 'Waiting for Claude to open the page in your browser…'
+    case 'passed':
+      return 'Claude opened the page, so browser control works.'
+    case 'failed':
+      return `${state.title}. ${state.detail}`
+  }
+}
+
+function drawBrowserTest(chromeState: ChromeStepStatus, state: BrowserTestStatus): void {
+  browserTest.hidden = chromeState.status !== 'installed'
+  browserTestMessage.textContent = browserTestText(state)
+  browserTestRun.hidden = state.status !== 'ready' && state.status !== 'failed'
+  browserTestRun.textContent = state.status === 'failed' ? 'Test again' : 'Test the browser'
+  browserTestRestart.hidden = state.status !== 'failed'
+}
+
 function drawChrome(state: ChromeStepStatus): void {
   chromeMessage.textContent = chromeText(state)
   const browsers = state.status === 'needed' ? state.browsers : []
@@ -234,7 +262,10 @@ function draw(view: WizardView): void {
   const onChrome = step.id === 'claudeInChrome'
   chrome.hidden = !onChrome
   notice.hidden = onClaude || onFolder || onSignIn || onModel || onMic || onChrome
-  if (onChrome) drawChrome(view.chrome)
+  if (onChrome) {
+    drawChrome(view.chrome)
+    drawBrowserTest(view.chrome, view.browserTest)
+  }
   if (onSignIn) drawSignIn(view)
   if (onModel) drawModel(view.model)
   if (onMic) drawMic(view.mic)
@@ -299,6 +330,12 @@ for (const [browser, open] of Object.entries(chromeOpen) as [ChromeBrowser, HTML
 }
 chromeCheck.addEventListener('click', () => {
   void run(() => window.voiceupWizard.checkChrome())
+})
+browserTestRun.addEventListener('click', () => {
+  void run(() => window.voiceupWizard.testBrowser())
+})
+browserTestRestart.addEventListener('click', () => {
+  void run(() => window.voiceupWizard.restartClaude())
 })
 chromeConfirm.addEventListener('click', () => {
   void run(() => window.voiceupWizard.confirmChrome())

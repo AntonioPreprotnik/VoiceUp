@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   EXTENSION_ID,
   findBrowsers,
+  openForTest,
   openStore,
   STORE_URL,
   type Disk,
@@ -92,6 +93,41 @@ describe('openStore', () => {
 
   it('starts nothing when that browser is not installed', () => {
     expect(openStore('brave', PLACES, disk([CHROME]), launch)).toBe(false)
+    expect(launch).not.toHaveBeenCalled()
+  })
+})
+
+describe('openForTest', () => {
+  const launch = vi.fn<(program: string, args: readonly string[]) => void>()
+  const isRunning = vi.fn<(exe: string) => Promise<boolean>>()
+  beforeEach(() => {
+    launch.mockReset()
+    isRunning.mockReset()
+  })
+
+  it('starts the browser, with no page, when it is not running', async () => {
+    isRunning.mockResolvedValue(false)
+    await expect(openForTest('chrome', PLACES, disk([CHROME]), isRunning, launch)).resolves.toBe(
+      'started'
+    )
+    expect(isRunning).toHaveBeenCalledWith('chrome.exe')
+    expect(launch).toHaveBeenCalledExactlyOnceWith(CHROME, [])
+  })
+
+  it('leaves a running browser alone', async () => {
+    isRunning.mockResolvedValue(true)
+    await expect(openForTest('brave', PLACES, disk([BRAVE_USER]), isRunning, launch)).resolves.toBe(
+      'running'
+    )
+    expect(isRunning).toHaveBeenCalledWith('brave.exe')
+    expect(launch).not.toHaveBeenCalled()
+  })
+
+  it('starts nothing without a browser to start', async () => {
+    await expect(openForTest(null, PLACES, disk([CHROME]), isRunning, launch)).resolves.toBe('none')
+    await expect(openForTest('brave', PLACES, disk([CHROME]), isRunning, launch)).resolves.toBe(
+      'none'
+    )
     expect(launch).not.toHaveBeenCalled()
   })
 })

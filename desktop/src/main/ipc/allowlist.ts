@@ -33,6 +33,7 @@ type RendererChannel =
   | typeof Channels.wizardChromeOpen
   | typeof Channels.wizardChromeCheck
   | typeof Channels.wizardChromeConfirm
+  | typeof Channels.wizardChromeTest
 
 /** The window kinds allowed to send each renderer-to-main channel (TECH_SPEC §6.1). */
 export const SENDERS: Readonly<Record<RendererChannel, readonly WindowKind[]>> = {
@@ -66,5 +67,6 @@ export const SENDERS: Readonly<Record<RendererChannel, readonly WindowKind[]>> =
   [Channels.wizardSkipMicTest]: ['wizard'],
   [Channels.wizardChromeOpen]: ['wizard'],
   [Channels.wizardChromeCheck]: ['wizard'],
-  [Channels.wizardChromeConfirm]: ['wizard']
+  [Channels.wizardChromeConfirm]: ['wizard'],
+  [Channels.wizardChromeTest]: ['wizard']
 }

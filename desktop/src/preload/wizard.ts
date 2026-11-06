@@ -22,6 +22,7 @@ const Channels = {
   wizardChromeOpen: 'wizard:chromeOpen',
   wizardChromeCheck: 'wizard:chromeCheck',
   wizardChromeConfirm: 'wizard:chromeConfirm',
+  wizardChromeTest: 'wizard:chromeTest',
   wizardChanged: 'wizard:changed',
   wizardOutput: 'wizard:output'
 } as const satisfies Partial<typeof SharedChannels>
@@ -44,6 +45,7 @@ const api: WizardApi = {
   openChromeStore: (browser) =>
     ipcRenderer.invoke(Channels.wizardChromeOpen, { browser }) as Promise<WizardResult>,
   checkChrome: () => ipcRenderer.invoke(Channels.wizardChromeCheck, {}) as Promise<WizardResult>,
+  testBrowser: () => ipcRenderer.invoke(Channels.wizardChromeTest, {}) as Promise<WizardResult>,
   confirmChrome: () =>
     ipcRenderer.invoke(Channels.wizardChromeConfirm, {}) as Promise<WizardResult>,
   onChanged: (listener) => {

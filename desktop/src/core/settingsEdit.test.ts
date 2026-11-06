@@ -23,12 +23,14 @@ describe('withChanges', () => {
       sounds: false,
       notifications: false,
       startWithWindows: true,
+      browserControl: false,
       logLevel: 'debug'
     })
     expect(Settings.safeParse(next).success).toBe(true)
     expect(editable(next)).toMatchObject({ hotkey: 'Alt+V', previewMs: 500, logLevel: 'debug' })
     expect(next.speech.modelId).toBe('parakeet-tdt-0.6b-v2-int8')
     expect(next.ui.startWithWindows).toBe(true)
+    expect(next.claude).toEqual({ ...saved().claude, browserControl: false })
   })
 
   it('leaves everything off the screen alone', () => {
@@ -41,12 +43,12 @@ describe('withChanges', () => {
 })
 
 describe('defaultEditable', () => {
-  it('resets the screen and nothing else', () => {
+  it('resets the screen and nothing else, keeping browser control', () => {
     const next = withChanges(
       withChanges(saved(), { previewMs: 900, hotkey: 'Alt+V' }),
       defaultEditable()
     )
-    expect(editable(next)).toEqual(editable(defaultSettings()))
+    expect(editable(next)).toEqual({ ...editable(defaultSettings()), browserControl: true })
     expect(next.claude.projectDir).toBe('C:\\work')
     expect(next.wizard.done).toBe(true)
     expect(next.ui.fontSize).toBe(20)

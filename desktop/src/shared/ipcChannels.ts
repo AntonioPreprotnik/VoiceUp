@@ -45,6 +45,7 @@ export const Channels = {
   wizardChromeOpen: 'wizard:chromeOpen',
   wizardChromeCheck: 'wizard:chromeCheck',
   wizardChromeConfirm: 'wizard:chromeConfirm',
+  wizardChromeTest: 'wizard:chromeTest',
   wizardChanged: 'wizard:changed',
   wizardOutput: 'wizard:output'
 } as const
@@ -195,8 +196,18 @@ export type ChromeStepStatus =
   /** Null when the user said so, and the check couldn't see it. */
   | { readonly status: 'installed'; readonly browser: ChromeBrowser | null }
 
+/** The browser test on the Claude in Chrome step (S6.9). It passes only on a real page load. */
+export type BrowserTestStatus =
+  | { readonly status: 'ready' }
+  /** Claude is starting again, with browser control. */
+  | { readonly status: 'starting' }
+  | { readonly status: 'testing' }
+  | { readonly status: 'passed' }
+  | { readonly status: 'failed'; readonly title: string; readonly detail: string }
+
 export interface WizardView extends WizardProgress {
   readonly chrome: ChromeStepStatus
+  readonly browserTest: BrowserTestStatus
   readonly model: ModelStepStatus
   readonly mic: MicStepStatus
   readonly claude: ClaudeStepStatus
@@ -231,6 +242,8 @@ export interface WizardApi {
   checkChrome(): Promise<WizardResult>
   /** The user says the extension is installed, for when the check can't see it. */
   confirmChrome(): Promise<WizardResult>
+  /** Restarts Claude with browser control if needed, then sends the fixed browser test. */
+  testBrowser(): Promise<WizardResult>
   /** Returns the function that unsubscribes. */
   onChanged(listener: (view: WizardView) => void): () => void
   /** The installer's output, as it arrives. Returns the function that unsubscribes. */

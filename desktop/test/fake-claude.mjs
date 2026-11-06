@@ -8,7 +8,11 @@
 //   VOICEUP_FAKE_LIVE      a file: instead of replaying, act like a session. Each submitted prompt
 //                          fires UserPromptSubmit and Stop, and is added to the file. A prompt
 //                          containing "ask permission" fires PermissionRequest instead of Stop,
-//                          and one containing "slow turn" waits 2 s before its Stop.
+//                          and one containing "slow turn" waits 2 s before its Stop. Started with
+//                          --chrome, a prompt asking to "open" a page uses Claude in Chrome's
+//                          navigate tool as recorded in S6.9 (test/scenarios/browser-navigate).
+//   VOICEUP_FAKE_BROWSER   "disconnected": the browser tool answers as it did with no browser
+//                          open (test/scenarios/browser-not-connected)
 import { spawn } from 'node:child_process'
 import { appendFileSync, readFileSync } from 'node:fs'
 import { request } from 'node:http'
@@ -117,6 +121,24 @@ async function fire(event, body) {
 process.stdout.write('fake-claude> ')
 process.stdin.setEncoding('utf8')
 
+/** As recorded in S6.9: a browser that can't be reached still answers the tool call, as text. */
+async function useBrowser() {
+  const disconnected = process.env.VOICEUP_FAKE_BROWSER === 'disconnected'
+  const tool = disconnected
+    ? 'mcp__claude-in-chrome__tabs_context_mcp'
+    : 'mcp__claude-in-chrome__navigate'
+  const text = disconnected
+    ? 'Browser extension is not connected. Please ensure the Claude browser extension is installed and running (https://claude.ai/chrome).'
+    : 'Navigated to https://example.com/'
+  const call = { tool_name: tool, mcp_server: 'claude-in-chrome', permission_mode: 'default' }
+  await fire('PreToolUse', { hook_event_name: 'PreToolUse', ...call })
+  await fire('PostToolUse', {
+    hook_event_name: 'PostToolUse',
+    ...call,
+    tool_response: [{ type: 'text', text }]
+  })
+}
+
 /** Like Claude's prompt: a paste and typed text build one line, and Enter submits it. */
 async function runLive(log) {
   let line = ''
@@ -142,6 +164,9 @@ async function runLive(log) {
           hook_event_name: 'PermissionRequest',
           tool_name: 'Write'
         })
+      } else if (process.argv.includes('--chrome') && prompt.includes('Use the browser to open')) {
+        await useBrowser()
+        await fire('Stop', { hook_event_name: 'Stop' })
       } else {
         if (prompt.includes('slow turn')) await sleep(2000)
         await fire('Stop', { hook_event_name: 'Stop' })

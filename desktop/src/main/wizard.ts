@@ -1,5 +1,6 @@
 import type { BrowserWindow } from 'electron'
 import type { ClaudeCommand } from '../core/claudeCommand'
+import { BrowserTest } from '../core/browserTest'
 import { ChromeStep, type BrowserFinding } from '../core/chromeStep'
 import { ClaudeStep } from '../core/claudeStep'
 import { MESSAGES, type MessageCode } from '../core/messages'
@@ -59,7 +60,13 @@ export interface WizardOptions {
     find(): readonly BrowserFinding[]
     /** Opens the fixed Web Store page in that browser. */
     open(browser: ChromeBrowser): void
+    /** Windows' default browser, if it is one of ours. */
+    defaultBrowser(): ChromeBrowser | null
+    /** Starts the browser for the browser test if it isn't running. Opens no page. */
+    openForTest(): Promise<'started' | 'running' | 'none'>
   }
+  /** Whether the running Claude was started with --chrome. */
+  readonly launchedWithChrome: () => boolean
 }
 
 export interface Wizard {
@@ -92,7 +99,8 @@ export function openWizard({
   models,
   startHotkey,
   hotkey,
-  browsers
+  browsers,
+  launchedWithChrome
 }: WizardOptions): Wizard {
   const flow = new WizardFlow(settings.current.wizard.completed)
   const window = createWindow('wizard')
@@ -132,10 +140,48 @@ export function openWizard({
     }
   })
 
-  const chromeStep = new ChromeStep()
+  const chromeStep = new ChromeStep(browsers.defaultBrowser())
   const checkChrome = (): boolean => chromeStep.update(browsers.find())
 
   let claudeStarted = false
+  const browserTest = new BrowserTest({
+    startWithBrowser: () => {
+      if (!settings.current.claude.browserControl) {
+        settings.update((current) => ({
+          ...current,
+          claude: { ...current.claude, browserControl: true }
+        }))
+      }
+      // Sign in may have been finished in an earlier run, so Claude may not be running yet.
+      if (!claudeStarted) {
+        claudeStarted = true
+        startClaude(window)
+        return 'fresh'
+      }
+      if (launchedWithChrome()) return 'running'
+      restartClaude()
+      return 'restart'
+    },
+    openBrowser: () => browsers.openForTest(),
+    deliver,
+    discard: discardDelivery,
+    promptDirty,
+    schedule,
+    onChange: () => {
+      logBrowserTest()
+      send(Channels.wizardChanged, view())
+    }
+  })
+  // Fixed wording only: never anything Claude wrote.
+  let loggedTest = 'ready'
+  const logBrowserTest = (): void => {
+    const status = browserTest.status
+    if (status.status === loggedTest) return
+    loggedTest = status.status
+    if (status.status === 'testing') log.info('Setup: browser test sent')
+    else if (status.status === 'passed') log.info('Setup: browser test passed')
+    else if (status.status === 'failed') log.warn(`Setup: browser test failed: ${status.title}`)
+  }
   let hotkeyOn: boolean | null = null
   let heard: string | null = null
   let micProblem: MicStepStatus['problem'] = null
@@ -193,13 +239,14 @@ export function openWizard({
     if (flow.currentStep === 'signIn') return signIn.isDone
     if (flow.currentStep === 'speechModel') return models.chosenModel().installed
     if (flow.currentStep === 'micAndHotkey') return heard !== null || micSkipped
-    if (flow.currentStep === 'claudeInChrome') return chromeStep.isDone
+    if (flow.currentStep === 'claudeInChrome') return chromeStep.isDone && browserTest.passed
     return true
   }
   const view = (): WizardView => ({
     ...flow.view,
     claude: claudeStep.status,
     chrome: chromeStep.status,
+    browserTest: browserTest.status,
     folder: folder(),
     signIn: signIn.status,
     model: model(),
@@ -301,6 +348,10 @@ export function openWizard({
       if (flow.currentStep === 'claudeInChrome') checkChrome()
       return view()
     },
+    testBrowser: () => {
+      if (flow.currentStep === 'claudeInChrome' && chromeStep.isDone) browserTest.start()
+      return view()
+    },
     confirmChrome: () => {
       if (flow.currentStep === 'claudeInChrome') {
         log.info('Setup: the user confirmed Claude in Chrome is installed')
@@ -326,9 +377,11 @@ export function openWizard({
     window,
     onClaudeState: (state) => {
       signIn.onClaudeState(state)
+      browserTest.onClaudeState(state)
     },
     onHook: (message) => {
       signIn.onHook(message)
+      browserTest.onHook(message)
     },
     onModelStatus: () => {
       send(Channels.wizardChanged, view())

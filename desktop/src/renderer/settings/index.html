@@ -203,6 +203,15 @@
         <p class="error" data-error-for="startWithWindows" hidden></p>
       </div>
       <div class="row">
+        <label for="browserControl">Browser control</label>
+        <input id="browserControl" type="checkbox" data-field="browserControl" />
+        <p class="note">
+          Lets Claude use Chrome or Brave through the Claude extension. Claude uses this from its
+          next start: restart it from the terminal window.
+        </p>
+        <p class="error" data-error-for="browserControl" hidden></p>
+      </div>
+      <div class="row">
         <label for="logLevel">Log level</label>
         <select id="logLevel" data-field="logLevel">
           <option value="error">Errors</option>
@@ -220,7 +229,9 @@
         <button id="reset" type="button">Reset to defaults</button>
         <span id="status" role="status"></span>
       </footer>
-      <p class="note">Reset changes only what is on this screen. Your project folder stays.</p>
+      <p class="note">
+        Reset changes only what is on this screen. Your project folder and browser control stay.
+      </p>
     </main>
     <script type="module" src="./main.ts"></script>
   </body>

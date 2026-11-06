@@ -16,6 +16,7 @@ import fakeLog from '../../../test/fakes/electronLog'
 import type { HookMessage } from '../../shared/hooks'
 import { HookLink } from './link'
 import { readHookPolicies } from './policy'
+import { HookServer } from './server'
 
 vi.mock('electron', () => import('../../../test/fakes/electron'))
 vi.mock('electron-log/main', () => import('../../../test/fakes/electronLog'))
@@ -167,6 +168,19 @@ describe('when the server cannot start', () => {
     expect(onUnavailable).toHaveBeenCalledWith('HOOKS_FAILED', null)
     expect(created.voiceBlock).toBe('HOOKS_FAILED')
     expect(fakeLog.messages('error').flat().join()).toContain('HOOKS_FAILED')
+  })
+
+  // It asks Windows for any free port, so no fixed port can be taken; this is the bind failing.
+  it('treats a port in use like any other start failure (S7.2)', async () => {
+    const inUse = Object.assign(new Error('listen EADDRINUSE: address already in use'), {
+      code: 'EADDRINUSE'
+    })
+    const start = vi.spyOn(HookServer.prototype, 'start').mockRejectedValueOnce(inUse)
+    const created = makeLink()
+    expect(await created.prepareLaunch('C:\\project')).toEqual({ args: [], env: {} })
+    expect(onUnavailable).toHaveBeenCalledWith('HOOKS_FAILED', null)
+    expect(created.voiceBlock).toBe('HOOKS_FAILED')
+    start.mockRestore()
   })
 })
 

@@ -77,3 +77,50 @@ describe('parseHook', () => {
     expect(parseHook(name, raw)).toEqual({ kind: 'unexpected', name, reason })
   })
 })
+
+describe('browser tool answers (S6.9, S7.2)', () => {
+  const answer = (tool: string, text: string): string =>
+    body({
+      hook_event_name: 'PostToolUse',
+      tool_name: tool,
+      tool_response: [{ type: 'text', text }]
+    })
+
+  it('keeps only that a page opened, never the answer', () => {
+    expect(
+      parseHook(
+        'PostToolUse',
+        answer('mcp__claude-in-chrome__navigate', 'Navigated to https://example.com/ secret')
+      )
+    ).toEqual({
+      kind: 'hook',
+      hook: {
+        hook_event_name: 'PostToolUse',
+        tool_name: 'mcp__claude-in-chrome__navigate',
+        navigated: true
+      }
+    })
+  })
+
+  it('keeps only that the extension could not be reached, from any browser tool', () => {
+    const text =
+      'Browser extension is not connected. Please ensure the Claude browser extension is installed'
+    expect(
+      parseHook('PostToolUse', answer('mcp__claude-in-chrome__tabs_context_mcp', text))
+    ).toEqual({
+      kind: 'hook',
+      hook: {
+        hook_event_name: 'PostToolUse',
+        tool_name: 'mcp__claude-in-chrome__tabs_context_mcp',
+        browserDisconnected: true
+      }
+    })
+  })
+
+  it('ignores the same words from a tool that is not the browser', () => {
+    expect(parseHook('PostToolUse', answer('Bash', 'Browser extension is not connected'))).toEqual({
+      kind: 'hook',
+      hook: { hook_event_name: 'PostToolUse', tool_name: 'Bash' }
+    })
+  })
+})

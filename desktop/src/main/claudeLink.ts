@@ -2,6 +2,7 @@ import { join } from 'node:path'
 import { app, dialog, type BrowserWindow } from 'electron'
 import { BrowserFollow } from '../core/browserFollow'
 import { Delivery } from '../core/delivery/delivery'
+import { FailureNotices } from '../core/failureNotices'
 import { MESSAGES } from '../core/messages'
 import type { ShutdownSteps } from '../core/shutdown'
 import type { ClaudeState } from '../core/state/reducer'
@@ -113,6 +114,7 @@ export function createClaudeLink({
   )
   // Step 4: stale files go, then the hook server and this launch's hook files.
   const browserFollow = new BrowserFollow()
+  const failureNotices = new FailureNotices()
   const hooks = new HookLink({
     runDir: join(app.getPath('userData'), 'run'),
     curlPath: system32Path('curl.exe'),
@@ -124,6 +126,12 @@ export function createClaudeLink({
       claudeState.onHook(message)
       delivery.onHook(message)
       onHook(message)
+      const failure = failureNotices.onHook(message)
+      // During setup the wizard explains its own tests' failures.
+      if (failure !== null && settings.current.wizard.done) {
+        log.warn(failure)
+        overlay.failed(failure)
+      }
       const browser = settings.current.claude.showBrowser
       if (browser !== 'off' && browserFollow.onHook(message, claudeState.state)) {
         void showBrowser(browser)

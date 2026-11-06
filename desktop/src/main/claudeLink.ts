@@ -30,6 +30,7 @@ export interface ClaudeLinkOptions {
   readonly parentWindow: () => BrowserWindow | undefined
   readonly showWindow: () => void
   readonly openSettings: () => void
+  readonly pauseListening: (paused: boolean) => void
   /** Writes to Claude's terminal. */
   readonly write: (data: string) => void
   readonly steps: ShutdownSteps
@@ -44,6 +45,9 @@ export interface ClaudeLink {
   readonly hooks: HookLink
   readonly publishStatus: () => void
   readonly setNotifications: (on: boolean) => void
+  readonly setListeningPaused: (paused: boolean) => void
+  /** The notice for the window's first trip to the tray. */
+  readonly stillRunning: () => void
 }
 
 /** What VoiceUp knows of Claude, and what reaches it: state, status, hooks and voice delivery. */
@@ -54,6 +58,7 @@ export function createClaudeLink({
   parentWindow,
   showWindow,
   openSettings,
+  pauseListening,
   write,
   steps,
   onClaudeState,
@@ -82,6 +87,7 @@ export function createClaudeLink({
     },
     showWindow,
     openSettings,
+    pauseListening,
     quit: () => {
       app.quit()
     }
@@ -173,6 +179,12 @@ export function createClaudeLink({
     publishStatus,
     setNotifications: (on) => {
       claudeStatus.setNotifications(on)
+    },
+    setListeningPaused: (paused) => {
+      claudeStatus.setListeningPaused(paused)
+    },
+    stillRunning: () => {
+      claudeStatus.stillRunning()
     }
   }
 }

@@ -510,7 +510,7 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 
 *Goal: it works on machines other than yours and fails gracefully.*
 
-**[ ] S7.1 Tray and background mode.** As a user, I want it out of the way.
+**[x] S7.1 Tray and background mode.** As a user, I want it out of the way.
 
 - AC: closing the window minimizes to tray (Claude session keeps running); tray menu: Show, Pause listening, Settings, Quit; optional start with Windows.
 

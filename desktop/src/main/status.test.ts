@@ -11,6 +11,7 @@ let window: BrowserWindow
 let reArm: Mock
 let showWindow: Mock
 let quit: Mock
+let pauseListening: Mock
 
 function create(notifications = true): ClaudeStatus {
   return new ClaudeStatus({
@@ -19,6 +20,7 @@ function create(notifications = true): ClaudeStatus {
     reArm,
     showWindow,
     quit,
+    pauseListening,
     openSettings: () => undefined
   })
 }
@@ -32,7 +34,8 @@ function tray(): Tray {
 interface MenuItem {
   label?: string
   enabled?: boolean
-  click?: () => void
+  checked?: boolean
+  click?: (item?: { checked: boolean }) => void
 }
 
 function menuItem(label: string): MenuItem {
@@ -47,6 +50,7 @@ beforeEach(() => {
   reArm = vi.fn()
   showWindow = vi.fn()
   quit = vi.fn()
+  pauseListening = vi.fn()
 })
 
 describe('showing a state', () => {
@@ -128,6 +132,42 @@ describe('the tray menu', () => {
     expect(showWindow).toHaveBeenCalledOnce()
     menuItem('Quit').click?.()
     expect(quit).toHaveBeenCalledOnce()
+  })
+
+  it('pauses and resumes listening, with the tick and tooltip saying so', () => {
+    const status = create()
+    status.show(statusView('idle', null))
+    expect(menuItem('Pause listening').checked).toBe(false)
+    // Electron flips a checkbox before its click arrives.
+    menuItem('Pause listening').click?.({ checked: true })
+    expect(pauseListening).toHaveBeenCalledWith(true)
+    status.setListeningPaused(true)
+    expect(menuItem('Pause listening').checked).toBe(true)
+    expect(tray().tooltip).toBe('VoiceUp: Ready, listening paused')
+    expect((tray().menu as MenuItem[])[0]?.label).toBe('Ready (listening paused)')
+    status.setListeningPaused(false)
+    expect(tray().tooltip).toBe('VoiceUp: Ready')
+  })
+
+  it('offers Show, Pause listening, Settings and Quit', () => {
+    create().show(statusView('idle', null))
+    const labels = (tray().menu as MenuItem[]).map((item) => item.label).filter(Boolean)
+    expect(labels).toEqual([
+      'Ready',
+      'Show VoiceUp',
+      'Pause listening',
+      'Re-arm voice',
+      'Settings...',
+      'Quit'
+    ])
+  })
+
+  it('says once that it is still running, unless notifications are off', () => {
+    create().stillRunning()
+    expect(Notification.shown.at(-1)?.options).toMatchObject({ title: 'VoiceUp is still running' })
+    const before = Notification.shown.length
+    create(false).stillRunning()
+    expect(Notification.shown).toHaveLength(before)
   })
 
   it('shows the window on a click on the icon', () => {

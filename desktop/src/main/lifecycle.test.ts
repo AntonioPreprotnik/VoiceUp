@@ -10,9 +10,11 @@ import {
   ipcMain,
   Menu,
   net,
+  Notification,
   protocol,
   resetFakes,
   session,
+  Tray,
   utilityProcess
 } from '../../test/fakes/electron'
 import { resetFakePty, spawned } from '../../test/fakes/nodePty'
@@ -219,6 +221,54 @@ describe('startup', () => {
     await settle()
     onlyWindow().emit('closed')
     expect(app.quitCount).toBe(1)
+  })
+
+  it('hides the terminal in the tray when it is closed, and says so once', async () => {
+    startApp({ argv: [] })
+    await settle()
+    const window = onlyWindow()
+    const notices = Notification.shown.length
+    window.close()
+    window.close()
+    expect(app.quitCount).toBe(0)
+    expect(window.hideCount).toBe(2)
+    expect(Notification.shown.slice(notices).map((notice) => notice.options.title)).toEqual([
+      'VoiceUp is still running'
+    ])
+    // The tray brings it back.
+    app.emit('second-instance')
+    expect(window.shown).toBe(true)
+  })
+
+  it('closes for real once quitting, or when Windows ends the session', async () => {
+    startApp({ argv: [] })
+    await settle()
+    app.emit('before-quit', { preventDefault: vi.fn() })
+    onlyWindow().close()
+    expect(onlyWindow().hideCount).toBe(0)
+  })
+
+  it('lets Windows sign out without being held up by the tray', async () => {
+    startApp({ argv: [] })
+    await settle()
+    onlyWindow().emit('query-session-end')
+    onlyWindow().close()
+    expect(app.quitCount).toBe(1)
+  })
+
+  it('stays in the tray when Windows starts it at sign-in', async () => {
+    startApp({ argv: ['--background'] })
+    await settle()
+    onlyWindow().emit('ready-to-show')
+    expect(onlyWindow().shown).toBe(false)
+    expect(onlyWindow().loadedUrl).toBe('app://voiceup/terminal/index.html')
+  })
+
+  it('shows the window at a normal start', async () => {
+    startApp({ argv: [] })
+    await settle()
+    onlyWindow().emit('ready-to-show')
+    expect(onlyWindow().shown).toBe(true)
   })
 
   it('denies every permission (rule 6)', async () => {
@@ -464,6 +514,28 @@ describe('the hotkey', () => {
     startApp({ argv: [] })
     await settle()
     expect(globalShortcut.registered.has(HOTKEY)).toBe(true)
+  })
+
+  it('lets go of the keys while listening is paused from the tray, and takes them back', async () => {
+    startApp({ argv: [] })
+    await settle()
+    interface Item {
+      label?: string
+      checked?: boolean
+      click?: (item: { checked: boolean }) => void
+    }
+    const pause = (): Item | undefined =>
+      (Tray.instances.at(-1)?.menu as Item[] | undefined)?.find(
+        (item) => item.label === 'Pause listening'
+      )
+    pause()?.click?.({ checked: true })
+    expect(globalShortcut.registered.has(HOTKEY)).toBe(false)
+    expect(pause()?.checked).toBe(true)
+    expect(Tray.instances.at(-1)?.tooltip).toContain('listening paused')
+
+    pause()?.click?.({ checked: false })
+    expect(globalShortcut.registered.has(HOTKEY)).toBe(true)
+    expect(pause()?.checked).toBe(false)
   })
 
   it('registers a combination set in the settings', async () => {
@@ -805,7 +877,16 @@ describe('the settings screen', () => {
   it('adds itself to the startup list only when packaged', async () => {
     const event = await opened()
     invokeSettings('settings:set', event, { startWithWindows: true })
-    expect(app.loginItem).toEqual({ openAtLogin: true })
+    // In the background: Windows starts it at sign-in straight to the tray (S7.1).
+    expect(app.loginItem).toEqual({ openAtLogin: true, args: ['--background'] })
+  })
+
+  it('brings a startup entry from before up to date at start', async () => {
+    const file = join(app.getPath('userData'), 'settings.json')
+    const saved = JSON.parse(readFileSync(file, 'utf8')) as { ui?: object }
+    writeFileSync(file, JSON.stringify({ ...saved, ui: { ...saved.ui, startWithWindows: true } }))
+    await opened()
+    expect(app.loginItem).toEqual({ openAtLogin: true, args: ['--background'] })
   })
 
   it('never touches the startup list when unpackaged', async () => {

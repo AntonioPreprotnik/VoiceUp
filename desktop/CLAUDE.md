@@ -35,7 +35,7 @@ Exact versions only. Confirmed with `npm view` on 2026-11-02: Electron 45.2.1, e
 - The page can't reach the clipboard: `navigator.clipboard` is denied by the deny-all permission handler (security rule 6), so copy and paste go through main.
 - Frames from the recorder to the worker must be copied. A transferred `ArrayBuffer` reaches the `utilityProcess` as `null`. The smoke test sends frames from main, so it doesn't cover this path: test with the real hotkey and microphone.
 - The worker's stderr goes to the log, so a crash there explains itself.
-- A hidden recorder window is always open, so `window-all-closed` never fires: closing the terminal is what quits the app.
+- A hidden recorder window is always open, so `window-all-closed` never fires. Once set up, closing the terminal only hides it in the tray (S7.1), and only Quit, File → Quit VoiceUp or Windows ending the session quits. In a test, `app.quit()` quits, and `BrowserWindow.close()` on the terminal hides it.
 - A model install runs in main. Its progress shows in the title bar, the wizard and the settings screen. To unpack the real archive in a test: `VOICEUP_TEST_MODELS=<folder holding it> npm test`.
 - Voice text reaches Claude only through `core/delivery/delivery.ts`, which asks the gate before the paste and again before Enter, and writes directly to the PTY, not through `onInput`, so it can't look like the user typing. The limits in `sanitize.ts` were measured in S5.3 and aren't documented by Claude: re-measure them on a Claude upgrade.
 - Nothing typed by delivery counts as the user's typing, and queued text only goes when the gate says `send`, so the queue can never put text into a prompt.

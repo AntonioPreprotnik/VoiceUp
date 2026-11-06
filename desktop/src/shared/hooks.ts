@@ -13,12 +13,35 @@ const agent = {
 /** Claude in Chrome's page-opening tool (decision note S6.10, recorded again in S6.9). */
 export const BROWSER_NAVIGATE_TOOL = 'mcp__claude-in-chrome__navigate'
 
-/** Its answer starts "Navigated to <url>" when the page opened (test/scenarios/browser-navigate). */
-function navigated(tool: string | undefined, response: unknown): boolean {
-  if (tool !== BROWSER_NAVIGATE_TOOL || !Array.isArray(response)) return false
+/** Every Claude in Chrome tool is named with this (decision note S6.10). */
+const BROWSER_TOOL_PREFIX = 'mcp__claude-in-chrome__'
+
+/** What a browser tool answers when the extension can't be reached (test/scenarios/browser-not-connected). */
+const NOT_CONNECTED = 'Browser extension is not connected'
+
+/** The first text of a tool's answer, if it has one. */
+function firstText(response: unknown): string | undefined {
+  if (!Array.isArray(response)) return undefined
   const first: unknown = response[0]
-  if (typeof first !== 'object' || first === null || !('text' in first)) return false
-  return typeof first.text === 'string' && first.text.startsWith('Navigated to ')
+  if (typeof first !== 'object' || first === null || !('text' in first)) return undefined
+  return typeof first.text === 'string' ? first.text : undefined
+}
+
+/** At most one flag: the key is absent, not false, when it doesn't apply. */
+type BrowserOutcome =
+  | { navigated: true }
+  | { browserDisconnected: true }
+  | { navigated?: never; browserDisconnected?: never }
+
+/** What a browser tool's answer says, reduced to a flag. Nothing else of it is kept. */
+function browserOutcome(tool: string | undefined, response: unknown): BrowserOutcome {
+  if (tool?.startsWith(BROWSER_TOOL_PREFIX) !== true) return {}
+  const text = firstText(response)
+  if (text === undefined) return {}
+  // Its answer starts "Navigated to <url>" when the page opened (test/scenarios/browser-navigate).
+  if (tool === BROWSER_NAVIGATE_TOOL && text.startsWith('Navigated to ')) return { navigated: true }
+  if (text.startsWith(NOT_CONNECTED)) return { browserDisconnected: true }
+  return {}
 }
 
 const HookEvent = z.discriminatedUnion('hook_event_name', [
@@ -33,17 +56,18 @@ const HookEvent = z.discriminatedUnion('hook_event_name', [
   z.object({ hook_event_name: z.literal('PreToolUse'), ...agent }),
   z.object({ hook_event_name: z.literal('PermissionRequest'), ...agent }),
   // A browser tool that can't reach the extension still "succeeds", with the error as its text
-  // (S6.9). Only whether a navigation really happened is kept: the rest of the answer, which can
-  // hold page content, is dropped here.
+  // (S6.9). Only whether a navigation really happened, or the extension was unreachable (S7.2), is
+  // kept: the rest of the answer, which can hold page content, is dropped here.
   z
     .object({
       hook_event_name: z.literal('PostToolUse'),
       ...agent,
       tool_response: z.unknown().optional()
     })
-    .transform(({ tool_response: response, ...hook }) =>
-      navigated(hook.tool_name, response) ? { ...hook, navigated: true as const } : hook
-    ),
+    .transform(({ tool_response: response, ...hook }): typeof hook & BrowserOutcome => ({
+      ...hook,
+      ...browserOutcome(hook.tool_name, response)
+    })),
   z.object({ hook_event_name: z.literal('PostToolUseFailure'), ...agent }),
   z.object({
     hook_event_name: z.literal('Notification'),

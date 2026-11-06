@@ -514,9 +514,9 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 
 - AC: closing the window minimizes to tray (Claude session keeps running); tray menu: Show, Pause listening, Settings, Quit; optional start with Windows.
 
-**[ ] S7.2 Failure matrix.** As a user, I want every failure to tell me what to do.
+**[x] S7.2 Failure matrix.** As a user, I want every failure to tell me what to do.
 
-- AC: documented and tested behavior for: mic missing, mic denied, hotkey taken, model missing or corrupt, engine crash, Claude not installed, Claude not logged in, Claude exits, Claude too old, hooks blocked, `ANTHROPIC_API_KEY` set, Chrome extension not detected, nothing heard, transcript dropped, transcription timeout, hook server port in use, offline. Each uses a code from TECH_SPEC §6.5.
+- AC: documented and tested behavior for: mic missing, mic denied, hotkey taken, model missing or corrupt, engine crash, Claude not installed, Claude not logged in, Claude exits, Claude too old, hooks blocked, `ANTHROPIC_API_KEY` set, Chrome extension not detected, nothing heard, transcript dropped, transcription timeout, hook server port in use, offline. Each uses a code from TECH_SPEC §6.5. The matrix is TECH_SPEC §6.6.
 
 **[ ] S7.3 Manual test checklist.** As the developer, I want a repeatable release check.
 

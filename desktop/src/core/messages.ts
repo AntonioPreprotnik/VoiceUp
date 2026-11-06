@@ -20,7 +20,17 @@ export const MESSAGES = {
   },
   CLAUDE_NOT_LOGGED_IN: {
     title: "Claude isn't signed in",
-    detail: 'Log in inside the terminal window, then test again.'
+    detail: 'Type /login in the terminal window and sign in, then try again.'
+  },
+  CLAUDE_TURN_FAILED: {
+    title: 'Claude couldn’t answer',
+    detail:
+      'Claude’s own message is in the terminal window. If you are offline, reconnect, then say it again.'
+  },
+  CHROME_NOT_DETECTED: {
+    title: 'Claude can’t reach your browser',
+    detail:
+      'Check that Chrome or Brave is open with the Claude extension on. In the terminal, type /chrome and choose Reconnect extension, or restart the browser and Claude.'
   },
   BROWSER_NOT_CONNECTED: {
     title: 'Claude couldn’t use your browser',

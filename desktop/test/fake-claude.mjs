@@ -8,7 +8,8 @@
 //   VOICEUP_FAKE_LIVE      a file: instead of replaying, act like a session. Each submitted prompt
 //                          fires UserPromptSubmit and Stop, and is added to the file. A prompt
 //                          containing "ask permission" fires PermissionRequest instead of Stop,
-//                          and one containing "slow turn" waits 2 s before its Stop. Started with
+//                          one containing "slow turn" waits 2 s before its Stop, and one with
+//                          "fail turn <code>" ends in StopFailure with that error. Started with
 //                          --chrome, a prompt asking to "open" a page uses Claude in Chrome's
 //                          navigate tool as recorded in S6.9 (test/scenarios/browser-navigate).
 //   VOICEUP_FAKE_BROWSER   "disconnected": the browser tool answers as it did with no browser
@@ -164,6 +165,9 @@ async function runLive(log) {
           hook_event_name: 'PermissionRequest',
           tool_name: 'Write'
         })
+      } else if (/fail turn ([a-z_]+)/.test(prompt)) {
+        const [, error] = /fail turn ([a-z_]+)/.exec(prompt)
+        await fire('StopFailure', { hook_event_name: 'StopFailure', error })
       } else if (process.argv.includes('--chrome') && prompt.includes('Use the browser to open')) {
         await useBrowser()
         await fire('Stop', { hook_event_name: 'Stop' })

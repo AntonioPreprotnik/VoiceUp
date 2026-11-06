@@ -478,10 +478,11 @@ export const Settings = z.object({
 | `HOOKS_FAILED` | the hook server or its files can't be set up | "VoiceUp's status hooks could not start" | restart VoiceUp; voice disabled |
 | `STARTING_SLOW` | 30 s in `starting` | "Waiting for Claude to start" | finish any prompt in the terminal, otherwise check the hooks |
 | `CLAUDE_TOO_OLD` | `claude --version` below `MIN_CLAUDE_VERSION` | "Claude Code needs updating" | shows `claude update`, then Check again |
-| `CLAUDE_NOT_LOGGED_IN` | sign-in step incomplete, or `StopFailure` with an authentication error | "Claude isn't signed in" | sign in inside the terminal |
+| `CLAUDE_NOT_LOGGED_IN` | sign-in step incomplete, or `StopFailure` with an authentication error (an `error` containing "auth") | "Claude isn't signed in" | type `/login` in the terminal and sign in |
+| `CLAUDE_TURN_FAILED` | any other `StopFailure` once set up, such as no connection or a rate limit (S7.2) | "Claude couldn’t answer" | read Claude's own message in the terminal; if offline, reconnect and say it again |
 | `BROWSER_NOT_CONNECTED` | the wizard's browser test ended without a page opened (S6.9) | "Claude couldn’t use your browser" | open Chrome or Brave with the extension on and signed in to the same account, then `/chrome` → Reconnect extension, or restart the browser and Claude, and test again |
 | `API_KEY_SET` | `ANTHROPIC_API_KEY` in the environment | "An API key overrides your subscription and bills the API" | explains how to remove it; continue allowed |
-| `CHROME_NOT_DETECTED` | Claude reports the extension is missing | "Claude can't reach your browser" | restart the browser and Claude, or `/chrome` → Reconnect |
+| `CHROME_NOT_DETECTED` | once set up, a Claude in Chrome tool answers "Browser extension is not connected" (recorded in S6.9) | "Claude can’t reach your browser" | restart the browser and Claude, or `/chrome` → Reconnect |
 | `NO_SPEECH` | "no speech" timer expires | "Didn't hear anything" | press the hotkey again; check the mic |
 | `TRANSCRIPT_DROPPED` | cleaner returns `null` | "Nothing usable was heard" | press the hotkey again |
 | `TRANSCRIBE_TIMEOUT` | decode exceeds the timeout (§5.3) | "Transcription took too long" | worker restarts; try again |
@@ -489,6 +490,30 @@ export const Settings = z.object({
 | `DELIVERY_UNCONFIRMED` | no `UserPromptSubmit` in 10 s, or the state changed in the gap before Enter | "Your command may not have been sent" | check the terminal: press Enter, or Ctrl+C to clear it |
 
 User-facing text lives in one `messages.ts` table keyed by code; logs always carry the code.
+
+### 6.6 Failure matrix (S7.2)
+
+What each failure does, and the test that proves it. Failures Claude reports through its hooks (`core/failureNotices.ts`) show in the voice overlay at most once per command, and only once set up: during setup the wizard explains its own tests. None of them changes Claude's state, so voice keeps working after them.
+
+| Failure | Code | What the user sees and does | Tested by |
+| --- | --- | --- | --- |
+| Mic missing, or unplugged mid-recording | `MIC_MISSING` | overlay notice; connect one and press the hotkey | `recording.test.ts` "ends the recording when the microphone is unplugged" |
+| Mic denied by Windows | `MIC_DENIED` | overlay notice; the privacy setting to turn on; the wizard's button opens it | `recording.test.ts` "shows a microphone error"; `wizard.test.ts` |
+| Hotkey taken | `HOTKEY_TAKEN` | message box with the combination; close the other app or choose another in Settings | `hotkey.test.ts` "tells the user, with the combination and what to do next"; `listening.test.ts` |
+| Model missing or corrupt | `MODEL_MISSING`, `MODEL_CORRUPT` | overlay notice; Speech model > Retry download | `speechEngine.test.ts`; `model-manager.test.ts` "reports a wrong checksum, deletes the file, and installs nothing"; `controller.test.ts` |
+| Engine crash | `WORKER_CRASHED` (`WORKER_ERROR` for one it survives) | overlay notice; the mic never opens; restart VoiceUp | `recording.test.ts` "does not open the mic when no worker is left" |
+| Claude not installed | `CLAUDE_NOT_FOUND` | the install command in the terminal, or the wizard's install step; Check again | `session.test.ts` "shows the official install command instead of a blank terminal"; `wizard.e2e.ts` |
+| Claude not logged in | `CLAUDE_NOT_LOGGED_IN` | in setup, the sign-in step; later, overlay notice; `/login` in the terminal | `signInStep.test.ts` "says Claude is not signed in on an authentication failure"; `failureNotices.test.ts`; `failures.e2e.ts` |
+| Claude exits | `CLAUDE_EXITED` | exit code and Restart session in the terminal | `session.test.ts` "tells the window, with the exit code and a next step" |
+| Claude too old | `CLAUDE_TOO_OLD` | `claude update` and Check again; not started | `session.test.ts` "when Claude Code is too old"; `wizard.e2e.ts` |
+| Hooks blocked | `HOOKS_BLOCKED` | message box naming the setting; voice off, and the hotkey repeats it without opening the mic | `link.test.ts` "passes no hooks, reports it and turns voice off"; `recording.test.ts` "says why, without opening the mic" |
+| `ANTHROPIC_API_KEY` set | `API_KEY_SET` | warning in the wizard's sign-in step; continuing is allowed | `wizard.test.ts` "warns about an API key without blocking, and never carries the key"; `wizard.e2e.ts` |
+| Chrome extension not detected | `CHROME_NOT_DETECTED` (`BROWSER_NOT_CONNECTED` in the wizard's test) | overlay notice; `/chrome` → Reconnect extension, or restart the browser and Claude | `hooks.test.ts` "browser tool answers"; `failureNotices.test.ts`; `failures.e2e.ts`; `wizard.e2e.ts` |
+| Nothing heard | `NO_SPEECH` | overlay notice; check the mic, press the hotkey again | `speechEngine.test.ts` "reports no speech when nothing was said"; `recording.test.ts` |
+| Transcript dropped | `TRANSCRIPT_DROPPED` | overlay notice; nothing is sent | `recording.test.ts` "is still dropped when it has nothing usable" |
+| Transcription timeout | `TRANSCRIBE_TIMEOUT` | overlay notice; the worker restarts | `recording.test.ts` "waits 10 s for a short clip, then restarts the worker and tells the user" |
+| Hook server port in use | `HOOKS_FAILED` | message box; Claude still starts, with voice off; restart VoiceUp. The server asks Windows for any free port, so only the bind itself can fail | `link.test.ts` "treats a port in use like any other start failure (S7.2)" |
+| Offline | `MODEL_DOWNLOAD_FAILED` for the model; `CLAUDE_TURN_FAILED` for Claude; the wizard's install step shows its failure and Try again | overlay or settings notice; the download resumes on retry | `model-manager.test.ts` "reports no connection, and keeps the partial file for later"; `failures.e2e.ts`; `wizard.e2e.ts` "a failed install says so, and can be tried again" |
 
 ## 7. Build, packaging, release and CI
 

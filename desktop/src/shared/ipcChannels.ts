@@ -1,4 +1,6 @@
-// Channel names only, with no imports: a sandboxed preload can't load zod at runtime, so it must
+import type { EditableSettings, SettingsField } from './settingsFields'
+
+// Channel names only, with no value imports: a sandboxed preload can't load zod at runtime, so it must
 // not pull in ipc.ts. Payloads are in TECH_SPEC §6.1.
 export const Channels = {
   termData: 'term:data',
@@ -25,6 +27,11 @@ export const Channels = {
   recorderDevices: 'recorder:devices',
   overlayShow: 'overlay:show',
   overlaySound: 'overlay:sound',
+  settingsGet: 'settings:get',
+  settingsSet: 'settings:set',
+  settingsReset: 'settings:reset',
+  settingsRetryModel: 'settings:retryModel',
+  settingsChanged: 'settings:changed',
   wizardGet: 'wizard:get',
   wizardNext: 'wizard:next',
   wizardBack: 'wizard:back',
@@ -208,6 +215,43 @@ export interface WizardApi {
   onChanged(listener: (view: WizardView) => void): () => void
   /** The installer's output, as it arrives. Returns the function that unsubscribes. */
   onOutput(listener: (text: string) => void): () => void
+}
+
+/** What the settings screen shows. The microphone is the system default when the saved one is gone. */
+export interface SettingsView {
+  readonly values: EditableSettings
+  readonly microphones: readonly MicDevice[]
+  readonly models: readonly {
+    readonly id: string
+    readonly label: string
+    readonly size: string
+    readonly installed: boolean
+    readonly chosen: boolean
+  }[]
+  /** The chosen model's download. */
+  readonly model: ModelStepStatus
+  readonly hotkeyOn: boolean
+  readonly canStartWithWindows: boolean
+}
+
+/** Data is null only when main refused the request outright. */
+export type SettingsResult =
+  | { readonly ok: true; readonly data: SettingsView }
+  | {
+      readonly ok: false
+      readonly errors: Partial<Record<SettingsField, string>>
+      readonly data: SettingsView | null
+    }
+
+/** What the settings preload exposes as window.voiceupSettings. */
+export interface SettingsApi {
+  get(): Promise<SettingsResult>
+  /** Only the fields that changed. */
+  set(changes: Partial<EditableSettings>): Promise<SettingsResult>
+  reset(): Promise<SettingsResult>
+  retryModel(): Promise<SettingsResult>
+  /** Returns the function that unsubscribes. */
+  onChanged(listener: (view: SettingsView) => void): () => void
 }
 
 /** What the terminal preload exposes as window.voiceup. */

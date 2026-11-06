@@ -11,6 +11,7 @@ const ICON_SCALE = 2
 export interface ClaudeStatusOptions {
   readonly window: BrowserWindow
   readonly notifications: boolean
+  readonly openSettings: () => void
   readonly reArm: () => void
   readonly showWindow: () => void
   readonly quit: () => void
@@ -23,7 +24,10 @@ export class ClaudeStatus {
   // A notification with nothing holding on to it can be collected before its click arrives.
   private notice: Notification | undefined
 
+  private notifications: boolean
+
   constructor(private readonly options: ClaudeStatusOptions) {
+    this.notifications = options.notifications
     this.tray = new Tray(nativeImage.createEmpty())
     this.tray.on('click', () => {
       options.showWindow()
@@ -53,10 +57,14 @@ export class ClaudeStatus {
     if (!window.isDestroyed()) window.webContents.send(Channels.stateChanged, view)
   }
 
+  setNotifications(on: boolean): void {
+    this.notifications = on
+  }
+
   /** Only when the user isn't already looking at it. */
   notify(previous: ClaudeState, state: ClaudeState): void {
-    const { window, notifications, showWindow } = this.options
-    if (!notifications || window.isDestroyed() || window.isFocused()) return
+    const { window, showWindow } = this.options
+    if (!this.notifications || window.isDestroyed() || window.isFocused()) return
     const notice = noticeFor(previous, state)
     if (notice === null || !Notification.isSupported()) return
     try {
@@ -81,12 +89,13 @@ export class ClaudeStatus {
   }
 
   private menu(view: StatusView): Menu {
-    const { reArm, showWindow, quit } = this.options
+    const { reArm, showWindow, quit, openSettings } = this.options
     return Menu.buildFromTemplate([
       { label: view.label, enabled: false },
       { type: 'separator' },
       { label: 'Show VoiceUp', click: showWindow },
       { label: 'Re-arm voice', enabled: view.canReArm, click: reArm },
+      { label: 'Settings...', click: openSettings },
       { type: 'separator' },
       { label: 'Quit', click: quit }
     ])

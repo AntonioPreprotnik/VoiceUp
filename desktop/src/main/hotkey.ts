@@ -46,6 +46,10 @@ export const escapeKey = {
   }
 }
 
+export function unregisterHotkey(accelerator: string): void {
+  globalShortcut.unregister(accelerator)
+}
+
 export function unregisterHotkeys(): void {
   globalShortcut.unregisterAll()
 }

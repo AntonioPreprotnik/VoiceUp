@@ -143,6 +143,11 @@ class FakeApp extends EventEmitter {
   isPackaged = true
   hasLock = true
   quitCount = 0
+  loginItem: unknown = undefined
+
+  setLoginItemSettings(settings: unknown): void {
+    this.loginItem = settings
+  }
   exitCodes: number[] = []
   appUserModelId = ''
 
@@ -471,6 +476,7 @@ export function resetFakes(): void {
   app.isPackaged = true
   app.hasLock = true
   app.quitCount = 0
+  app.loginItem = undefined
   app.exitCodes = []
   protocol.handler = undefined
   protocol.privileged = []

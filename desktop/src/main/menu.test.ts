@@ -21,15 +21,12 @@ interface TemplateItem {
 
 function actions(
   overrides: Partial<SessionMenuActions> = {}
-): SessionMenuActions & { changeFontSize: Mock; selectMicrophone: Mock } {
+): SessionMenuActions & { changeFontSize: Mock; openSettings: Mock } {
   return {
     changeFolder: () => Promise.resolve(),
-    microphones: [],
-    selectedMicrophone: null,
-    speechModel: { choices: [], notes: [], canRetry: false, select: vi.fn(), retry: vi.fn() },
     ...overrides,
     changeFontSize: vi.fn(),
-    selectMicrophone: vi.fn()
+    openSettings: vi.fn()
   }
 }
 
@@ -54,43 +51,17 @@ describe('the app menu', () => {
 
   it('adds File and View only when there is a session to change', () => {
     installAppMenu(actions())
-    expect(template().map((item) => item.label)).toEqual([
-      'File',
-      'View',
-      'Microphone',
-      'Speech model',
-      'Help'
-    ])
+    expect(template().map((item) => item.label)).toEqual(['File', 'View', 'Help'])
   })
 
-  it('offers the speech models, and a retry only when one failed', () => {
-    const select = vi.fn()
-    const retry = vi.fn()
-    const speechModel = {
-      choices: [{ id: 'moonshine-base-en' as const, label: 'Moonshine', checked: true }],
-      notes: ['Models on disk: 287 MB'],
-      canRetry: false,
-      select,
-      retry
-    }
-    const items = (): TemplateItem[] =>
-      template().find((item) => item.label === 'Speech model')?.submenu ?? []
-
-    installAppMenu(actions({ speechModel }))
-    expect(items().map(({ label }) => label)).toEqual([
-      'Moonshine',
-      undefined,
-      'Models on disk: 287 MB'
-    ])
-    expect(items()[0]).toMatchObject({ type: 'radio', checked: true })
-    items()[0]?.click?.()
-    expect(select).toHaveBeenCalledWith('moonshine-base-en')
-
-    installAppMenu(actions({ speechModel: { ...speechModel, canRetry: true } }))
-    items()
-      .find((item) => item.label === 'Retry download')
+  it('opens the settings from File', () => {
+    const session = actions()
+    installAppMenu(session)
+    template()
+      .find((item) => item.label === 'File')
+      ?.submenu?.find((item) => item.label === 'Settings...')
       ?.click?.()
-    expect(retry).toHaveBeenCalledOnce()
+    expect(session.openSettings).toHaveBeenCalledOnce()
   })
 
   it.each([
@@ -105,65 +76,6 @@ describe('the app menu', () => {
     expect(entry?.accelerator).toBe(accelerator)
     entry?.click?.()
     expect(session.changeFontSize).toHaveBeenCalledWith(change)
-  })
-
-  describe('Microphone', () => {
-    const MICS = [
-      { deviceId: 'usb', label: 'USB Mic' },
-      { deviceId: 'webcam', label: 'Webcam Mic' }
-    ]
-
-    function entries(): TemplateItem[] {
-      return template().find((item) => item.label === 'Microphone')?.submenu ?? []
-    }
-
-    it('lists the system default first, then each microphone', () => {
-      installAppMenu(actions({ microphones: MICS }))
-      expect(entries().map((item) => item.label)).toEqual([
-        'System default',
-        'USB Mic',
-        'Webcam Mic'
-      ])
-    })
-
-    it('marks the system default when nothing is chosen', () => {
-      installAppMenu(actions({ microphones: MICS }))
-      expect(
-        entries()
-          .filter((item) => item.checked)
-          .map((item) => item.label)
-      ).toEqual(['System default'])
-    })
-
-    it('marks the chosen microphone', () => {
-      installAppMenu(actions({ microphones: MICS, selectedMicrophone: 'webcam' }))
-      expect(
-        entries()
-          .filter((item) => item.checked)
-          .map((item) => item.label)
-      ).toEqual(['Webcam Mic'])
-    })
-
-    it('marks the system default when the chosen microphone is unplugged', () => {
-      installAppMenu(actions({ microphones: MICS, selectedMicrophone: 'gone' }))
-      expect(
-        entries()
-          .filter((item) => item.checked)
-          .map((item) => item.label)
-      ).toEqual(['System default'])
-    })
-
-    it.each([
-      ['USB Mic', 'usb'],
-      ['System default', null]
-    ])('choosing %s selects it', (label, deviceId) => {
-      const session = actions({ microphones: MICS })
-      installAppMenu(session)
-      entries()
-        .find((item) => item.label === label)
-        ?.click?.()
-      expect(session.selectMicrophone).toHaveBeenCalledWith(deviceId)
-    })
   })
 
   it('runs Change folder and logs a failure', async () => {

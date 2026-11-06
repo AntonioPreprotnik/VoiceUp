@@ -150,13 +150,13 @@ describe('a failed install', () => {
     await settle()
     expect(failed).toEqual(['MODEL_CORRUPT'])
     expect(models.status.phase).toBe('failed')
-    expect(models.menu().canRetry).toBe(true)
+    expect(models.chosenStatus().phase).toBe('failed')
 
     models.ensure()
     installs[1]?.finish()
     await settle()
     expect(models.status.phase).toBe('idle')
-    expect(models.menu().canRetry).toBe(false)
+    expect(models.chosenStatus().phase).toBe('ready')
     expect(ready).toEqual(['moonshine-base-en'])
   })
 
@@ -168,23 +168,38 @@ describe('a failed install', () => {
   })
 })
 
-describe('the menu', () => {
-  it('marks the choice, the download sizes and the disk usage', () => {
+describe('for the settings screen', () => {
+  it('lists every model, marking the choice and what is installed', () => {
     installed.add('moonshine-base-en')
-    expect(controller().menu()).toEqual({
-      choices: [
-        { id: 'moonshine-base-en', label: 'Moonshine', checked: true },
-        { id: 'parakeet-tdt-0.6b-v2-int8', label: 'Parakeet, downloads 482 MB', checked: false }
-      ],
-      notes: ['Models on disk: 287 MB'],
-      canRetry: false
-    })
+    expect(controller().choices()).toEqual([
+      {
+        id: 'moonshine-base-en',
+        label: 'Moonshine',
+        size: '251 MB',
+        installed: true,
+        chosen: true
+      },
+      {
+        id: 'parakeet-tdt-0.6b-v2-int8',
+        label: 'Parakeet',
+        size: '482 MB',
+        installed: false,
+        chosen: false
+      }
+    ])
   })
 
-  it('says when something is installing', () => {
+  it('shows the download as it goes', () => {
     const models = controller()
     models.ensure()
-    expect(models.menu().notes).toContain('Installing, the title bar shows how far along')
+    expect(models.chosenStatus()).toMatchObject({ phase: 'downloading', percent: 0 })
+  })
+
+  it('switches back to the default for auto', () => {
+    const models = controller()
+    models.select('parakeet-tdt-0.6b-v2-int8')
+    models.select('auto')
+    expect(models.choices().find((entry) => entry.chosen)?.id).toBe('moonshine-base-en')
   })
 })
 

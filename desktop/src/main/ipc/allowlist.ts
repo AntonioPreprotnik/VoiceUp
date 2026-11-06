@@ -16,6 +16,10 @@ type RendererChannel =
   | typeof Channels.settingsFontSize
   | typeof Channels.recorderError
   | typeof Channels.recorderDevices
+  | typeof Channels.settingsGet
+  | typeof Channels.settingsSet
+  | typeof Channels.settingsReset
+  | typeof Channels.settingsRetryModel
   | typeof Channels.wizardGet
   | typeof Channels.wizardNext
   | typeof Channels.wizardBack
@@ -43,6 +47,10 @@ export const SENDERS: Readonly<Record<RendererChannel, readonly WindowKind[]>> =
   [Channels.settingsFontSize]: ['terminal'],
   [Channels.recorderError]: ['recorder'],
   [Channels.recorderDevices]: ['recorder'],
+  [Channels.settingsGet]: ['settings'],
+  [Channels.settingsSet]: ['settings'],
+  [Channels.settingsReset]: ['settings'],
+  [Channels.settingsRetryModel]: ['settings'],
   [Channels.wizardGet]: ['wizard'],
   [Channels.wizardNext]: ['wizard'],
   [Channels.wizardBack]: ['wizard'],

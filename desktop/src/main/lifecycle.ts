@@ -7,7 +7,7 @@ import { RecorderDevices } from '../shared/ipc'
 import { Channels, type MicDevice } from '../shared/ipcChannels'
 import { installShutdown } from './appShutdown'
 import { createClaudeLink } from './claudeLink'
-import { registerHotkey, reportHotkeyTaken, unregisterHotkeys } from './hotkey'
+import { registerHotkey, reportHotkeyTaken, unregisterHotkey, unregisterHotkeys } from './hotkey'
 import { exposeForE2e } from './e2eHook'
 import { on, registerTerminalIpc } from './ipc/terminal'
 import { registerTerminalUiIpc } from './ipc/terminalUi'
@@ -22,6 +22,7 @@ import { installScript, runInstaller } from './pty/installClaude'
 import { isDirectory, pickProjectFolder } from './pty/projectFolder'
 import { resolveClaude } from './pty/resolveClaude'
 import { ClaudeSession } from './pty/session'
+import { SettingsScreen } from './settings/settingsScreen'
 import { SettingsStore } from './settings/settingsStore'
 import { loadSettings, saveSettings } from './settings/store'
 import { runSmokeTest } from './smokeTest'
@@ -109,12 +110,15 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
       loadRenderer(overlayWindow, 'overlay').catch((error: unknown) => {
         log.error('Could not load the overlay window', error)
       })
-      const { claudeState, delivery, hooks, publishStatus } = createClaudeLink({
+      const { claudeState, delivery, hooks, publishStatus, setNotifications } = createClaudeLink({
         settings: store,
         overlay,
         terminalWindow,
         parentWindow: () => mainWindow,
         showWindow: focusFront,
+        openSettings: () => {
+          openSettings()
+        },
         write: (data) => {
           claude.host.write(data)
         },
@@ -127,7 +131,7 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
         }
       })
       // Step 5: the speech worker that the hidden window streams to.
-      const { recording, models } = createVoice({
+      const { recording, models, applySpeechSettings } = createVoice({
         settings: store,
         overlay,
         recorderWindow,
@@ -147,6 +151,7 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
         },
         onModelStatus: () => {
           wizard?.onModelStatus()
+          settingsScreen.refresh()
         },
         rebuildMenu: () => {
           rebuildMenu()
@@ -194,29 +199,15 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
           changeFontSize: (change) => {
             claude.changeFontSize(change)
           },
-          microphones,
-          selectedMicrophone: claude.micDeviceId,
-          selectMicrophone: (deviceId) => {
-            claude.setMicDevice(deviceId)
-            rebuildMenu()
-          },
-          speechModel: {
-            ...models.menu(),
-            select: (id) => {
-              claude.setModel(id)
-              models.select(id)
-              rebuildMenu()
-            },
-            retry: () => {
-              models.ensure()
-            }
+          openSettings: () => {
+            openSettings()
           }
         })
       }
       rebuildMenu()
       on(Channels.recorderDevices, RecorderDevices, (devices) => {
         microphones = devices
-        rebuildMenu()
+        settingsScreen.refresh()
       })
       // Closing the terminal quits. window-all-closed can't do it: the hidden recorder stays open.
       mainWindow.once('closed', () => {
@@ -236,6 +227,61 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
         })
         return hotkeyOn
       }
+      const pressHotkey = (): void => {
+        recording.press()
+      }
+      /** The new one on, then the old one off. If it can't be had, the old one stays on. */
+      const changeHotkey = (next: string): boolean => {
+        const previous = store.current.hotkey
+        if (hotkeyOn === true) unregisterHotkey(previous)
+        if (registerHotkey(next, pressHotkey)) {
+          steps.shortcuts ??= unregisterHotkeys
+          hotkeyOn = true
+          log.info('Hotkey changed')
+          return true
+        }
+        log.warn('HOTKEY_TAKEN: the new hotkey could not be registered')
+        if (hotkeyOn === true && !registerHotkey(previous, pressHotkey)) hotkeyOn = false
+        return false
+      }
+      const settingsScreen = new SettingsScreen({
+        store,
+        microphones: () => microphones,
+        models: () => models.choices(),
+        model: () => models.chosenStatus(),
+        retryModel: () => {
+          models.ensure()
+        },
+        changeHotkey,
+        hotkeyOn: () => hotkeyOn === true,
+        canStartWithWindows: app.isPackaged
+      })
+      // Not during setup: the wizard owns these choices until it finishes.
+      const openSettings = (): void => {
+        if (store.current.wizard.done) settingsScreen.open()
+        else focusFront()
+      }
+      // A saved change takes effect at once, or from the next recording.
+      store.subscribe((next, previous) => {
+        if (next.logLevel !== previous.logLevel) setLogLevel(next.logLevel)
+        if (next.ui.sounds !== previous.ui.sounds) overlay.setSounds(next.ui.sounds)
+        if (next.ui.notifications !== previous.ui.notifications) {
+          setNotifications(next.ui.notifications)
+        }
+        if (next.ui.startWithWindows !== previous.ui.startWithWindows) {
+          // An unpackaged build would add electron.exe to the startup list.
+          if (app.isPackaged) app.setLoginItemSettings({ openAtLogin: next.ui.startWithWindows })
+          log.info(`Start with Windows: ${next.ui.startWithWindows ? 'on' : 'off'}`)
+        }
+        if (next.speech.modelId !== previous.speech.modelId) {
+          models.select(next.speech.modelId)
+        } else if (
+          next.speech.endSilenceSec !== previous.speech.endSilenceSec ||
+          next.speech.maxRecordingSec !== previous.speech.maxRecordingSec
+        ) {
+          applySpeechSettings()
+        }
+      })
       const openTerminal = async (): Promise<void> => {
         await loadTerminal()
         // The e2e tests have no model and no network, so nothing downloads for them.

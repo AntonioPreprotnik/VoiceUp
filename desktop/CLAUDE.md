@@ -36,7 +36,7 @@ Exact versions only. Confirmed with `npm view` on 2026-11-02: Electron 45.2.1, e
 - Frames from the recorder to the worker must be copied. A transferred `ArrayBuffer` reaches the `utilityProcess` as `null`. The smoke test sends frames from main, so it doesn't cover this path: test with the real hotkey and microphone.
 - The worker's stderr goes to the log, so a crash there explains itself.
 - A hidden recorder window is always open, so `window-all-closed` never fires: closing the terminal is what quits the app.
-- A model install runs in main and uses the title bar for progress until S6.5 and S6.6 bring real screens. To unpack the real archive in a test: `VOICEUP_TEST_MODELS=<folder holding it> npm test`.
+- A model install runs in main. Its progress shows in the title bar, the wizard and the settings screen. To unpack the real archive in a test: `VOICEUP_TEST_MODELS=<folder holding it> npm test`.
 - Voice text reaches Claude only through `core/delivery/delivery.ts`, which asks the gate before the paste and again before Enter, and writes directly to the PTY, not through `onInput`, so it can't look like the user typing. The limits in `sanitize.ts` were measured in S5.3 and aren't documented by Claude: re-measure them on a Claude upgrade.
 - Nothing typed by delivery counts as the user's typing, and queued text only goes when the gate says `send`, so the queue can never put text into a prompt.
 - `npm run build`, then `npm run test:e2e`: Playwright against the unpackaged app and the fake Claude. It needs no model, microphone or network.
@@ -51,6 +51,8 @@ Exact versions only. Confirmed with `npm view` on 2026-11-02: Electron 45.2.1, e
 - To run the real browser raise, which moves your browser to the front: `VOICEUP_TEST_SHOW_BROWSER=brave npx vitest run test/integration/show-browser.test.ts`; CI skips this.
 - A fresh settings file starts the wizard; a file with no `wizard` section counts as set up, so existing copies skip it. To see it without touching your own settings, run with `--user-data-dir=<empty folder>`.
 - Never test the real Claude Code installer on your own account: the resolve order prefers a native install, so it would silently replace an npm one for your daily copy. Use a temporary Windows user, or a VM. Tests use `VOICEUP_INSTALL_SCRIPT` and `VOICEUP_CLAUDE_CMD_FILE`, which a packaged build ignores.
+- Settings change only through `SettingsStore` (`src/main/settings/settingsStore.ts`), which checks, saves and announces each change. Never keep a copy of the settings object: read `store.current` when the value is needed.
+- Start with Windows only touches the startup list in a packaged build, under that copy's own path. Test it on a test copy by turning it on and off again, then check `HKCUSoftwareMicrosoftWindowsCurrentVersionRun` is as it was.
 - electron-builder does not bundle: run `npm run build` first, or it packages a stale `out/`.
 - Plain `tsc --noEmit` checks nothing here: the root `tsconfig.json` has `files: []` and only references the two projects. Use `npm run typecheck`.
 - Import rules live in `eslint.import-rules.mjs`, as an allowlist per folder. A new allowed package goes there and in the table in `test/lint/import-rules.test.ts`.

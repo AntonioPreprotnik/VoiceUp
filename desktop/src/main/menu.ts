@@ -1,8 +1,6 @@
 import { mkdir } from 'node:fs/promises'
 import { app, Menu, shell, type MenuItemConstructorOptions } from 'electron'
 import type { FontSizeChange } from '../core/fontSize'
-import type { MicDevice } from '../shared/ipcChannels'
-import type { ModelId } from '../shared/models'
 import { log, logsDirectory } from './log'
 
 async function openLogsFolder(): Promise<void> {
@@ -16,73 +14,7 @@ async function openLogsFolder(): Promise<void> {
 export interface SessionMenuActions {
   readonly changeFolder: () => Promise<void>
   readonly changeFontSize: (change: FontSizeChange) => void
-  readonly microphones: readonly MicDevice[]
-  readonly selectedMicrophone: string | null
-  /** Null is the system default. */
-  readonly selectMicrophone: (deviceId: string | null) => void
-  readonly speechModel: SpeechModelMenu
-}
-
-/** A stand-in for the settings screen, S6.6. */
-export interface SpeechModelMenu {
-  readonly choices: readonly { id: ModelId; label: string; checked: boolean }[]
-  /** Shown greyed out, such as what's downloading and the disk usage. */
-  readonly notes: readonly string[]
-  readonly canRetry: boolean
-  readonly select: (id: ModelId) => void
-  readonly retry: () => void
-}
-
-function speechModelMenu(menu: SpeechModelMenu): MenuItemConstructorOptions {
-  return {
-    label: 'Speech model',
-    submenu: [
-      ...menu.choices.map(({ id, label, checked }): MenuItemConstructorOptions => ({
-        label,
-        type: 'radio',
-        checked,
-        click: () => {
-          menu.select(id)
-        }
-      })),
-      { type: 'separator' },
-      ...(menu.canRetry
-        ? [
-            {
-              label: 'Retry download',
-              click: () => {
-                menu.retry()
-              }
-            }
-          ]
-        : []),
-      ...menu.notes.map((label) => ({ label, enabled: false }))
-    ]
-  }
-}
-
-function microphoneMenu(actions: SessionMenuActions): MenuItemConstructorOptions {
-  const { microphones, selectedMicrophone, selectMicrophone } = actions
-  // A saved microphone that isn't plugged in now shows as the system default, which is what
-  // getUserMedia falls back to.
-  const selected = microphones.some(({ deviceId }) => deviceId === selectedMicrophone)
-    ? selectedMicrophone
-    : null
-  const item = (label: string, deviceId: string | null): MenuItemConstructorOptions => ({
-    label,
-    type: 'radio',
-    checked: deviceId === selected,
-    click: () => {
-      selectMicrophone(deviceId)
-    }
-  })
-  return {
-    label: 'Microphone',
-    submenu: [
-      item('System default', null),
-      ...microphones.map(({ deviceId, label }) => item(label, deviceId))
-    ]
-  }
+  readonly openSettings: () => void
 }
 
 function fontSizeItem(
@@ -130,6 +62,12 @@ export function installAppMenu(actions?: SessionMenuActions): void {
                   log.error('Could not change the project folder', error)
                 })
               }
+            },
+            {
+              label: 'Settings...',
+              click: () => {
+                actions.openSettings()
+              }
             }
           ]
         }
@@ -154,8 +92,6 @@ export function installAppMenu(actions?: SessionMenuActions): void {
       { role: 'toggleDevTools', registerAccelerator: false }
     ]
   }
-  const microphone = actions === undefined ? undefined : microphoneMenu(actions)
-  const speechModel = actions === undefined ? undefined : speechModelMenu(actions.speechModel)
-  const items = [file, view, microphone, speechModel, help, app.isPackaged ? undefined : devTools]
+  const items = [file, view, help, app.isPackaged ? undefined : devTools]
   Menu.setApplicationMenu(Menu.buildFromTemplate(items.filter((item) => item !== undefined)))
 }

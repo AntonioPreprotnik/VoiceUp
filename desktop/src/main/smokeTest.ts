@@ -89,6 +89,20 @@ async function checkWizardPage(consoleErrors: string[]): Promise<void> {
     "typeof window.voiceupWizard?.next === 'function' && document.getElementById('continue') !== null"
   )
   if (ready !== true) consoleErrors.push('The wizard page did not get its preload')
+  await checkSettingsPage(consoleErrors)
+}
+
+/** Like the wizard page: nothing in main answers it here, which it shows as a warning only. */
+async function checkSettingsPage(consoleErrors: string[]): Promise<void> {
+  const window = createWindow('settings', { showWhenReady: false })
+  window.webContents.on('console-message', (details) => {
+    if (details.level === 'error') consoleErrors.push(details.message)
+  })
+  await loadRenderer(window, 'settings')
+  const ready: unknown = await window.webContents.executeJavaScript(
+    "typeof window.voiceupSettings?.set === 'function' && document.getElementById('reset') !== null"
+  )
+  if (ready !== true) consoleErrors.push('The settings page did not get its preload')
 }
 
 /** Spawns `cmd.exe /c exit 0` through node-pty, proving the native module loads and runs. */

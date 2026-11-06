@@ -11,6 +11,7 @@ export type TermResize = z.infer<typeof TermResize>
 export const SessionRestart = z.object({}).strict()
 export const StateReArm = z.object({}).strict()
 export const WizardAction = z.object({}).strict()
+export const WizardChromeOpen = z.object({ browser: z.enum(['chrome', 'brave']) }).strict()
 export const NoPayload = z.object({}).strict()
 /** Only the fields the settings screen shows. Their bounds are checked against the full schema. */
 export const SettingsChange = z

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { BrowserWindow, ipcMain, resetFakes } from '../../test/fakes/electron'
 import { defaultSettings } from '../core/settingsMigrate'
 import type { ClaudeCommand } from '../core/claudeCommand'
+import type { BrowserFinding } from '../core/chromeStep'
 import type { ModelStatus } from './models/controller'
 import type { RunningInstall } from './pty/installClaude'
 import { Channels, type WizardResult, type WizardView } from '../shared/ipcChannels'
@@ -34,6 +35,8 @@ let modelInstalled = true
 let modelStatus: ModelStatus = { phase: 'idle' }
 const ensureModel = vi.fn()
 const startHotkey = vi.fn<() => boolean>()
+let browsersFound: BrowserFinding[] = []
+const openStore = vi.fn()
 let wizard: Wizard
 let settings: Settings
 let store: SettingsStore
@@ -84,7 +87,8 @@ function open(): void {
       chosenModel: () => ({ label: 'Moonshine', bytes: 250807309, installed: modelInstalled })
     },
     startHotkey,
-    hotkey: 'Control+Shift+Space'
+    hotkey: 'Control+Shift+Space',
+    browsers: { find: () => browsersFound, open: openStore }
   })
   const created = BrowserWindow.instances.at(-1)
   if (created === undefined) throw new Error('No window was created')
@@ -104,6 +108,11 @@ beforeEach(() => {
   modelInstalled = true
   modelStatus = { phase: 'idle' }
   startHotkey.mockReturnValue(true)
+  // Most tests pass this step: the ones about it set their own.
+  browsersFound = [
+    { browser: 'chrome', installed: true, extension: true },
+    { browser: 'brave', installed: false, extension: false }
+  ]
   promptDirty.mockReturnValue(false)
   isFolder.mockReturnValue(true)
   chooseFolder.mockResolvedValue(null)
@@ -118,6 +127,102 @@ async function openReady(): Promise<void> {
     expect(invoke(Channels.wizardGet, wizardEvent)?.canContinue).toBe(true)
   })
 }
+
+describe('the Claude in Chrome step', () => {
+  function atChrome(): void {
+    settings.wizard.completed = ['claudeCode', 'projectFolder', 'signIn', 'speechModel']
+    open()
+    expect(invoke(Channels.wizardGet, wizardEvent)?.steps[4]?.id).toBe('claudeInChrome')
+  }
+  const without: BrowserFinding[] = [
+    { browser: 'chrome', installed: true, extension: false },
+    { browser: 'brave', installed: true, extension: false }
+  ]
+
+  it('refuses Continue until the extension is found, then turns on browser control', () => {
+    browsersFound = without
+    atChrome()
+    expect(invoke(Channels.wizardGet, wizardEvent)?.chrome).toEqual({
+      status: 'needed',
+      browsers: ['chrome', 'brave']
+    })
+    expect(invoke(Channels.wizardNext, wizardEvent)?.index).toBe(4)
+
+    browsersFound = [{ browser: 'brave', installed: true, extension: true }]
+    expect(invoke(Channels.wizardChromeCheck, wizardEvent)?.chrome).toEqual({
+      status: 'installed',
+      browser: 'brave'
+    })
+    expect(store.current.claude.browserControl).toBe(false)
+    expect(invoke(Channels.wizardNext, wizardEvent)?.index).toBe(5)
+    expect(store.current.claude.browserControl).toBe(true)
+  })
+
+  it('checks again when the window comes back to the front, and tells the page', () => {
+    browsersFound = without
+    atChrome()
+    const sent = window.webContents.sent.length
+    browsersFound = [{ browser: 'chrome', installed: true, extension: true }]
+    window.emit('focus')
+    const [channel, payload] = window.webContents.sent.slice(sent).at(-1) ?? []
+    expect(channel).toBe(Channels.wizardChanged)
+    expect(payload).toMatchObject({ canContinue: true })
+  })
+
+  it('with no browser, says so and waits, and the user can still confirm', () => {
+    browsersFound = []
+    atChrome()
+    expect(invoke(Channels.wizardGet, wizardEvent)?.chrome).toEqual({ status: 'noBrowser' })
+    expect(invoke(Channels.wizardNext, wizardEvent)?.index).toBe(4)
+    expect(invoke(Channels.wizardChromeConfirm, wizardEvent)?.canContinue).toBe(true)
+    expect(invoke(Channels.wizardNext, wizardEvent)?.index).toBe(5)
+    expect(store.current.claude.browserControl).toBe(true)
+  })
+
+  it('opens the store only in a browser it found', () => {
+    browsersFound = [{ browser: 'chrome', installed: true, extension: false }]
+    atChrome()
+    invoke(Channels.wizardChromeOpen, wizardEvent, { browser: 'brave' })
+    expect(openStore).not.toHaveBeenCalled()
+    invoke(Channels.wizardChromeOpen, wizardEvent, { browser: 'chrome' })
+    expect(openStore).toHaveBeenCalledExactlyOnceWith('chrome')
+  })
+
+  it('refuses an address or another browser from the page', () => {
+    browsersFound = without
+    atChrome()
+    for (const payload of [
+      { browser: 'edge' },
+      { browser: 'chrome', url: 'https://example.com' },
+      {}
+    ]) {
+      expect(result(Channels.wizardChromeOpen, wizardEvent, payload)).toEqual({
+        ok: false,
+        code: 'WIZARD_REFUSED'
+      })
+    }
+    expect(openStore).not.toHaveBeenCalled()
+  })
+
+  it('ignores its actions on another step', () => {
+    browsersFound = without
+    open()
+    invoke(Channels.wizardChromeOpen, wizardEvent, { browser: 'chrome' })
+    invoke(Channels.wizardChromeConfirm, wizardEvent)
+    expect(openStore).not.toHaveBeenCalled()
+    expect(invoke(Channels.wizardGet, wizardEvent)?.chrome.status).not.toBe('installed')
+  })
+
+  it('refuses its channels from another window', () => {
+    browsersFound = without
+    atChrome()
+    expect(result(Channels.wizardChromeConfirm, terminalEvent())).toEqual({
+      ok: false,
+      code: 'WIZARD_REFUSED'
+    })
+    expect(invoke(Channels.wizardGet, wizardEvent)?.canContinue).toBe(false)
+  })
+})
 
 describe('the Speech model step', () => {
   function atModel(): void {

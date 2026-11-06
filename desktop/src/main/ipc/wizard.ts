@@ -1,6 +1,11 @@
 import { ipcMain, type IpcMainInvokeEvent } from 'electron'
-import { WizardAction } from '../../shared/ipc'
-import { Channels, type WizardResult, type WizardView } from '../../shared/ipcChannels'
+import { WizardAction, WizardChromeOpen } from '../../shared/ipc'
+import {
+  Channels,
+  type ChromeBrowser,
+  type WizardResult,
+  type WizardView
+} from '../../shared/ipcChannels'
 import { log } from '../log'
 import { SENDERS } from './allowlist'
 import { validateSender } from './validateSender'
@@ -16,6 +21,9 @@ export interface WizardActions {
   restartClaude(): WizardView
   retryModel(): WizardView
   skipMicTest(): WizardView
+  openChromeStore(browser: ChromeBrowser): WizardView
+  checkChrome(): WizardView
+  confirmChrome(): WizardView
 }
 
 type WizardChannel =
@@ -29,31 +37,48 @@ type WizardChannel =
   | typeof Channels.wizardRestartClaude
   | typeof Channels.wizardRetryModel
   | typeof Channels.wizardSkipMicTest
+  | typeof Channels.wizardChromeOpen
+  | typeof Channels.wizardChromeCheck
+  | typeof Channels.wizardChromeConfirm
 
 /**
  * The wizard page can read its progress, move through the steps, ask for the fixed Claude Code
- * install, open the folder picker, send the fixed test prompt and restart Claude. It can't choose
- * what runs, supply a path or choose the prompt's text, and nothing here changes any other setting (TECH_SPEC §6.1).
+ * install, open the folder picker, send the fixed test prompt, restart Claude and open the fixed
+ * Web Store page in Chrome or Brave. It can't choose what runs, supply a path or an address, or
+ * choose the prompt's text, and nothing here changes any other setting (TECH_SPEC §6.1).
  */
 export function registerWizardIpc(actions: WizardActions): void {
-  const handle = (channel: WizardChannel, act: () => WizardView): void => {
+  const handle = <T>(
+    channel: WizardChannel,
+    schema: { safeParse(raw: unknown): { success: true; data: T } | { success: false } },
+    act: (payload: T) => WizardView
+  ): void => {
     ipcMain.handle(channel, (event: IpcMainInvokeEvent, raw: unknown): WizardResult => {
       if (!validateSender(event, ...SENDERS[channel])) return { ok: false, code: 'WIZARD_REFUSED' }
-      if (!WizardAction.safeParse(raw).success) {
+      const parsed = schema.safeParse(raw)
+      if (!parsed.success) {
         log.warn(`Dropped an invalid IPC payload on ${channel}`)
         return { ok: false, code: 'WIZARD_REFUSED' }
       }
-      return { ok: true, data: act() }
+      return { ok: true, data: act(parsed.data) }
     })
   }
-  handle(Channels.wizardGet, () => actions.view())
-  handle(Channels.wizardNext, () => actions.next())
-  handle(Channels.wizardBack, () => actions.back())
-  handle(Channels.wizardClaudeCheck, () => actions.checkClaude())
-  handle(Channels.wizardClaudeInstall, () => actions.installClaude())
-  handle(Channels.wizardChooseFolder, () => actions.chooseFolder())
-  handle(Channels.wizardTestClaude, () => actions.testClaude())
-  handle(Channels.wizardRestartClaude, () => actions.restartClaude())
-  handle(Channels.wizardRetryModel, () => actions.retryModel())
-  handle(Channels.wizardSkipMicTest, () => actions.skipMicTest())
+  const plain = (channel: WizardChannel, act: () => WizardView): void => {
+    handle(channel, WizardAction, () => act())
+  }
+  plain(Channels.wizardGet, () => actions.view())
+  plain(Channels.wizardNext, () => actions.next())
+  plain(Channels.wizardBack, () => actions.back())
+  plain(Channels.wizardClaudeCheck, () => actions.checkClaude())
+  plain(Channels.wizardClaudeInstall, () => actions.installClaude())
+  plain(Channels.wizardChooseFolder, () => actions.chooseFolder())
+  plain(Channels.wizardTestClaude, () => actions.testClaude())
+  plain(Channels.wizardRestartClaude, () => actions.restartClaude())
+  plain(Channels.wizardRetryModel, () => actions.retryModel())
+  plain(Channels.wizardSkipMicTest, () => actions.skipMicTest())
+  handle(Channels.wizardChromeOpen, WizardChromeOpen, ({ browser }) =>
+    actions.openChromeStore(browser)
+  )
+  plain(Channels.wizardChromeCheck, () => actions.checkChrome())
+  plain(Channels.wizardChromeConfirm, () => actions.confirmChrome())
 }

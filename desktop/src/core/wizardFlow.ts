@@ -17,7 +17,7 @@ const STEPS = [
   {
     id: 'claudeInChrome',
     title: 'Claude in Chrome',
-    detail: 'Let Claude use your browser. You can skip this.'
+    detail: 'Let Claude use your browser, so you can ask it to open and read web pages.'
   },
   { id: 'micAndHotkey', title: 'Microphone and hotkey', detail: 'Check that VoiceUp can hear you.' }
 ] as const

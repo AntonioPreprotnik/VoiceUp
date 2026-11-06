@@ -1,4 +1,6 @@
 import type {
+  ChromeBrowser,
+  ChromeStepStatus,
   ClaudeStepStatus,
   FolderStepStatus,
   MicStepStatus,
@@ -63,6 +65,17 @@ const micMessage = element('mic-message')
 const micHeard = element('mic-heard')
 const micProblem = element('mic-problem')
 const micSkip = button('mic-skip')
+const chrome = element('chrome')
+const chromeMessage = element('chrome-message')
+const chromeAccount = element('chrome-account')
+const chromeOpen: Record<ChromeBrowser, HTMLButtonElement> = {
+  chrome: button('chrome-open-chrome'),
+  brave: button('chrome-open-brave')
+}
+const chromeCheck = button('chrome-check')
+const chromeConfirm = button('chrome-confirm')
+
+const BROWSER_NAMES: Record<ChromeBrowser, string> = { chrome: 'Chrome', brave: 'Brave' }
 
 /** What the step says. */
 function claudeText(state: ClaudeStepStatus): string {
@@ -167,6 +180,33 @@ function drawMic(state: MicStepStatus): void {
   micSkip.hidden = state.heard !== null || state.skipped
 }
 
+function chromeText(state: ChromeStepStatus): string {
+  switch (state.status) {
+    case 'noBrowser':
+      return 'Claude in Chrome needs Google Chrome or Brave, and neither is installed. Install one, open it once, then check again.'
+    case 'needed':
+      return 'Add the Claude extension from the Chrome Web Store. VoiceUp opens its page, and you choose Add to Chrome there, in Brave too.'
+    case 'installed':
+      return state.browser === null
+        ? 'You said Claude in Chrome is installed.'
+        : `Claude in Chrome is installed in ${BROWSER_NAMES[state.browser]}.`
+  }
+}
+
+function drawChrome(state: ChromeStepStatus): void {
+  chromeMessage.textContent = chromeText(state)
+  const browsers = state.status === 'needed' ? state.browsers : []
+  for (const [browser, open] of Object.entries(chromeOpen) as [
+    ChromeBrowser,
+    HTMLButtonElement
+  ][]) {
+    open.hidden = !browsers.includes(browser)
+  }
+  chromeAccount.hidden = state.status !== 'needed'
+  chromeCheck.hidden = state.status === 'installed'
+  chromeConfirm.hidden = state.status === 'installed'
+}
+
 function draw(view: WizardView): void {
   steps.replaceChildren(
     ...view.steps.map((step, index) => {
@@ -191,7 +231,10 @@ function draw(view: WizardView): void {
   model.hidden = !onModel
   const onMic = step.id === 'micAndHotkey'
   mic.hidden = !onMic
-  notice.hidden = onClaude || onFolder || onSignIn || onModel || onMic
+  const onChrome = step.id === 'claudeInChrome'
+  chrome.hidden = !onChrome
+  notice.hidden = onClaude || onFolder || onSignIn || onModel || onMic || onChrome
+  if (onChrome) drawChrome(view.chrome)
   if (onSignIn) drawSignIn(view)
   if (onModel) drawModel(view.model)
   if (onMic) drawMic(view.mic)
@@ -248,6 +291,17 @@ modelRetry.addEventListener('click', () => {
 })
 micSkip.addEventListener('click', () => {
   void run(() => window.voiceupWizard.skipMicTest())
+})
+for (const [browser, open] of Object.entries(chromeOpen) as [ChromeBrowser, HTMLButtonElement][]) {
+  open.addEventListener('click', () => {
+    void run(() => window.voiceupWizard.openChromeStore(browser))
+  })
+}
+chromeCheck.addEventListener('click', () => {
+  void run(() => window.voiceupWizard.checkChrome())
+})
+chromeConfirm.addEventListener('click', () => {
+  void run(() => window.voiceupWizard.confirmChrome())
 })
 window.voiceupWizard.onChanged(draw)
 window.voiceupWizard.onOutput((text) => {

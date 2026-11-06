@@ -4,7 +4,7 @@ Each Spike story writes one note here, `<story>-<slug>.md`, using the `/decision
 
 ## Notes
 
-- `S0.6-node-pty-packaging.md`, `S2.1-hook-events.md`, `S4.1-speech-engine.md`, `S5.3-input-injection.md`.
+- `S0.6-node-pty-packaging.md`, `S2.1-hook-events.md`, `S4.1-speech-engine.md`, `S5.3-input-injection.md`, `S6.7-code-signing.md`, `S6.10-show-browser.md`.
 
 ## Pre-verification (2026-10-26)
 

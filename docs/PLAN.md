@@ -485,7 +485,7 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 
 - AC: decision note: sign (OV certificate cost and process) vs unsigned with a one-page "More info → Run anyway" guide for friends.
 
-**[ ] S6.8 Claude in Chrome step.** As a new user, I want Claude to be able to use my browser.
+**[x] S6.8 Claude in Chrome step.** As a new user, I want Claude to be able to use my browser.
 
 - AC: detect Google Chrome or Brave. Antonio chose these on 2026-11-06 in place of Edge. Brave works with Claude in Chrome (S6.10), but Claude Code doesn't document it. The step is required, so with neither browser it says to install one and check again.
 - AC: open the Claude in Chrome page on the Chrome Web Store in the chosen browser with a one-line explanation. No silent install, no enterprise policy, no registry tricks.

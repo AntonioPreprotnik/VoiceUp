@@ -25,6 +25,8 @@ function launch(env: Record<string, string> = {}): Promise<ElectronApplication> 
       // Live, so the fake answers what is typed. A replayed scenario answers on a fixed clock,
       // which only matches a click by luck, and not on a slower machine.
       VOICEUP_FAKE_LIVE: join(dir, 'prompts.txt'),
+      // A pretend Chrome with the extension, unless a test builds its own.
+      VOICEUP_TEST_BROWSER_ROOT: join(dir, 'browsers'),
       ...env
     }
   })
@@ -38,6 +40,26 @@ async function windowAt(path: string): Promise<Page> {
   if (page === undefined) throw new Error(`No window at ${path}`)
   return page
 }
+
+const EXTENSION_ID = 'fcoeoabgfenejglbffodgkkbkcdhcgfn'
+
+/** Only file existence matters to the check, so empty files and folders are a browser here. */
+function fakeBrowser(root: string, vendor: string, exe: string, extension: boolean): string {
+  const program = join(root, 'Program Files', vendor, 'Application')
+  mkdirSync(program, { recursive: true })
+  writeFileSync(join(program, exe), '')
+  const extensions = join(root, 'Local', vendor, 'User Data', 'Default', 'Extensions')
+  mkdirSync(extensions, { recursive: true })
+  if (extension) mkdirSync(join(extensions, EXTENSION_ID))
+  return join(extensions, EXTENSION_ID)
+}
+
+const savedBrowserControl = (): unknown =>
+  (
+    JSON.parse(readFileSync(join(dir, 'settings.json'), 'utf8')) as {
+      claude: { browserControl: unknown }
+    }
+  ).claude.browserControl
 
 const hasWindowAt = (path: string): boolean =>
   app.windows().some((page) => page.url().includes(path))
@@ -81,6 +103,7 @@ const savedWizard = (): unknown =>
 
 test.beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'voiceup-e2e-wizard-'))
+  fakeBrowser(join(dir, 'browsers'), 'Google/Chrome', 'chrome.exe', true)
 })
 
 test.afterEach(async () => {
@@ -304,4 +327,58 @@ test('a Claude that is too old stops a set-up copy, with the update command', as
     timeout: 20000
   })
   await expect(terminal.locator('#session-command-text')).toHaveText('claude update')
+})
+
+test('Claude in Chrome is required: it waits for the extension, then turns on browser control', async () => {
+  const root = join(dir, 'brave-only')
+  const extension = fakeBrowser(root, 'BraveSoftware/Brave-Browser', 'brave.exe', false)
+  writeFileSync(
+    join(dir, 'settings.json'),
+    JSON.stringify({
+      version: 1,
+      claude: { projectDir: dir },
+      wizard: {
+        done: false,
+        completed: ['claudeCode', 'projectFolder', 'signIn', 'speechModel', 'micAndHotkey']
+      }
+    })
+  )
+  app = await launch({ VOICEUP_TEST_BROWSER_ROOT: root })
+  const wizard = await windowAt('wizard')
+  await expect(wizard.locator('#title')).toHaveText('Claude in Chrome')
+  await expect(wizard.locator('#chrome-message')).toContainText('Chrome Web Store')
+  await expect(wizard.locator('#chrome-open-brave')).toBeVisible()
+  await expect(wizard.locator('#chrome-open-chrome')).toBeHidden()
+  await expect(wizard.locator('#continue')).toBeDisabled()
+
+  mkdirSync(extension)
+  await wizard.locator('#chrome-check').click()
+  await expect(wizard.locator('#chrome-message')).toHaveText(
+    'Claude in Chrome is installed in Brave.'
+  )
+  await expect(wizard.locator('#continue')).toBeEnabled()
+  expect(savedBrowserControl()).toBe(false)
+  await wizard.locator('#continue').click()
+  await expect(wizard.locator('#title')).toHaveText('Microphone and hotkey')
+  expect(savedBrowserControl()).toBe(true)
+})
+
+test('with neither browser the step says so, and the user can still confirm it by hand', async () => {
+  writeFileSync(
+    join(dir, 'settings.json'),
+    JSON.stringify({
+      version: 1,
+      claude: { projectDir: dir },
+      wizard: {
+        done: false,
+        completed: ['claudeCode', 'projectFolder', 'signIn', 'speechModel', 'micAndHotkey']
+      }
+    })
+  )
+  app = await launch({ VOICEUP_TEST_BROWSER_ROOT: join(dir, 'nothing') })
+  const wizard = await windowAt('wizard')
+  await expect(wizard.locator('#chrome-message')).toContainText('neither is installed')
+  await expect(wizard.locator('#continue')).toBeDisabled()
+  await wizard.locator('#chrome-confirm').click()
+  await expect(wizard.locator('#continue')).toBeEnabled()
 })

@@ -485,11 +485,11 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 
 - AC: decision note: sign (OV certificate cost and process) vs unsigned with a one-page "More info → Run anyway" guide for friends.
 
-**[ ] S6.8 Claude in Chrome step.** As a new user, I want Claude to be able to use my browser.
+**[x] S6.8 Claude in Chrome step.** As a new user, I want Claude to be able to use my browser.
 
-- AC: detect Google Chrome or Microsoft Edge (both supported by Claude Code's Chrome integration); if neither is installed, the step can be skipped.
-- AC: open the Claude in Chrome page on the Chrome Web Store in the user's browser with a one-line explanation. No silent install, no enterprise policy, no registry tricks.
-- AC: detect installation with a read-only existence check for extension ID `fcoeoabgfenejglbffodgkkbkcdhcgfn` in the browser profile's `Extensions` folder, or let the user confirm manually. No other browser data is read.
+- AC: detect Google Chrome or Brave. Antonio chose these on 2026-11-06 in place of Edge. Brave works with Claude in Chrome (S6.10), but Claude Code doesn't document it. The step is required, so with neither browser it says to install one and check again.
+- AC: open the Claude in Chrome page on the Chrome Web Store in the chosen browser with a one-line explanation. No silent install, no enterprise policy, no registry tricks.
+- AC: detect installation with a read-only existence check for extension ID `fcoeoabgfenejglbffodgkkbkcdhcgfn` in the browser profile's `Extensions` folder, or let the user confirm manually. No other browser data is read. Continue stays off until one of the two, and finishing the step turns on `claude.browserControl` for S6.9.
 - AC: the user signs into the extension with the same Claude account.
 
 **[ ] S6.9 Launch Claude with Chrome.** As a user, I want Claude to use the browser without remembering flags.
@@ -504,7 +504,7 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 - AC: other tools never move it; it moves at most once per command; it never moves while Claude is asking for permission or input.
 - AC: a browser that is closed or that Windows refuses to raise is logged, and Claude's work is unaffected.
 - Known limit: this shows the browser's active tab, which may not be Claude's, because Claude works in a background tab. The helper extension in `spikes/S6.10/tab-follow/` is being tested for that.
-- Brave works here (S6.10), but S6.8 still promises only Chrome and Edge, the browsers Claude Code documents.
+- Brave works here (S6.10), and S6.8 offers Chrome and Brave.
 
 ### E7 — Hardening and friends release
 

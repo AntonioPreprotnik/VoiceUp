@@ -71,6 +71,12 @@ vi.mock('./pty/resolveClaude', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./pty/resolveClaude')>()),
   resolveClaude: () => Promise.resolve({ file: 'claude.exe', args: [] })
 }))
+// The real one looks at this PC's browsers. Here Chrome has the extension, so setup can finish.
+vi.mock('./browser/chromeExtension', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./browser/chromeExtension')>()),
+  findBrowsers: () => [{ browser: 'chrome', installed: true, extension: true }],
+  openStore: () => true
+}))
 vi.mock('electron', () => import('../../test/fakes/electron'))
 vi.mock('electron-log/main', () => import('../../test/fakes/electronLog'))
 vi.mock('node-pty', () => import('../../test/fakes/nodePty'))

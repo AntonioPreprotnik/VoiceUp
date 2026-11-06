@@ -19,6 +19,9 @@ const Channels = {
   wizardRestartClaude: 'wizard:restartClaude',
   wizardRetryModel: 'wizard:retryModel',
   wizardSkipMicTest: 'wizard:skipMicTest',
+  wizardChromeOpen: 'wizard:chromeOpen',
+  wizardChromeCheck: 'wizard:chromeCheck',
+  wizardChromeConfirm: 'wizard:chromeConfirm',
   wizardChanged: 'wizard:changed',
   wizardOutput: 'wizard:output'
 } as const satisfies Partial<typeof SharedChannels>
@@ -38,6 +41,11 @@ const api: WizardApi = {
     ipcRenderer.invoke(Channels.wizardRestartClaude, {}) as Promise<WizardResult>,
   retryModel: () => ipcRenderer.invoke(Channels.wizardRetryModel, {}) as Promise<WizardResult>,
   skipMicTest: () => ipcRenderer.invoke(Channels.wizardSkipMicTest, {}) as Promise<WizardResult>,
+  openChromeStore: (browser) =>
+    ipcRenderer.invoke(Channels.wizardChromeOpen, { browser }) as Promise<WizardResult>,
+  checkChrome: () => ipcRenderer.invoke(Channels.wizardChromeCheck, {}) as Promise<WizardResult>,
+  confirmChrome: () =>
+    ipcRenderer.invoke(Channels.wizardChromeConfirm, {}) as Promise<WizardResult>,
   onChanged: (listener) => {
     const handler = (_event: unknown, view: WizardView): void => {
       listener(view)

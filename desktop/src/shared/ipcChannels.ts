@@ -42,6 +42,9 @@ export const Channels = {
   wizardRestartClaude: 'wizard:restartClaude',
   wizardRetryModel: 'wizard:retryModel',
   wizardSkipMicTest: 'wizard:skipMicTest',
+  wizardChromeOpen: 'wizard:chromeOpen',
+  wizardChromeCheck: 'wizard:chromeCheck',
+  wizardChromeConfirm: 'wizard:chromeConfirm',
   wizardChanged: 'wizard:changed',
   wizardOutput: 'wizard:output'
 } as const
@@ -181,7 +184,19 @@ export interface MicStepStatus {
   readonly skipped: boolean
 }
 
+/** The browsers the Claude in Chrome step offers (S6.8). */
+export type ChromeBrowser = 'chrome' | 'brave'
+
+/** The Claude in Chrome step. The extension is required, so only `installed` lets the user continue. */
+export type ChromeStepStatus =
+  | { readonly status: 'noBrowser' }
+  /** The browsers found, each able to open the store page. */
+  | { readonly status: 'needed'; readonly browsers: readonly ChromeBrowser[] }
+  /** Null when the user said so, and the check couldn't see it. */
+  | { readonly status: 'installed'; readonly browser: ChromeBrowser | null }
+
 export interface WizardView extends WizardProgress {
+  readonly chrome: ChromeStepStatus
   readonly model: ModelStepStatus
   readonly mic: MicStepStatus
   readonly claude: ClaudeStepStatus
@@ -211,6 +226,11 @@ export interface WizardApi {
   restartClaude(): Promise<WizardResult>
   retryModel(): Promise<WizardResult>
   skipMicTest(): Promise<WizardResult>
+  /** Opens the fixed Web Store page in that browser. The page can't supply an address. */
+  openChromeStore(browser: ChromeBrowser): Promise<WizardResult>
+  checkChrome(): Promise<WizardResult>
+  /** The user says the extension is installed, for when the check can't see it. */
+  confirmChrome(): Promise<WizardResult>
   /** Returns the function that unsubscribes. */
   onChanged(listener: (view: WizardView) => void): () => void
   /** The installer's output, as it arrives. Returns the function that unsubscribes. */

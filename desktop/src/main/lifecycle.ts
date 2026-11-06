@@ -29,6 +29,7 @@ import { runSmokeTest } from './smokeTest'
 import { createVoice } from './voice'
 import { schedule } from './schedule'
 import { openWizard, type Wizard } from './wizard'
+import { browserPlaces, findBrowsers, openStore } from './browser/chromeExtension'
 import { createWindow, loadRenderer, windowKindOf } from './windows/factory'
 
 function failStartup(error: unknown): void {
@@ -345,7 +346,13 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
           chosenModel: () => models.chosenModel()
         },
         startHotkey,
-        hotkey: store.current.hotkey
+        hotkey: store.current.hotkey,
+        browsers: {
+          find: () => findBrowsers(browserPlaces(app.isPackaged)),
+          open: (browser) => {
+            openStore(browser, browserPlaces(app.isPackaged))
+          }
+        }
       })
       wizard.onClaudeState(claudeState.state)
       wizardWindow = wizard.window

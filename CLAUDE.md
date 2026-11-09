@@ -24,7 +24,7 @@ Values in TECH_SPEC marked "Verified 2026-10-26" were checked against package so
 
 ## Stack (exact versions, committed lockfile, no `^` for Electron, native addons or models)
 
-Electron 45.x · electron-vite 5 / Vite 7 · TypeScript 6 strict · zod 4 · Vitest 5 · ESLint flat config · electron-builder 26 (NSIS, per-user) · electron-updater (public GitHub Releases) · node-pty (ConPTY) · @xterm/xterm + fit/webgl/unicode11 · sherpa-onnx-node 2.0.0 (Silero VAD; Moonshine base by default, Parakeet TDT 0.6B v2 int8 optional) in a `utilityProcess`.
+Electron 45.x · electron-vite 5 / Vite 7 · TypeScript 6 strict · zod 4 · Vitest 5 · ESLint flat config · electron-builder 26 (NSIS, per-user) · electron-updater (public GitHub Releases) · node-pty (ConPTY) · @xterm/xterm + fit/webgl/unicode11 · sherpa-onnx-node 2.0.1 (Silero VAD; Moonshine base by default, Parakeet TDT 0.6B v2 int8 optional) in a `utilityProcess`.
 v1.2: Elixir / Phoenix 1.8 Channels, coturn or eturnal (TURN REST API), Kotlin + Jetpack Compose, stream-webrtc-android.
 
 When S0.1 runs, confirm each with `npm view <pkg>@<line> version`: the latest release in the named line, not the latest overall. Pin those and record them. TypeScript 7 is out until typescript-eslint supports it (PLAN.md dependency baseline).

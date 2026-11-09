@@ -12,6 +12,7 @@ let reArm: Mock
 let showWindow: Mock
 let quit: Mock
 let pauseListening: Mock
+let restartToUpdate: Mock
 
 function create(notifications = true): ClaudeStatus {
   return new ClaudeStatus({
@@ -21,6 +22,7 @@ function create(notifications = true): ClaudeStatus {
     showWindow,
     quit,
     pauseListening,
+    restartToUpdate,
     openSettings: () => undefined
   })
 }
@@ -51,6 +53,7 @@ beforeEach(() => {
   showWindow = vi.fn()
   quit = vi.fn()
   pauseListening = vi.fn()
+  restartToUpdate = vi.fn()
 })
 
 describe('showing a state', () => {
@@ -174,6 +177,20 @@ describe('the tray menu', () => {
     create()
     tray().emit('click')
     expect(showWindow).toHaveBeenCalledOnce()
+  })
+
+  it('offers Restart to update only once an update has downloaded, and says so once', () => {
+    const status = create()
+    status.show(statusView('idle', null))
+    const labels = (): (string | undefined)[] =>
+      (tray().menu as MenuItem[]).map((item) => item.label)
+    expect(labels().some((label) => label?.startsWith('Restart to update') === true)).toBe(false)
+    status.updateReady('1.0.1')
+    expect(Notification.shown.at(-1)?.options).toMatchObject({ title: 'VoiceUp 1.0.1 is ready' })
+    menuItem('Restart to update to 1.0.1').click?.()
+    expect(restartToUpdate).toHaveBeenCalledOnce()
+    // Quit stays last, below it.
+    expect(labels().at(-1)).toBe('Quit')
   })
 
   it('is removed on destroy, so no ghost icon stays behind', () => {

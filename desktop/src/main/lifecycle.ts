@@ -2,6 +2,7 @@ import { join } from 'node:path'
 import { app, screen, session, type BrowserWindow } from 'electron'
 import { sideBySide } from '../core/sideBySide'
 import type { ShutdownSteps } from '../core/shutdown'
+import type { ExitReason } from '../core/updates'
 import { parseSmokeTestPath } from '../core/smokeTest'
 import { RecorderDevices } from '../shared/ipc'
 import { Channels, type ChromeBrowser, type MicDevice } from '../shared/ipcChannels'
@@ -29,6 +30,7 @@ import { loadSettings, saveSettings } from './settings/store'
 import { runSmokeTest } from './smokeTest'
 import { createVoice } from './voice'
 import { schedule } from './schedule'
+import { startAppUpdates, type AppUpdates } from './updater'
 import { openWizard, type Wizard } from './wizard'
 import { browserPlaces, findBrowsers, openForTest, openStore } from './browser/chromeExtension'
 import { browserForTest, browserFromAppName } from '../core/chromeStep'
@@ -57,10 +59,16 @@ export interface StartOptions {
   readonly argv?: readonly string[]
   /** Later stories add their steps here as they arrive. */
   readonly shutdownSteps?: ShutdownSteps
+  /** Tests pass a fake; only an installed copy starts the real one. */
+  readonly startUpdates?: typeof startAppUpdates
 }
 
 /** The startup order from TECH_SPEC §3. */
-export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptions = {}): void {
+export function startApp({
+  argv = process.argv,
+  shutdownSteps = {},
+  startUpdates = startAppUpdates
+}: StartOptions = {}): void {
   const smokeTestPath = parseSmokeTestPath(argv)
 
   // Step 1: single-instance lock. A smoke test skips it so it can run beside an open copy.
@@ -96,6 +104,13 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
   })
   const steps: ShutdownSteps = { ...shutdownSteps }
   installShutdown(steps)
+  // A downloaded update installs as VoiceUp exits, unless Windows is ending the session (S7.4).
+  let exitReason: ExitReason = 'quit'
+  let updates: AppUpdates | null = null
+  steps.update ??= () => {
+    updates?.stop()
+    updates?.installOnExit(exitReason)
+  }
 
   app
     .whenReady()
@@ -131,7 +146,8 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
         publishStatus,
         setNotifications,
         setListeningPaused,
-        stillRunning
+        stillRunning,
+        updateReady
       } = createClaudeLink({
         settings: store,
         overlay,
@@ -154,6 +170,10 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
           setListeningPaused(listening.isPaused)
           settingsScreen.refresh()
         },
+        restartToUpdate: () => {
+          exitReason = 'restart'
+          app.quit()
+        },
         write: (data) => {
           claude.host.write(data)
         },
@@ -165,6 +185,14 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
           wizard?.onHook(message)
         }
       })
+      // The first check waits 30 s, so it never competes with Claude starting.
+      startUpdates(updateReady)
+        .then((started) => {
+          updates = started
+        })
+        .catch((error: unknown) => {
+          log.error('App updates could not start; this copy will not update', error)
+        })
       // Step 5: the speech worker that the hidden window streams to.
       const { recording, models, applySpeechSettings } = createVoice({
         settings: store,
@@ -253,6 +281,7 @@ export function startApp({ argv = process.argv, shutdownSteps = {} }: StartOptio
       })
       const endingSession = (): void => {
         quitting = true
+        exitReason = 'sessionEnd'
       }
       terminalWindow.on('query-session-end', endingSession)
       terminalWindow.on('session-end', endingSession)

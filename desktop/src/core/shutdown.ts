@@ -7,6 +7,8 @@ export const SHUTDOWN_ORDER = [
   'worker',
   'hookServer',
   'hookFiles',
+  // Last before the logs, so the app has let go of everything the installer replaces (S7.4).
+  'update',
   'logs'
 ] as const
 

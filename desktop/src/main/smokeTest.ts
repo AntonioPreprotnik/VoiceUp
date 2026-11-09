@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { app, MessageChannelMain } from 'electron'
 import { FRAME_SAMPLES } from '../shared/worker'
 import { log } from './log'
+import { loadNsisUpdater } from './updater'
 import { checkModelInstall } from './models/selfTest'
 import { cmdExePath } from './pty/resolveClaude'
 import { SpeechSupervisor } from './speech/supervisor'
@@ -194,10 +195,21 @@ async function checkModels(): Promise<Check> {
   }
 }
 
+/** Loads the updater as an installed copy does: only the bundle shows how its import resolves. */
+async function checkUpdater(): Promise<Check> {
+  try {
+    const updater = await loadNsisUpdater()
+    return typeof updater.checkForUpdates === 'function' ? 'ok' : 'failed'
+  } catch (error: unknown) {
+    log.error('Smoke test could not load the updater', error)
+    return 'failed'
+  }
+}
+
 /**
- * Proves a packaged build starts, serves its renderer over app://, can run node-pty and can run the
- * speech worker (TECH_SPEC §7.2): writes a JSON result and exits 0, or exits 1. The result goes to a
- * file because a GUI exe has no reliable stdout.
+ * Proves a packaged build starts, serves its renderer over app://, can run node-pty, can run the
+ * speech worker and can load the updater (TECH_SPEC §7.2): writes a JSON result and exits 0, or
+ * exits 1. The result goes to a file because a GUI exe has no reliable stdout.
  */
 export async function runSmokeTest(resultPath: string): Promise<void> {
   try {
@@ -205,8 +217,13 @@ export async function runSmokeTest(resultPath: string): Promise<void> {
     const pty = await checkPty()
     const speech = await checkSpeech()
     const models = await checkModels()
-    await writeFile(resultPath, JSON.stringify({ app: 'ok', renderer, pty, speech, models }))
-    app.exit(renderer === 'ok' && pty === 'ok' && speech === 'ok' && models === 'ok' ? 0 : 1)
+    const updater = await checkUpdater()
+    await writeFile(
+      resultPath,
+      JSON.stringify({ app: 'ok', renderer, pty, speech, models, updater })
+    )
+    const checks = [renderer, pty, speech, models, updater]
+    app.exit(checks.every((check) => check === 'ok') ? 0 : 1)
   } catch (error: unknown) {
     log.error(`Smoke test failed writing ${resultPath}`, error)
     app.exit(1)

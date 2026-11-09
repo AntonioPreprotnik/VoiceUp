@@ -84,7 +84,7 @@ Monorepo: `desktop/` and `docs/` in v1.0; `protocol/`, `server/`, `android/` arr
 
 ### Dependency hygiene
 - Exact versions and a committed lockfile. Native modules are verified in a packaged build for every Electron major before the upgrade merges.
-- CI gates: `npm audit --omit=dev` fails on high severity; licenses limited to MIT, Apache-2.0, BSD, ISC.
+- CI gates: `npm audit --omit=dev` fails on high severity; licenses limited to MIT, Apache-2.0, BSD, ISC (exact-version exceptions in TECH_SPEC §7.3).
 - Nothing loads from a CDN at runtime. Every asset is bundled or downloaded with a checksum.
 
 ## Definition of Done (every story; canonical list in PLAN.md)

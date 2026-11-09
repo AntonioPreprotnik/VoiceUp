@@ -13,7 +13,7 @@ Windows Home has no Windows Sandbox, so use VirtualBox.
 3. Install Windows with a local account. Don't install Git, Node, Claude Code, Chrome or Brave.
 4. Install the VirtualBox Guest Additions, restart, and take a snapshot named **Clean**.
 
-Before each run: restore **Clean**, start the VM, and allow it to use your microphone if the host asks. You also need your Claude Pro or Max login and the release's `VoiceUp Setup <version>.exe` with `SHA256SUMS.txt`.
+Before each run: restore **Clean**, start the VM, and allow it to use your microphone if the host asks. You also need your Claude Pro or Max login and the release's `VoiceUp-Setup-<version>.exe` with `SHA256SUMS.txt`.
 
 Never run the real-named installer or uninstaller on your own Windows account: it shares `%APPDATA%\VoiceUp` with your daily copy, and the uninstaller can delete that folder.
 
@@ -22,7 +22,7 @@ Never run the real-named installer or uninstaller on your own Windows account: i
 From a browser download, as a friend would (S6.1, S6.7).
 
 - [ ] **1.1** In the VM, download the installer and `SHA256SUMS.txt` from the GitHub release with Edge. The steps in `docs/install.md` match what Edge shows ("Keep").
-- [ ] **1.2** `Get-FileHash '.\VoiceUp Setup <version>.exe'` matches its line in `SHA256SUMS.txt`.
+- [ ] **1.2** `Get-FileHash '.\VoiceUp-Setup-<version>.exe'` matches its line in `SHA256SUMS.txt`.
 - [ ] **1.3** Run it. **Windows protected your PC** appears; **More info** shows the file name and **Unknown publisher**, and **Run anyway** starts the installer, as `docs/install.md` says.
 - [ ] **1.4** No administrator prompt (UAC) appears: it installs per user.
 - [ ] **1.5** Afterwards, VoiceUp is in the Start menu, and the installer is at most 150 MB (TECH_SPEC §1), because no model is inside it.
@@ -75,11 +75,14 @@ TECH_SPEC §6.6 lists every failure and its automated test. These need the real 
 - [ ] **6.4 Extension off.** In Chrome, turn off the Claude extension and ask Claude to open a page. VoiceUp says **Claude can't reach your browser**, with the `/chrome` fix. Turn it back on.
 - [ ] **6.5 API key.** Restore **Clean**, set a user environment variable `ANTHROPIC_API_KEY=not-a-real-key`, install, and reach Sign in. The wizard warns that an API key bills the API, and still lets you continue. Remove the variable afterwards.
 
-## 7. Tray and startup
+## 7. Tray, startup and updates
 
 - [ ] **7.1** Close the terminal with X. A notice says **VoiceUp is still running**, the tray icon stays, and the hotkey still works. Clicking the tray icon brings the window back (S7.1).
 - [ ] **7.2** Tick **Pause listening** in the tray menu: the hotkey does nothing, and the tooltip says listening is paused. Untick it: the hotkey works again.
 - [ ] **7.3** Turn on **Start with Windows** in Settings, sign out and back in. VoiceUp starts in the tray, with no window, and the hotkey works.
+- [ ] **7.4 Update.** Install the previous release, then publish this one. Start the old copy: within a minute, a notice says **VoiceUp <version> is ready**, and the tray has **Restart to update to <version>** (S7.4).
+- [ ] **7.5** Choose **Restart to update**. VoiceUp closes, updates with no installer window, and starts again: Help → Open logs folder, and `main.log` says `VoiceUp <version> starting`. Settings, folder and model are kept.
+- [ ] **7.6** No SmartScreen or UAC prompt appeared during 7.5 (S6.7). Write down what showed if one did.
 
 ## 8. Uninstall
 

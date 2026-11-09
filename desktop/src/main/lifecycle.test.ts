@@ -19,7 +19,9 @@ import {
 } from '../../test/fakes/electron'
 import { resetFakePty, spawned } from '../../test/fakes/nodePty'
 import fakeLog from '../../test/fakes/electronLog'
+import { FakeUpdater } from '../../test/fakes/updater'
 import { startApp } from './lifecycle'
+import { AppUpdates } from './updater'
 import { ModelError, type ModelPhase } from './models/manager'
 
 // The model manager has its own integration test against a real server.
@@ -1046,6 +1048,78 @@ describe('shutdown', () => {
     expect(app.exitCodes).toEqual([])
     await vi.advanceTimersByTimeAsync(1)
     expect(app.exitCodes).toEqual([1])
+  })
+})
+
+describe('app updates (S7.4)', () => {
+  interface TrayItem {
+    label?: string
+    click?: () => void
+  }
+
+  /** Starts as an installed copy would, with a fake updater that has downloaded 1.0.1. */
+  async function startWithUpdate(): Promise<FakeUpdater> {
+    const updater = new FakeUpdater()
+    startApp({
+      argv: [],
+      startUpdates: (onReady) => {
+        const updates = new AppUpdates({ updater, onReady })
+        updates.start()
+        return Promise.resolve(updates)
+      }
+    })
+    await settle()
+    updater.download('1.0.1')
+    return updater
+  }
+
+  function trayItem(label: string): TrayItem {
+    const item = (Tray.instances.at(-1)?.menu as TrayItem[] | undefined)?.find(
+      (entry) => entry.label === label
+    )
+    if (item === undefined) throw new Error(`No tray item ${label}`)
+    return item
+  }
+
+  async function exited(): Promise<void> {
+    app.emit('before-quit', { preventDefault: vi.fn() })
+    await vi.waitFor(() => {
+      expect(app.exitCodes).toEqual([0])
+    })
+  }
+
+  it('installs a downloaded update silently on quit, without starting again', async () => {
+    const updater = await startWithUpdate()
+    trayItem('Quit').click?.()
+    await exited()
+    expect(updater.installs).toEqual([[true, false]])
+  })
+
+  it('restarts into the new version from the tray', async () => {
+    const updater = await startWithUpdate()
+    expect(Notification.shown.at(-1)?.options).toMatchObject({ title: 'VoiceUp 1.0.1 is ready' })
+    const quits = app.quitCount
+    trayItem('Restart to update to 1.0.1').click?.()
+    expect(app.quitCount).toBe(quits + 1)
+    await exited()
+    expect(updater.installs).toEqual([[true, true]])
+  })
+
+  it('never installs while Windows signs out or shuts down', async () => {
+    const updater = await startWithUpdate()
+    onlyWindow().emit('query-session-end')
+    await exited()
+    expect(updater.installs).toEqual([])
+  })
+
+  it('stays off in a copy the installer did not put there', async () => {
+    startApp({ argv: [] })
+    await settle()
+    await vi.waitFor(() => {
+      expect(fakeLog.messages('info')).toContainEqual([
+        'App updates are off: this copy was not installed by the VoiceUp installer'
+      ])
+    })
   })
 })
 

@@ -192,7 +192,7 @@ This list is canonical; `CLAUDE.md` and the `story` skill copy it.
 
 ## Milestones
 
-Nine milestones, built strictly in order. M3 is the first build worth using, M5 is v1.0, and the phone companion (v1.2) starts only after v1.0 is with friends.
+Nine milestones, built strictly in order. M3 is the first build worth using, M5 is v1.0, and the phone companion (v1.2) was planned to start only after v1.0 is with friends. Antonio decided on 2026-11-09 to start v1.2 while S7.5 (friends beta) and the clean-VM test wait, so M6 may start before M5 is done. M5 stays open until both have run.
 
 | # | Milestone | Epics | Done when |
 | --- | --- | --- | --- |
@@ -203,7 +203,7 @@ Nine milestones, built strictly in order. M3 is the first build worth using, M5 
 | — | **Gate** | — | Daily-drive it yourself for one week |
 | M4 | Installer, onboarding, Claude in Chrome | E6 | A clean Windows VM goes from `.exe` to a working voice session with Chrome |
 | M5 | **Hardening and friends release: v1.0** | E7 | Two friends finish setup without your help |
-| — | *v1.2 starts after v1.0 ships* | | |
+| — | *v1.2 was planned after v1.0 ships; started early on 2026-11-09, see above* | | |
 | M6 | Connection backbone | E8, E9; S11.1, S11.2 | A paired phone on mobile data and the PC exchange authenticated messages |
 | M7 | Remote view | E10; S12.1; S11.3, S11.6, S11.7 | The phone on mobile data watches the desktop live, view-only |
 | — | **Gate** | — | Security review against the threat model |
@@ -213,7 +213,7 @@ Each milestone ends with a working, committed app. E2 is built inside M3 because
 
 ## Epics and stories
 
-Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome); E8–E12 make up v1.2 (phone companion) and start only after v1.0 ships. Each story lists its acceptance criteria (AC) and is sized to fit one Claude Code session.
+Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome); E8–E12 make up v1.2 (phone companion), started on 2026-11-09 before v1.0 ships (see Milestones). Each story lists its acceptance criteria (AC) and is sized to fit one Claude Code session.
 
 ### E0 — Foundation
 
@@ -536,7 +536,7 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 
 ---
 
-**v1.2: phone companion.** Everything below starts only after v1.0 is in your friends' hands.
+**v1.2: phone companion.** Planned to start only after v1.0 is in your friends' hands. Antonio decided on 2026-11-09 to start v1.2 while S7.5 (friends beta) and the clean-VM test wait, so M6 may start before M5 is done. M5 stays open until both have run.
 
 ### E8 — Connection server (v1.2)
 
@@ -581,6 +581,7 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 **[ ] S9.2 Device identity.** As a user, I want each device to have its own key.
 
 - AC: keypair generated on first use; PC key in Electron `safeStorage`, phone key in Android Keystore; public key and random device ID registered with the server.
+- AC: ECDSA P-256 on both sides (S9.1). The phone key requires the user's biometric or screen-lock PIN at least every 5 minutes, so a stolen phone can't start a session (`docs/threat-model.md` A1).
 
 **[ ] S9.3 QR pairing.** As a user, I want to pair my phone once by scanning a code.
 
@@ -594,7 +595,7 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 
 **[ ] S9.5 Consent, indicator and auto-stop.** As a user, I want to always know when my screen is visible.
 
-- AC: PC setting "Ask every time" (default) or "Allow this phone automatically"; Windows notification when a phone connects.
+- AC: PC setting "Ask every time" (default) or "Allow this phone automatically"; Windows notification when a phone connects. The automatic option says that it turns a stolen phone into remote command execution (S9.1).
 - AC: persistent "Phone is watching" indicator with one-click stop; auto-stop after 15 min with no voice activity (configurable).
 
 **[ ] S9.6 Revocation.** As a user, I want to unpair a lost phone instantly.
@@ -632,17 +633,18 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 
 **[ ] S11.1 Scaffold.** As the developer, I want a clean Android project and CI.
 
-- AC: Kotlin + Jetpack Compose in `android/`; minimum Android version decided in S9.1; ktlint and detekt; unit tests; GitHub Actions builds a signed release APK.
+- AC: Kotlin + Jetpack Compose in `android/`; minimum Android 11, API 30 (S9.1; check friends' phones first); ktlint and detekt; unit tests; GitHub Actions builds a signed release APK.
 - AC: release keystore kept outside the repo (CI secret); losing it means friends must reinstall, so it is backed up.
 
 **[ ] S11.2 Pairing screen.** As a user, I want to pair by scanning the PC's QR code.
 
 - AC: CameraX + ML Kit barcode scanning; 6-digit confirmation (S9.3); keys stored in Android Keystore.
+- AC: the app exports nothing that starts a session; a `voiceup://pair` link only opens this screen (S9.1).
 
 **[ ] S11.3 Connect and view.** As a user, I want to watch my desktop.
 
 - AC: signaling client over WSS (OkHttp); WebRTC via `io.getstream:stream-webrtc-android` (pinned version), since Google no longer publishes Android WebRTC builds.
-- AC: full-screen video, landscape, pinch-zoom that is local to the phone only; automatic reconnect.
+- AC: full-screen video, landscape, pinch-zoom that is local to the phone only; automatic reconnect; `FLAG_SECURE` keeps the stream out of screenshots and recent apps (S9.1).
 
 **[ ] S11.4 Voice capture.** As a user, I want to speak a command from the phone.
 
@@ -659,7 +661,7 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 
 **[ ] S11.7 Distribution.** As a friend, I want to install it easily.
 
-- AC: signed APK on GitHub Releases with SHA-256 checksum; one-page install guide (allow install from unknown sources); protocol-version check against the PC with a clear "update needed" message.
+- AC: signed APK on GitHub Releases with SHA-256 checksum; one-page install guide (allow install from unknown sources; pair only a phone with a screen lock, and keep Claude's default permission mode); protocol-version check against the PC with a clear "update needed" message.
 
 ### E12 — Remote voice on the PC (v1.2)
 
@@ -672,6 +674,7 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 **[ ] S12.2 Clip intake.** As a user, I want phone voice handled like desktop voice.
 
 - AC: validate size, duration and format; then run the same transcribe → clean → preview → send gate pipeline, tagged as source "phone".
+- AC: refused, with the reason shown on the phone, while the latest hook says Claude's `permission_mode` is `bypassPermissions` (S9.1).
 
 **[ ] S12.3 Arbitration.** As a user, I don't want two voice commands colliding.
 
@@ -711,7 +714,7 @@ The biggest risk is outside your control: Anthropic's subscription-use policy an
 | Relay traffic grows | Monthly bill | 720p/15 fps default, bitrate cap, per-session caps, traffic alert (S8.5); measured in S8.1 |
 | Friends' mobile data use | Phone bills | Data counter, Wi-Fi-only option, stream stops in background (S11.6) |
 | Android WebRTC comes from a third-party prebuilt | Library could go stale | Pin the version; documented fallback is building the WebRTC AAR yourself |
-| Phone work delays the desktop app | v1.0 never ships | v1.2 starts only after v1.0 is with friends |
+| Phone work delays the desktop app | v1.0 never ships | Planned: v1.2 only after v1.0 is with friends. Since 2026-11-09 v1.2 runs first by Antonio's choice, so S7.5 and the VM test stay on the list until they run |
 
 ### Open decisions
 
@@ -726,7 +729,7 @@ The biggest risk is outside your control: Anthropic's subscription-use policy an
 **For v1.2:**
 
 - [ ] Domain name, VPS provider and region for the server (decide in S8.1).
-- [ ] Minimum Android version (decide in S9.1).
+- [x] Minimum Android version: Android 11, API 30 (S9.1, `docs/threat-model.md`).
 - [ ] Phone endpointing: energy threshold or Silero (S11.4 spike).
 - [ ] Whether "Allow this phone automatically" is offered at all, or every session needs approval on the PC.
 

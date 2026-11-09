@@ -652,7 +652,7 @@ Short-lived TURN credentials per the TURN REST API scheme, supported by both cot
 ### 9.6 Android structure
 
 - Gradle modules: `app` (Compose UI), `protocol` (kotlinx.serialization models, tested against `protocol/` schema fixtures), `rtc` (WebRTC session, `io.getstream:stream-webrtc-android`), `pairing` (CameraX + ML Kit, Keystore keys), `audio` (`AudioRecord`, `VOICE_RECOGNITION` source, 16 kHz mono PCM16).
-- Keys: ECDSA P-256 in Android Keystore (S9.1, `docs/threat-model.md`), with user authentication required at least every 5 minutes: `setUserAuthenticationParameters(300, AUTH_BIOMETRIC_STRONG | AUTH_DEVICE_CREDENTIAL)`. Minimum Android 11 (API 30). The PC key is ECDSA P-256 too, signatures DER-encoded on both sides.
+- Keys: ECDSA P-256 in Android Keystore (S9.1, `docs/threat-model.md`). Requiring the owner's biometric or PIN for it is parked (`docs/ideas.md`). Minimum Android 11 (API 30). The PC key is ECDSA P-256 too, signatures DER-encoded on both sides.
 - Lifecycle: the stream stops on `ON_STOP`; a foreground service of type microphone runs only while recording.
 
 ## 10. Claude Code skills for this repo

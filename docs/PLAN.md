@@ -38,7 +38,7 @@ VoiceUp is a Windows desktop app that hosts a Claude Code session in its own ter
 
 - Phone: view-only desktop stream and voice commands from anywhere, with no port forwarding or extra software on the PC.
 - Transcription stays on the PC; the phone sends a voice clip, which passes through the same send gate as local voice.
-- The phone can never move the PC's mouse or type on its keyboard. Phone voice can still drive Claude, so a stolen paired phone is remote command execution limited by Claude's permission mode; S9.1 must treat it that way.
+- The phone can never move the PC's mouse or type on its keyboard. Phone voice can still drive Claude, so a stolen paired phone is remote command execution limited by Claude's permission mode. Protection against that is parked until the phone companion works (`docs/ideas.md`, 2026-11-09).
 
 ### Non-goals
 
@@ -574,14 +574,14 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 **[ ] S9.1 Threat model (Spike, ≤ 3 h).** As the developer, I want risks named before code.
 
 - AC: `docs/threat-model.md` covering assets (screen, voice, Claude session), attackers (compromised server, stolen phone, network attacker, malicious app on the PC's network) and the mitigation story for each.
-- AC: treats a stolen paired phone as remote command execution through Claude, limited by Claude's permission mode, and states the mitigations.
+- AC: treats a stolen paired phone as remote command execution through Claude, limited by Claude's permission mode, and states the mitigations. Parked by Antonio on 2026-11-09; the ideas are in `docs/ideas.md`.
 - AC: key algorithm chosen (Ed25519 or ECDSA P-256 based on Android Keystore support for your minimum Android version).
 - AC: reviewed before any E10 code is written.
 
 **[ ] S9.2 Device identity.** As a user, I want each device to have its own key.
 
 - AC: keypair generated on first use; PC key in Electron `safeStorage`, phone key in Android Keystore; public key and random device ID registered with the server.
-- AC: ECDSA P-256 on both sides (S9.1). The phone key requires the user's biometric or screen-lock PIN at least every 5 minutes, so a stolen phone can't start a session (`docs/threat-model.md` A1).
+- AC: ECDSA P-256 on both sides (S9.1).
 
 **[ ] S9.3 QR pairing.** As a user, I want to pair my phone once by scanning a code.
 
@@ -595,7 +595,7 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 
 **[ ] S9.5 Consent, indicator and auto-stop.** As a user, I want to always know when my screen is visible.
 
-- AC: PC setting "Ask every time" (default) or "Allow this phone automatically"; Windows notification when a phone connects. The automatic option says that it turns a stolen phone into remote command execution (S9.1).
+- AC: PC setting "Ask every time" (default) or "Allow this phone automatically"; Windows notification when a phone connects.
 - AC: persistent "Phone is watching" indicator with one-click stop; auto-stop after 15 min with no voice activity (configurable).
 
 **[ ] S9.6 Revocation.** As a user, I want to unpair a lost phone instantly.
@@ -661,7 +661,7 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 
 **[ ] S11.7 Distribution.** As a friend, I want to install it easily.
 
-- AC: signed APK on GitHub Releases with SHA-256 checksum; one-page install guide (allow install from unknown sources; pair only a phone with a screen lock, and keep Claude's default permission mode); protocol-version check against the PC with a clear "update needed" message.
+- AC: signed APK on GitHub Releases with SHA-256 checksum; one-page install guide (allow install from unknown sources); protocol-version check against the PC with a clear "update needed" message.
 
 ### E12 — Remote voice on the PC (v1.2)
 
@@ -674,7 +674,6 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 **[ ] S12.2 Clip intake.** As a user, I want phone voice handled like desktop voice.
 
 - AC: validate size, duration and format; then run the same transcribe → clean → preview → send gate pipeline, tagged as source "phone".
-- AC: refused, with the reason shown on the phone, while the latest hook says Claude's `permission_mode` is `bypassPermissions` (S9.1).
 
 **[ ] S12.3 Arbitration.** As a user, I don't want two voice commands colliding.
 

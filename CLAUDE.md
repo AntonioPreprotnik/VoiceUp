@@ -73,7 +73,7 @@ Monorepo: `desktop/` and `docs/` in v1.0; `protocol/`, `server/`, `android/` arr
 - The app never reads, copies or transmits Claude credentials. Login happens only inside Claude Code's own flow.
 
 ### Remote access (v1.2, non-negotiable; full list in PLAN.md)
-- Threat model (S9.1) before any streaming code. View-only by construction: no code path injects mouse or keyboard input from the phone. Phone voice still drives Claude through the send gate, so treat a stolen paired phone as remote command execution.
+- Threat model (S9.1) before any streaming code. View-only by construction: no code path injects mouse or keyboard input from the phone. Phone voice still drives Claude through the send gate, so a stolen paired phone is remote command execution; protection against it is parked in `docs/ideas.md` until the phone companion works.
 - The server is untrusted: peers verify each other's signed DTLS fingerprints. Keys live in `safeStorage` / Android Keystore only.
 
 ### Testing

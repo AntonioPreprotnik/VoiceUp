@@ -2,24 +2,18 @@ import type { BrowserWindow } from 'electron'
 import type { ClaudeCommand } from '../core/claudeCommand'
 import { ClaudeStep } from '../core/claudeStep'
 import { MESSAGES, type MessageCode } from '../core/messages'
-import { formatSize } from '../core/modelChoice'
 import { SignInStep } from '../core/signInStep'
 import type { ClaudeState } from '../core/state/reducer'
 import { WizardFlow } from '../core/wizardFlow'
 import type { HookMessage } from '../shared/hooks'
-import {
-  Channels,
-  type FolderStepStatus,
-  type MicStepStatus,
-  type ModelStepStatus,
-  type WizardView
-} from '../shared/ipcChannels'
+import { Channels, type WizardView } from '../shared/ipcChannels'
 import { registerWizardIpc } from './ipc/wizard'
 import { log } from './log'
-import type { ModelStatus } from './models/controller'
 import type { RunningInstall } from './pty/installClaude'
 import type { SettingsStore } from './settings/settingsStore'
 import { ChromeSetup, type WizardBrowsers } from './wizardChrome'
+import { FolderStep } from './wizardFolder'
+import { VoiceSteps, type WizardModels } from './wizardVoice'
 import { createWindow } from './windows/factory'
 
 export interface WizardOptions {
@@ -42,12 +36,7 @@ export interface WizardOptions {
   readonly promptDirty: () => boolean
   readonly schedule: (callback: () => void, ms: number) => () => void
   readonly apiKeySet: boolean
-  readonly models: {
-    /** Starts the download if the model isn't on disk. */
-    ensure(): void
-    status(): ModelStatus
-    chosenModel(): { label: string; bytes: number; installed: boolean }
-  }
+  readonly models: WizardModels
   /** Turns the global hotkey on, once. False if another app has it. */
   readonly startHotkey: () => boolean
   /** As Electron names it, such as Control+Shift+Space. */
@@ -149,60 +138,36 @@ export function openWizard({
       send(Channels.wizardChanged, view())
     }
   })
-  let hotkeyOn: boolean | null = null
-  let heard: string | null = null
-  let micProblem: MicStepStatus['problem'] = null
-  let micSkipped = false
+  const voice = new VoiceSteps({ models, startHotkey, hotkey })
   const enteredStep = (): void => {
     const step = flow.currentStep
     const done = flow.completed.includes(step)
     if (step === 'signIn' && !done) startClaudeOnce()
-    if (step === 'speechModel' && !done) models.ensure()
-    if (step === 'micAndHotkey' && hotkeyOn === null) hotkeyOn = startHotkey()
+    if (step === 'speechModel' && !done) voice.ensureModel()
+    if (step === 'micAndHotkey') voice.enteredMicStep()
     if (step === 'claudeInChrome') chrome.check()
   }
 
-  const model = (): ModelStepStatus => {
-    const chosen = models.chosenModel()
-    const status = models.status()
-    const phase: ModelStepStatus['phase'] = chosen.installed
-      ? 'ready'
-      : status.phase === 'installing'
-        ? status.stage
-        : status.phase === 'failed'
-          ? 'failed'
-          : 'waiting'
-    return {
-      label: chosen.label,
-      size: formatSize(chosen.bytes),
-      phase,
-      percent: status.phase === 'installing' ? status.percent : 0
+  const folder = new FolderStep({
+    settings,
+    window,
+    chooseFolder,
+    isFolder,
+    folderChanged: () => {
+      if (claudeStarted) restartClaude()
+    },
+    onChange: () => {
+      send(Channels.wizardChanged, view())
     }
-  }
-
-  const mic = (): MicStepStatus => ({
-    hotkey: hotkey.replaceAll('Control', 'Ctrl'),
-    hotkeyOn,
-    heard,
-    problem: micProblem,
-    skipped: micSkipped
   })
-
-  const folder = (): FolderStepStatus => {
-    const path = settings.current.claude.projectDir
-    return { path, missing: path !== null && !isFolder(path) }
-  }
 
   const canContinue = (): boolean => {
     if (flow.currentStep === 'claudeCode') return claudeStep.canContinue
-    if (flow.currentStep === 'projectFolder') {
-      const { path, missing } = folder()
-      return path !== null && !missing
-    }
+    if (flow.currentStep === 'projectFolder') return folder.canContinue
     if (flow.completed.includes(flow.currentStep)) return true
     if (flow.currentStep === 'signIn') return signIn.isDone
-    if (flow.currentStep === 'speechModel') return models.chosenModel().installed
-    if (flow.currentStep === 'micAndHotkey') return heard !== null || micSkipped
+    if (flow.currentStep === 'speechModel') return voice.modelReady
+    if (flow.currentStep === 'micAndHotkey') return voice.micDone
     if (flow.currentStep === 'claudeInChrome') return chrome.canContinue
     return true
   }
@@ -210,10 +175,10 @@ export function openWizard({
     ...flow.view,
     claude: claudeStep.status,
     ...chrome.view,
-    folder: folder(),
+    folder: folder.status,
     signIn: signIn.status,
-    model: model(),
-    mic: mic(),
+    model: voice.model,
+    mic: voice.mic,
     apiKeyWarning: apiKeySet ? MESSAGES.API_KEY_SET : null,
     canContinue: canContinue()
   })
@@ -225,27 +190,6 @@ export function openWizard({
       ...(turnOnBrowserControl ? { claude: { ...current.claude, browserControl: true } } : {}),
       wizard: { done: flow.finished, completed: [...flow.completed] }
     }))
-  }
-
-  let choosing = false
-  const chooseProjectFolder = async (): Promise<void> => {
-    if (choosing) return
-    choosing = true
-    try {
-      const chosen = await chooseFolder(window, settings.current.claude.projectDir)
-      if (chosen === null) return
-      settings.update((current) => ({
-        ...current,
-        claude: { ...current.claude, projectDir: chosen }
-      }))
-      // Claude runs in one folder for its whole session, so going back to change it restarts it.
-      if (claudeStarted) restartClaude()
-      send(Channels.wizardChanged, view())
-    } catch (error: unknown) {
-      log.error('Could not ask for a project folder', error)
-    } finally {
-      choosing = false
-    }
   }
 
   registerWizardIpc({
@@ -280,7 +224,7 @@ export function openWizard({
       return view()
     },
     chooseFolder: () => {
-      void chooseProjectFolder()
+      void folder.choose()
       return view()
     },
     testClaude: () => {
@@ -292,14 +236,11 @@ export function openWizard({
       return view()
     },
     retryModel: () => {
-      if (flow.currentStep === 'speechModel') models.ensure()
+      if (flow.currentStep === 'speechModel') voice.ensureModel()
       return view()
     },
     skipMicTest: () => {
-      if (flow.currentStep === 'micAndHotkey') {
-        log.info('Setup: microphone test skipped')
-        micSkipped = true
-      }
+      if (flow.currentStep === 'micAndHotkey') voice.skipMicTest()
       return view()
     },
     openChromeStore: (browser) => {
@@ -346,12 +287,11 @@ export function openWizard({
       send(Channels.wizardChanged, view())
     },
     onTranscript: (text) => {
-      heard = text
-      micProblem = null
+      voice.onTranscript(text)
       send(Channels.wizardChanged, view())
     },
     onVoiceFailed: (code) => {
-      micProblem = { title: MESSAGES[code].title, detail: MESSAGES[code].detail }
+      voice.onVoiceFailed(code)
       send(Channels.wizardChanged, view())
     }
   }

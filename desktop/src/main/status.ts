@@ -17,6 +17,8 @@ export interface ClaudeStatusOptions {
   readonly pauseListening: (paused: boolean) => void
   readonly showWindow: () => void
   readonly quit: () => void
+  /** Quits and starts the downloaded version (S7.4). */
+  readonly restartToUpdate: () => void
 }
 
 /** Shows Claude's state outside the terminal: the status bar, the tray and Windows notifications. */
@@ -28,6 +30,7 @@ export class ClaudeStatus {
 
   private notifications: boolean
   private paused = false
+  private updateVersion: string | null = null
 
   constructor(private readonly options: ClaudeStatusOptions) {
     this.notifications = options.notifications
@@ -76,6 +79,16 @@ export class ClaudeStatus {
     })
   }
 
+  /** An update has downloaded: a tray item to install it now, and one notice to say so. */
+  updateReady(version: string): void {
+    this.updateVersion = version
+    if (this.view !== undefined) this.refreshTray(this.view)
+    this.showNotice({
+      title: `VoiceUp ${version} is ready`,
+      body: 'It installs when you quit VoiceUp, or now with Restart to update in the tray menu.'
+    })
+  }
+
   /** Only when the user isn't already looking at it. */
   notify(previous: ClaudeState, state: ClaudeState): void {
     const { window } = this.options
@@ -115,7 +128,11 @@ export class ClaudeStatus {
   }
 
   private menu(view: StatusView): Menu {
-    const { reArm, showWindow, quit, openSettings, pauseListening } = this.options
+    const { reArm, showWindow, quit, openSettings, pauseListening, restartToUpdate } = this.options
+    const update: Electron.MenuItemConstructorOptions[] =
+      this.updateVersion === null
+        ? []
+        : [{ label: `Restart to update to ${this.updateVersion}`, click: restartToUpdate }]
     return Menu.buildFromTemplate([
       { label: this.paused ? `${view.label} (listening paused)` : view.label, enabled: false },
       { type: 'separator' },
@@ -131,6 +148,7 @@ export class ClaudeStatus {
       { label: 'Re-arm voice', enabled: view.canReArm, click: reArm },
       { label: 'Settings...', click: openSettings },
       { type: 'separator' },
+      ...update,
       { label: 'Quit', click: quit }
     ])
   }

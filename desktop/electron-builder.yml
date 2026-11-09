@@ -25,6 +25,9 @@ nsis:
   allowToChangeInstallationDirectory: true
   createStartMenuShortcut: true
   include: build/installer.nsh
+  # S7.4: latest.yml names the installer with dashes, and GitHub would turn spaces into dots on
+  # upload, so the updater would ask for a file that isn't there.
+  artifactName: ${productName}-Setup-${version}.${ext}
 # Security baseline rule 10. Read back by scripts/check-fuses.mjs: keep the two in sync.
 electronFuses:
   runAsNode: false

@@ -176,7 +176,7 @@ Streaming a desktop to a phone is the most dangerous thing this project does; th
 - **Baseline at project start (October 2026):** Electron 45.x (current stable; Electron supports the latest three majors), electron-vite 5 with Vite 7, TypeScript 6, zod 4, Vitest 5, ESLint flat config, scoped `@xterm/*` packages, `node-pty`, `sherpa-onnx-node`. When S0.1 runs, confirm each with `npm view <pkg>@<line> version`: the latest release in the named line, not the latest overall. Checked 2026-11-02: Electron 45.2.1, electron-vite 5.0.0, Vite 7.3.7, TypeScript 6.0.3, Vitest 5.0.5 (moved up from 4 on 2026-11-02), electron-builder 26.18.1, sherpa-onnx-node 2.0.0 (2.0.1 exists but is not verified), ESLint 10.14.0, typescript-eslint 8.72.1, Prettier 3.9.10. TypeScript 7 is not usable yet: typescript-eslint 8.72.1 requires `<6.1.0`. `@types/node` stays on the line of the Node version CI runs (24), so code can't compile against APIs that aren't there at runtime. S0.6 picked `node-pty` 1.2.0-beta.18, from prebuilds with no rebuild (`docs/decisions/S0.6-node-pty-packaging.md`).
 - **Upgrade cadence:** Dependabot or Renovate weekly for patches; Electron major upgrades within 8 weeks of release so the app never leaves the supported window.
 - **Native modules** (`node-pty`, `sherpa-onnx-node`) are verified in a packaged build for every Electron major before the upgrade merges.
-- **CI gates:** `npm audit --omit=dev` fails on high severity; a license check allows only MIT, Apache-2.0, BSD and ISC.
+- **CI gates:** `npm audit --omit=dev` fails on high severity; a license check allows only MIT, Apache-2.0, BSD and ISC, with exact-version exceptions listed in TECH_SPEC §7.3 (S7.4: `argparse`, `sax`).
 - **Nothing loads from a CDN at runtime.** Every asset is bundled or downloaded with a checksum.
 
 ### Definition of Done (every story)
@@ -522,9 +522,12 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 
 - AC: `docs/manual-tests.md` covering install on a clean Windows VM (VirtualBox with a Windows evaluation image; Windows Sandbox also works where available, but Windows Home lacks it), first-run wizard, voice from a fullscreen app, permission prompt never receives text, uninstall.
 
-**[ ] S7.4 App updates.** As a friend, I want fixes without reinstalling by hand.
+**[x] S7.4 App updates.** As a friend, I want fixes without reinstalling by hand.
 
 - AC: `electron-updater` from the public repo's GitHub Releases (decided: the repo is public, so no token ships in the app). Unsigned builds still update; S6.7 only decides whether SmartScreen warns.
+- AC: an update downloads in the background and installs silently when VoiceUp quits, or at once from the tray's **Restart to update**, so it never cuts Claude off by itself. It never installs while Windows ends the session. A failed check is only logged.
+- AC: the CI `release` job from TECH_SPEC §7.3 (added here, since S0.3 built only `check` and `package`): a `v*` tag makes a draft Release with the installer, `.blockmap`, `latest.yml` and `SHA256SUMS.txt`. The installer is named `VoiceUp-Setup-<version>.exe`, the name `latest.yml` points to.
+- Still open: S6.7 asks whether an update downloaded by the app shows SmartScreen. That waits for the clean-VM run (`docs/manual-tests.md` 7.6).
 
 **[ ] S7.5 Friends beta.** As the developer, I want real feedback before calling it done.
 

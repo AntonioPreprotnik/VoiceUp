@@ -11,6 +11,7 @@ describe('runShutdown', () => {
       'worker',
       'hookServer',
       'hookFiles',
+      'update',
       'logs'
     ])
   })

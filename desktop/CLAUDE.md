@@ -19,7 +19,7 @@ Electron app. Root `CLAUDE.md`, `docs/PLAN.md` and `docs/TECH_SPEC.md` hold the 
 
 ## Pinned versions
 
-Exact versions only. Confirmed with `npm view` on 2026-11-02: Electron 45.2.1, electron-vite 5.0.0, Vite 7.3.7, TypeScript 6.0.3, @types/node 24.19.2, ESLint 10.14.0, @eslint/js 10.0.1, typescript-eslint 8.72.1, Prettier 3.9.10, Vitest 5.0.5, electron-builder 26.18.1, @electron/fuses 2.1.3 (reads the wire only; electron-builder keeps its own 1.8.0 to write it), license-checker-rseidelsohn 5.0.1, zod 4.6.7, electron-log 5.4.4. node-pty 1.2.0-beta.18 (S0.6), @xterm/xterm 6.0.0, @xterm/addon-fit 0.11.0, @xterm/addon-webgl 0.19.0, @xterm/addon-unicode11 0.9.0, @xterm/addon-web-links 0.12.0. sherpa-onnx-node 2.0.0, unbzip2-stream 1.4.3, tar-stream 3.2.2. @playwright/test 1.64.1 (dev only; it downloads no browsers, since it only drives Electron).
+Exact versions only. Confirmed with `npm view` on 2026-11-02: Electron 45.2.1, electron-vite 5.0.0, Vite 7.3.7, TypeScript 6.0.3, @types/node 24.19.2, ESLint 10.14.0, @eslint/js 10.0.1, typescript-eslint 8.72.1, Prettier 3.9.10, Vitest 5.0.5, electron-builder 26.18.1, @electron/fuses 2.1.3 (reads the wire only; electron-builder keeps its own 1.8.0 to write it), license-checker-rseidelsohn 5.0.1, zod 4.6.7, electron-log 5.4.4. node-pty 1.2.0-beta.18 (S0.6), @xterm/xterm 6.0.0, @xterm/addon-fit 0.11.0, @xterm/addon-webgl 0.19.0, @xterm/addon-unicode11 0.9.0, @xterm/addon-web-links 0.12.0. sherpa-onnx-node 2.0.0, unbzip2-stream 1.4.3, tar-stream 3.2.2. electron-updater 6.8.12 (S7.4, the `v26` line that matches electron-builder 26). @playwright/test 1.64.1 (dev only; it downloads no browsers, since it only drives Electron).
 
 ## Gotchas
 
@@ -58,3 +58,4 @@ Exact versions only. Confirmed with `npm view` on 2026-11-02: Electron 45.2.1, e
 - electron-builder does not bundle: run `npm run build` first, or it packages a stale `out/`.
 - Plain `tsc --noEmit` checks nothing here: the root `tsconfig.json` has `files: []` and only references the two projects. Use `npm run typecheck`.
 - Import rules live in `eslint.import-rules.mjs`, as an allowlist per folder. A new allowed package goes there and in the table in `test/lint/import-rules.test.ts`.
+- App updates (S7.4) run only in a copy the installer put there, which has `resources/app-update.yml`. To test one without publishing: build two renamed installers (see the installer gotcha) with `--config.extraMetadata.version=<x>`, install the older, and in its `resources/app-update.yml` replace the GitHub lines with `provider: generic` and `url: http://127.0.0.1:<port>/`. Then serve the newer build's output folder (installer, `.blockmap`, `latest.yml`) on that port.

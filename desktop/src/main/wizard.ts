@@ -1,7 +1,5 @@
 import type { BrowserWindow } from 'electron'
 import type { ClaudeCommand } from '../core/claudeCommand'
-import { BrowserTest } from '../core/browserTest'
-import { ChromeStep, type BrowserFinding } from '../core/chromeStep'
 import { ClaudeStep } from '../core/claudeStep'
 import { MESSAGES, type MessageCode } from '../core/messages'
 import { formatSize } from '../core/modelChoice'
@@ -11,7 +9,6 @@ import { WizardFlow } from '../core/wizardFlow'
 import type { HookMessage } from '../shared/hooks'
 import {
   Channels,
-  type ChromeBrowser,
   type FolderStepStatus,
   type MicStepStatus,
   type ModelStepStatus,
@@ -22,6 +19,7 @@ import { log } from './log'
 import type { ModelStatus } from './models/controller'
 import type { RunningInstall } from './pty/installClaude'
 import type { SettingsStore } from './settings/settingsStore'
+import { ChromeSetup, type WizardBrowsers } from './wizardChrome'
 import { createWindow } from './windows/factory'
 
 export interface WizardOptions {
@@ -54,17 +52,7 @@ export interface WizardOptions {
   readonly startHotkey: () => boolean
   /** As Electron names it, such as Control+Shift+Space. */
   readonly hotkey: string
-  /** Chrome and Brave, for the Claude in Chrome step. */
-  readonly browsers: {
-    /** Reads only whether files exist, never what is in them. */
-    find(): readonly BrowserFinding[]
-    /** Opens the fixed Web Store page in that browser. */
-    open(browser: ChromeBrowser): void
-    /** Windows' default browser, if it is one of ours. */
-    defaultBrowser(): ChromeBrowser | null
-    /** Starts the browser for the browser test if it isn't running. Opens no page. */
-    openForTest(): Promise<'started' | 'running' | 'none'>
-  }
+  readonly browsers: WizardBrowsers
   /** Whether the running Claude was started with --chrome. */
   readonly launchedWithChrome: () => boolean
 }
@@ -140,48 +128,27 @@ export function openWizard({
     }
   })
 
-  const chromeStep = new ChromeStep(browsers.defaultBrowser())
-  const checkChrome = (): boolean => chromeStep.update(browsers.find())
-
   let claudeStarted = false
-  const browserTest = new BrowserTest({
-    startWithBrowser: () => {
-      if (!settings.current.claude.browserControl) {
-        settings.update((current) => ({
-          ...current,
-          claude: { ...current.claude, browserControl: true }
-        }))
-      }
-      // Sign in may have been finished in an earlier run, so Claude may not be running yet.
-      if (!claudeStarted) {
-        claudeStarted = true
-        startClaude(window)
-        return 'fresh'
-      }
-      if (launchedWithChrome()) return 'running'
-      restartClaude()
-      return 'restart'
-    },
-    openBrowser: () => browsers.openForTest(),
+  const startClaudeOnce = (): boolean => {
+    if (claudeStarted) return false
+    claudeStarted = true
+    startClaude(window)
+    return true
+  }
+  const chrome = new ChromeSetup({
+    settings,
+    browsers,
+    startClaudeOnce,
+    restartClaude,
+    launchedWithChrome,
     deliver,
-    discard: discardDelivery,
+    discardDelivery,
     promptDirty,
     schedule,
     onChange: () => {
-      logBrowserTest()
       send(Channels.wizardChanged, view())
     }
   })
-  // Fixed wording only: never anything Claude wrote.
-  let loggedTest = 'ready'
-  const logBrowserTest = (): void => {
-    const status = browserTest.status
-    if (status.status === loggedTest) return
-    loggedTest = status.status
-    if (status.status === 'testing') log.info('Setup: browser test sent')
-    else if (status.status === 'passed') log.info('Setup: browser test passed')
-    else if (status.status === 'failed') log.warn(`Setup: browser test failed: ${status.title}`)
-  }
   let hotkeyOn: boolean | null = null
   let heard: string | null = null
   let micProblem: MicStepStatus['problem'] = null
@@ -189,13 +156,10 @@ export function openWizard({
   const enteredStep = (): void => {
     const step = flow.currentStep
     const done = flow.completed.includes(step)
-    if (step === 'signIn' && !claudeStarted && !done) {
-      claudeStarted = true
-      startClaude(window)
-    }
+    if (step === 'signIn' && !done) startClaudeOnce()
     if (step === 'speechModel' && !done) models.ensure()
     if (step === 'micAndHotkey' && hotkeyOn === null) hotkeyOn = startHotkey()
-    if (step === 'claudeInChrome') checkChrome()
+    if (step === 'claudeInChrome') chrome.check()
   }
 
   const model = (): ModelStepStatus => {
@@ -239,14 +203,13 @@ export function openWizard({
     if (flow.currentStep === 'signIn') return signIn.isDone
     if (flow.currentStep === 'speechModel') return models.chosenModel().installed
     if (flow.currentStep === 'micAndHotkey') return heard !== null || micSkipped
-    if (flow.currentStep === 'claudeInChrome') return chromeStep.isDone && browserTest.passed
+    if (flow.currentStep === 'claudeInChrome') return chrome.canContinue
     return true
   }
   const view = (): WizardView => ({
     ...flow.view,
     claude: claudeStep.status,
-    chrome: chromeStep.status,
-    browserTest: browserTest.status,
+    ...chrome.view,
     folder: folder(),
     signIn: signIn.status,
     model: model(),
@@ -296,7 +259,7 @@ export function openWizard({
       // Main decides, so a page that enabled its own button still can't skip the check.
       if (flow.finished || !canContinue()) return view()
       // Only this step, finished with the extension, turns browser control on.
-      const chromeDone = flow.currentStep === 'claudeInChrome' && chromeStep.isDone
+      const chromeDone = flow.currentStep === 'claudeInChrome' && chrome.extensionReady
       const finishedNow = flow.next()
       persist(chromeDone)
       if (finishedNow) {
@@ -340,30 +303,26 @@ export function openWizard({
       return view()
     },
     openChromeStore: (browser) => {
-      if (flow.currentStep === 'claudeInChrome' && chromeStep.canOpen(browser))
-        browsers.open(browser)
+      if (flow.currentStep === 'claudeInChrome') chrome.openStore(browser)
       return view()
     },
     checkChrome: () => {
-      if (flow.currentStep === 'claudeInChrome') checkChrome()
+      if (flow.currentStep === 'claudeInChrome') chrome.check()
       return view()
     },
     testBrowser: () => {
-      if (flow.currentStep === 'claudeInChrome' && chromeStep.isDone) browserTest.start()
+      if (flow.currentStep === 'claudeInChrome') chrome.testBrowser()
       return view()
     },
     confirmChrome: () => {
-      if (flow.currentStep === 'claudeInChrome') {
-        log.info('Setup: the user confirmed Claude in Chrome is installed')
-        chromeStep.confirm()
-      }
+      if (flow.currentStep === 'claudeInChrome') chrome.confirm()
       return view()
     }
   })
 
   // Coming back from the browser is when the extension has just been added.
   window.on('focus', () => {
-    if (!flow.finished && flow.currentStep === 'claudeInChrome' && checkChrome()) {
+    if (!flow.finished && flow.currentStep === 'claudeInChrome' && chrome.check()) {
       send(Channels.wizardChanged, view())
     }
   })
@@ -377,11 +336,11 @@ export function openWizard({
     window,
     onClaudeState: (state) => {
       signIn.onClaudeState(state)
-      browserTest.onClaudeState(state)
+      chrome.onClaudeState(state)
     },
     onHook: (message) => {
       signIn.onHook(message)
-      browserTest.onHook(message)
+      chrome.onHook(message)
     },
     onModelStatus: () => {
       send(Channels.wizardChanged, view())

@@ -1,6 +1,6 @@
 # VoiceUp
 
-Windows desktop app that hosts an interactive Claude Code session in its own terminal and lets the user speak commands to it with a global hotkey from any app. Speech is transcribed locally and typed in only when Claude is ready. v1.2 adds an Android companion (view-only desktop stream + voice from anywhere) through a Phoenix signaling server.
+Windows desktop app that hosts an interactive Claude Code session in its own terminal and lets the user speak commands to it with a global hotkey from any app. Speech is transcribed locally and typed in only when Claude is ready. v1.2 adds an Android companion (desktop stream, voice and a few fixed controls from anywhere) through a Phoenix signaling server.
 
 Users: Antonio and a few friends, each with their own Claude Pro/Max login. Windows only.
 
@@ -73,7 +73,7 @@ Monorepo: `desktop/` and `docs/` in v1.0; `protocol/`, `server/`, `android/` arr
 - The app never reads, copies or transmits Claude credentials. Login happens only inside Claude Code's own flow.
 
 ### Remote access (v1.2, non-negotiable; full list in PLAN.md)
-- Threat model (S9.1) before any streaming code. View-only by construction: no code path injects mouse or keyboard input from the phone. Phone voice still drives Claude through the send gate, so a stolen paired phone is remote command execution; protection against it is parked in `docs/ideas.md` until the phone companion works.
+- Threat model (S9.1) before any streaming code. No free input by construction: no code path moves the mouse or types text from the phone. It can send only voice and the fixed actions in TECH_SPEC §9.1 (send now, re-arm, switch window, next or previous browser tab). Phone voice still drives Claude through the send gate, so a stolen paired phone is remote command execution; protection against it is parked in `docs/ideas.md` until the phone companion works.
 - The server is untrusted: peers verify each other's signed DTLS fingerprints. Keys live in `safeStorage` / Android Keystore only.
 
 ### Testing

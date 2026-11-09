@@ -24,7 +24,7 @@ VoiceUp is a Windows desktop app that hosts a Claude Code session in its own ter
 
 **Claude in Chrome (v1.0):** onboarding guides the extension install and VoiceUp launches Claude with `--chrome`, so Claude can operate the browser.
 
-**Phone loop (v1.2):** open the VoiceUp Android app → it connects to your paired PC through the VoiceUp server, like AnyDesk → you watch a live, view-only video of the desktop (for example Claude driving Chrome) → tap the mic and speak → the clip goes to the PC, where the same local transcription, preview and send gate handle it.
+**Phone loop (v1.2):** open the VoiceUp Android app → it connects to your paired PC through the VoiceUp server, like AnyDesk → you watch a live video of the desktop (for example Claude driving Chrome) → tap the mic and speak → the clip goes to the PC, where the same local transcription, preview and send gate handle it. Buttons on the phone send the preview at once, re-arm voice, switch the PC's window, or move to the next or previous browser tab.
 
 ### Goals (v1.0)
 
@@ -36,9 +36,9 @@ VoiceUp is a Windows desktop app that hosts a Claude Code session in its own ter
 
 ### Goals (v1.2)
 
-- Phone: view-only desktop stream and voice commands from anywhere, with no port forwarding or extra software on the PC.
+- Phone: desktop stream and voice commands from anywhere, plus a fixed set of controls (switch window, next or previous browser tab, send now, re-arm voice), with no port forwarding or extra software on the PC.
 - Transcription stays on the PC; the phone sends a voice clip, which passes through the same send gate as local voice.
-- The phone can never move the PC's mouse or type on its keyboard. Phone voice can still drive Claude, so a stolen paired phone is remote command execution limited by Claude's permission mode. Protection against that is parked until the phone companion works (`docs/ideas.md`, 2026-11-09).
+- The phone can never move the PC's mouse or type free text on its keyboard. It can only send voice and the fixed actions in S12.5 (decided 2026-11-09). Phone voice can still drive Claude, so a stolen paired phone is remote command execution limited by Claude's permission mode. Protection against that is parked until the phone companion works (`docs/ideas.md`, 2026-11-09).
 
 ### Non-goals
 
@@ -150,7 +150,7 @@ These rules go into `CLAUDE.md` verbatim; they are what keeps AI-written code ma
 Streaming a desktop to a phone is the most dangerous thing this project does; these rules apply to every v1.2 story.
 
 - **Threat model before code.** S9.1 is written and reviewed before any streaming code exists.
-- **View-only by construction.** The PC contains no code path that injects mouse or keyboard input from the phone. The data channel accepts exactly two phone→PC message types (voice clip, cancel), each schema-validated; anything else closes the connection. A voice clip still becomes a Claude command after the send gate, so the threat model treats phone voice as command execution, not as viewing.
+- **No free input by construction.** The PC contains no code path that moves the mouse or types text from the phone. The data channel accepts only the phone→PC message types in TECH_SPEC §9.1 (voice clip, cancel, send now, re-arm, and S12.5's window and tab actions), each schema-validated; anything else closes the connection. Until 2026-11-09 this was view-only with two message types; Antonio added the fixed controls. A voice clip still becomes a Claude command after the send gate, so the threat model treats phone voice as command execution, not as viewing.
 - **The server is untrusted.** Peers sign their WebRTC DTLS fingerprints with their paired device keys and verify each other's, so even a compromised server cannot man-in-the-middle the stream.
 - **Keys stay in the OS vault.** PC private key in Electron `safeStorage` (Windows DPAPI); phone private key in Android Keystore. Never in plain files, never in logs.
 - **Consent and visibility.** Every session starts explicitly; the PC shows a persistent "Phone is watching" indicator with one-click stop; sessions auto-stop after inactivity (default 15 min).
@@ -205,7 +205,7 @@ Nine milestones, built strictly in order. M3 is the first build worth using, M5 
 | M5 | **Hardening and friends release: v1.0** | E7 | Two friends finish setup without your help |
 | — | *v1.2 was planned after v1.0 ships; started early on 2026-11-09, see above* | | |
 | M6 | Connection backbone | E8, E9; S11.1, S11.2 | A paired phone on mobile data and the PC exchange authenticated messages |
-| M7 | Remote view | E10; S12.1; S11.3, S11.6, S11.7 | The phone on mobile data watches the desktop live, view-only |
+| M7 | Remote view | E10; S12.1; S11.3, S11.6, S11.7 | The phone on mobile data watches the desktop live |
 | — | **Gate** | — | Security review against the threat model |
 | M8 | **Remote voice: v1.2** | E12 except S12.1; S11.4, S11.5 | A command spoken on the phone runs in Claude through the send gate |
 
@@ -213,7 +213,7 @@ Each milestone ends with a working, committed app. E2 is built inside M3 because
 
 ## Epics and stories
 
-Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome); E8–E12 make up v1.2 (phone companion), started on 2026-11-09 before v1.0 ships (see Milestones). Each story lists its acceptance criteria (AC) and is sized to fit one Claude Code session.
+Thirteen epics, 74 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome); E8–E12 make up v1.2 (phone companion), started on 2026-11-09 before v1.0 ships (see Milestones). Each story lists its acceptance criteria (AC) and is sized to fit one Claude Code session.
 
 ### E0 — Foundation
 
@@ -604,7 +604,7 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 
 ### E10 — Desktop streaming, PC side (v1.2)
 
-*Goal: a smooth, view-only video of the desktop that costs little CPU and bandwidth.*
+*Goal: a smooth video of the desktop that costs little CPU and bandwidth.*
 
 **[ ] S10.1 Capture spike (Spike, ≤ 2 h).** As the developer, I want to know what capture costs.
 
@@ -654,6 +654,7 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 **[ ] S11.5 Claude status and preview.** As a user, I want to know what happened to my command.
 
 - AC: shows Claude's state from the PC, the transcript preview with cancel (mirrors S5.2), and the result: sent, queued, or blocked with the reason.
+- AC: buttons for **Send now** during the preview and **Re-arm voice** when the PC offers it, and a controls bar with the PC's **window list** and **previous / next tab** (S12.5).
 
 **[ ] S11.6 Battery and data.** As a user, I don't want surprise drain or data bills.
 
@@ -669,7 +670,7 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 
 **[ ] S12.1 Shared protocol.** As the developer, I want PC and phone to agree on messages.
 
-- AC: versioned JSON Schema in `protocol/`: `voiceClip`, `cancel` (phone→PC); `state`, `transcriptPreview`, `result`, `error` (PC→phone). zod on the PC, kotlinx.serialization on Android, both tested against the schema files.
+- AC: versioned JSON Schema in `protocol/`: `voiceClip`, `cancel`, `sendNow`, `reArm`, `windows.list`, `window.focus`, `tab.next`, `tab.prev` (phone→PC); `windows` and `state`, `transcriptPreview`, `result`, `error` (PC→phone). zod on the PC, kotlinx.serialization on Android, both tested against the schema files.
 
 **[ ] S12.2 Clip intake.** As a user, I want phone voice handled like desktop voice.
 
@@ -682,6 +683,13 @@ Thirteen epics, 73 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 **[ ] S12.4 Feedback to the phone.** As a user, I want the phone to show what the PC did.
 
 - AC: state changes, preview and final result are pushed to the phone within 500 ms of happening on the PC.
+
+**[ ] S12.5 Phone actions.** As a user, I want to send, re-arm and switch what's on screen from the phone. Added on 2026-11-09 at Antonio's request.
+
+- AC: `sendNow` sends the previewed transcript at once, through the same send gate, and is ignored in the first 300 ms of the preview, as the hotkey is (TECH_SPEC §4.5). `reArm` does exactly what the tray's Re-arm voice does, and only when the PC offers it.
+- AC: `windows.list` returns the visible top-level windows as `{ id, title, app }`, with ids that are random per session, never window handles. `window.focus` brings one to the front the way S6.10 raises the browser, and answers `error` for an unknown id or a window Windows won't raise.
+- AC: `tab.next` and `tab.prev` send exactly Ctrl+Tab and Ctrl+Shift+Tab, only when the window in front belongs to Chrome, Brave or Edge. Otherwise they answer "no browser in front" and send nothing.
+- AC: these, with voice and cancel, are the only things the phone can make the PC do. No message carries free text, keys or coordinates, and a test proves an unknown type closes the connection.
 
 ## Risks and open decisions
 
@@ -708,7 +716,7 @@ The biggest risk is outside your control: Anthropic's subscription-use policy an
 
 | Risk | Impact | Mitigation |
 | --- | --- | --- |
-| Desktop stream exposes passwords, messages, anything on screen | Serious privacy breach | View-only by construction; end-to-end encryption with paired-key verification; consent, indicator, auto-stop (E9) |
+| Desktop stream exposes passwords, messages, anything on screen | Serious privacy breach | No free input by construction (only voice and S12.5's fixed actions); end-to-end encryption with paired-key verification; consent, indicator, auto-stop (E9) |
 | Your server is compromised | Attacker tries to intercept or impersonate | Server is untrusted by design (S9.4); it holds no content and no secrets beyond public keys |
 | Relay traffic grows | Monthly bill | 720p/15 fps default, bitrate cap, per-session caps, traffic alert (S8.5); measured in S8.1 |
 | Friends' mobile data use | Phone bills | Data counter, Wi-Fi-only option, stream stops in background (S11.6) |

@@ -14,7 +14,7 @@ paths:
 Spec: `docs/TECH_SPEC.md` §9. Threat model: `docs/threat-model.md` (must exist before any streaming code).
 
 ## Non-negotiables
-- **View-only by construction.** Phone → PC accepts only `voiceClip.begin`, binary chunks, `voiceClip.end`, `cancel`. Never add a message that moves the mouse, types keys, opens files or runs commands. A PR that does is rejected regardless of reason. A voice clip still becomes a Claude command after the send gate, so treat a stolen paired phone as remote command execution (`docs/threat-model.md`).
+- **No free input by construction.** Phone → PC accepts only `voiceClip.begin`, binary chunks, `voiceClip.end`, `cancel`, and S12.5's fixed actions: `sendNow`, `reArm`, `windows.list`, `window.focus`, `tab.next`, `tab.prev` (TECH_SPEC §9.1, added by Antonio on 2026-11-09). Never add a message that moves the mouse, types free text or arbitrary keys, opens files or runs commands. A new fixed action needs Antonio's say-so and a row in TECH_SPEC §9.1 first. A voice clip still becomes a Claude command after the send gate, so treat a stolen paired phone as remote command execution (`docs/threat-model.md`).
 - Unknown `type`, bad envelope, wrong `v`, or size over limit → close the data channel and log the code.
 - The server is untrusted: every session verifies the peer's signed DTLS fingerprint against the paired public key, then re-checks the remote certificate fingerprint from `getStats()`.
 - Keys live in `safeStorage` (PC) / Android Keystore (phone). Never log keys, signatures, SDP or ICE candidates above `debug`.

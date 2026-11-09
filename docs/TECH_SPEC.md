@@ -621,12 +621,18 @@ One reliable, ordered data channel named `voiceup`. JSON control messages carry 
 | binary chunks | phone → PC | ≤ 16 KB each, in order |
 | `voiceClip.end` | phone → PC | `{ clipId, sha256 }` |
 | `cancel` | phone → PC | `{ clipId }` |
+| `sendNow` | phone → PC | `{ clipId }`: sends the previewed transcript through the gate; ignored in the preview's first 300 ms (S12.5) |
+| `reArm` | phone → PC | `{}`: the tray's Re-arm voice, only when offered (S12.5) |
+| `windows.list` | phone → PC | `{}` (S12.5) |
+| `window.focus` | phone → PC | `{ windowId }`, an id from the last `windows` (S12.5) |
+| `tab.next`, `tab.prev` | phone → PC | `{}`: Ctrl+Tab or Ctrl+Shift+Tab, only to Chrome, Brave or Edge in front (S12.5) |
 | `state` | PC → phone | `{ state, queueLength }` |
 | `transcriptPreview` | PC → phone | `{ clipId, text, countdownMs }` |
 | `result` | PC → phone | `{ clipId, outcome: 'sent' \| 'queued' \| 'blocked' \| 'cancelled', reason? }` |
+| `windows` | PC → phone | `{ windows: [{ windowId, title, app }] }`, ids random per session (S12.5) |
 | `error` | PC → phone | `{ clipId?, code }` |
 
-Any other type, a bad envelope or a size over the limit closes the connection. The PC has no handler for anything that could move the mouse or type. A voice clip still becomes a Claude command after the send gate, so the threat model (S9.1) treats a stolen paired phone as remote command execution limited by Claude's permission mode.
+Any other type, a bad envelope or a size over the limit closes the connection. The PC has no handler that moves the mouse or types text; the only key it ever sends for the phone is the fixed tab shortcut above. A voice clip still becomes a Claude command after the send gate, so the threat model (S9.1) treats a stolen paired phone as remote command execution limited by Claude's permission mode.
 
 ### 9.2 Signaling (Phoenix 1.8)
 

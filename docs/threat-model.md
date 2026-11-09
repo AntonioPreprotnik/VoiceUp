@@ -18,7 +18,7 @@ v1.2 lets a paired Android phone watch the PC's desktop and speak commands to Cl
 
 ## Trust boundaries
 
-- **PC ↔ phone**: trusted only after pairing, and only for the two message types the PC accepts (`voiceClip`, `cancel`, TECH_SPEC §9.1). Everything else closes the connection.
+- **PC ↔ phone**: trusted only after pairing, and only for the message types the PC accepts (voice, cancel and the fixed actions of S12.5, TECH_SPEC §9.1). Everything else closes the connection.
 - **Either device ↔ server**: the server is **untrusted**. It can see who talks to whom and when, and it can drop or delay messages. It must never be able to read content, impersonate a device, or pair one on its own.
 - **Network**: untrusted everywhere (café Wi-Fi, carrier NAT, the relay).
 - **Other apps on each device**: untrusted. Another Windows user, or another Android app, must not reach the keys or the session.
@@ -51,12 +51,12 @@ v1.2 lets a paired Android phone watch the PC's desktop and speak commands to Cl
 
 ### A4. A malicious app or person on the PC's network, or on the PC
 
-| Attack                                               | Mitigation                                                                                                                                                                                                               | Story               |
-| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------- |
-| Connect to the PC directly                           | The PC opens no port. Both devices connect outward to the server (the AnyDesk model). The hook server stays on `127.0.0.1` with a per-launch token, as today                                                             | —                   |
-| Send input events over the data channel              | Not possible by construction: the PC has no handler that moves the mouse or types. Only `voiceClip` and `cancel` are accepted, schema-checked and size-limited. Anything else closes the connection                      | S12.1, S12.2        |
-| Read the PC's private key                            | Kept only in `safeStorage` (DPAPI, tied to the Windows user), never in plain files or logs. Another Windows user can't decrypt it. Malware running as the same user can, but it can already drive Claude without VoiceUp | S9.2                |
-| Crash or exhaust the PC with huge or malformed clips | `bytes` ≤ 1,920,000 (60 s at 16 kHz), chunks ≤ 16 KB, SHA-256 checked, one recording or transcription at a time. A second request gets "busy"                                                                            | S12.1, S12.2, S12.3 |
+| Attack                                               | Mitigation                                                                                                                                                                                                                                                                               | Story               |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| Connect to the PC directly                           | The PC opens no port. Both devices connect outward to the server (the AnyDesk model). The hook server stays on `127.0.0.1` with a per-launch token, as today                                                                                                                             | —                   |
+| Send input events over the data channel              | Not possible by construction: the PC has no handler that moves the mouse or types text. Only voice, cancel and the fixed actions of S12.5 are accepted, schema-checked and size-limited; the one key sent is Ctrl+(Shift+)Tab to a browser in front. Anything else closes the connection | S12.1, S12.2, S12.5 |
+| Read the PC's private key                            | Kept only in `safeStorage` (DPAPI, tied to the Windows user), never in plain files or logs. Another Windows user can't decrypt it. Malware running as the same user can, but it can already drive Claude without VoiceUp                                                                 | S9.2                |
+| Crash or exhaust the PC with huge or malformed clips | `bytes` ≤ 1,920,000 (60 s at 16 kHz), chunks ≤ 16 KB, SHA-256 checked, one recording or transcription at a time. A second request gets "busy"                                                                                                                                            | S12.1, S12.2, S12.3 |
 
 ### A5. Another app on the phone
 

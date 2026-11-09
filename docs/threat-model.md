@@ -101,7 +101,7 @@ The stolen-phone changes (S9.2, S9.5, S11.7, S12.2) were parked on 2026-11-09 an
 ## Review checklist before E10
 
 - [x] Antonio has read this page. The stolen-phone section is parked (2026-11-09).
-- [ ] The decision note for S9.1 is written (`/decision-note S9.1`).
+- [x] The decision note for S9.1 is written (`docs/decisions/S9.1-threat-model.md`).
 - [ ] The minimum Android version is checked against friends' phones.
 
 ## Sources

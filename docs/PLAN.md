@@ -571,7 +571,7 @@ Thirteen epics, 74 stories. E0–E7 make up v1.0 (desktop and Claude in Chrome);
 
 *Goal: only your phone can ever see your screen, and you always know when it does.*
 
-**[ ] S9.1 Threat model (Spike, ≤ 3 h).** As the developer, I want risks named before code.
+**[x] S9.1 Threat model (Spike, ≤ 3 h).** As the developer, I want risks named before code.
 
 - AC: `docs/threat-model.md` covering assets (screen, voice, Claude session), attackers (compromised server, stolen phone, network attacker, malicious app on the PC's network) and the mitigation story for each.
 - AC: treats a stolen paired phone as remote command execution through Claude, limited by Claude's permission mode, and states the mitigations. Parked by Antonio on 2026-11-09; the ideas are in `docs/ideas.md`.

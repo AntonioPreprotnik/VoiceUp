@@ -98,3 +98,13 @@ export function installAppMenu(actions?: SessionMenuActions): void {
   const items = [file, view, help, app.isPackaged ? undefined : devTools]
   Menu.setApplicationMenu(Menu.buildFromTemplate(items.filter((item) => item !== undefined)))
 }
+
+/**
+ * The session menu, once set up. Electron applies a menu to every window, which would undo the
+ * wizard's removeMenu and offer Change folder, which starts Claude: so nothing until the wizard
+ * finishes. Checked by the saved state, not the window: the wizard can change the menu while it is
+ * still opening, as a download it resumes reports progress.
+ */
+export function installSessionMenu(setUp: boolean, actions: SessionMenuActions): void {
+  if (setUp) installAppMenu(actions)
+}

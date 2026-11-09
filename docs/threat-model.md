@@ -27,19 +27,7 @@ v1.2 lets a paired Android phone watch the PC's desktop and speak commands to Cl
 
 ### A1. Someone who stole or picked up a paired phone
 
-**Treat this as remote command execution on the PC.** Phone voice becomes a Claude prompt after the send gate (TECH_SPEC §9.1). The gate only stops text from landing in a permission prompt or a dirty prompt. It doesn't judge what the command asks for, so `delete everything in this folder` gets through. What Claude then does is limited only by its permission mode and the user's allow rules.
-
-| Attack                                                    | Mitigation                                                                                                                                                                                                                                                                                                       | Story        |
-| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
-| Opens the app on an unlocked phone and speaks a command   | **new:** the phone's signing key requires the user's biometric or screen-lock PIN at least every 5 minutes (`setUserAuthenticationParameters(300, AUTH_BIOMETRIC_STRONG or AUTH_DEVICE_CREDENTIAL)`, API 30+). A thief holding an unlocked phone has at most that window, and can't start a new session after it | S9.2, S11.2  |
-| Uses the phone after the owner noticed                    | Revocation on the PC ends the session at once, deletes the key and tells the server to reject the device                                                                                                                                                                                                         | S9.6         |
-| Starts a session while the owner is away from the PC      | "Ask every time" is the default: a session waits for a click on the PC. "Allow this phone automatically" is opt-in, and its setting says it turns a stolen phone into remote command execution                                                                                                                   | S9.5         |
-| Session left running                                      | Auto-stop after 15 minutes with no voice activity. A persistent "Phone is watching" indicator with one-click Stop                                                                                                                                                                                                | S9.5         |
-| Commands go through while Claude skips permission prompts | **new:** phone voice is refused whenever the latest hook says Claude's `permission_mode` is `bypassPermissions` (the recorded hooks carry this field, e.g. `test/scenarios/agent-permission-send.json`). The phone shows why. Hotkey voice is unaffected, because the user is at the PC                          | S12.2        |
-| Destructive command misheard or spoken in a hurry         | The transcript preview with cancel reaches the phone (S11.5) and the PC overlay. Permission prompts still appear on the PC, and the phone can never answer them, because the gate blocks text while Claude asks (`needs_permission` → block)                                                                     | S11.5, S12.2 |
-| Reads the screen through the stream                       | Same controls: consent, indicator, auto-stop, revocation. Pausing the stream from a PC hotkey, and auto-pause when Windows locks                                                                                                                                                                                 | S9.5, S10.4  |
-
-**What's left:** within the 5-minute window, on a session the owner already allowed, a thief can run any command Claude would run in its current permission mode. That limit has to be said plainly in the README and the pairing screen: **pair only a phone that has a screen lock, and use Claude's default permission mode.**
+**Parked on 2026-11-09** until the phone companion works end to end. See `docs/ideas.md`. What the plan already has still applies: revocation (S9.6), "Ask every time" by default, auto-stop and the "Phone is watching" indicator (S9.5). The phone can never answer one of Claude's permission prompts, because the send gate blocks text while Claude asks.
 
 ### A2. A compromised or malicious VoiceUp server
 
@@ -96,25 +84,23 @@ One algorithm everywhere keeps signing and verifying code identical on both side
 
 ## Minimum Android version: 11 (API 30)
 
-- API 30 adds `setUserAuthenticationParameters` with `AUTH_BIOMETRIC_STRONG` and `AUTH_DEVICE_CREDENTIAL`. These name exactly which unlock methods may open the key, and for how long, which is A1's main mitigation. Older versions have only the deprecated `setUserAuthenticationValidityDurationSeconds`, which can do the same but is less precise. So this is the cleaner API, not a hard requirement.
+- API 30 adds `setUserAuthenticationParameters` with `AUTH_BIOMETRIC_STRONG` and `AUTH_DEVICE_CREDENTIAL`. These name exactly which unlock methods may open the key, and for how long, which the parked stolen-phone idea needs (`docs/ideas.md`). Older versions have only the deprecated `setUserAuthenticationValidityDurationSeconds`, which is less precise. So this is the cleaner API, not a hard requirement.
 - Android 11 and later run on roughly 90% of active devices (Android Studio numbers, October 2026: 11 is 10.5%, 12 is 9.6%, 13 is 11.8%, 14 is 15.3%, 15 is 14.7%, 16 is 25.4%, 17 about 1%). Android 10 and older no longer get security updates, which matters for an app that can drive Claude.
-- Check friends' phones before S11.1. If one is on Android 10, lowering the minimum to API 29 with the deprecated call is the fallback. Never a key with no user authentication.
+- Check friends' phones before S11.1. If one is on Android 10, lowering the minimum to API 29 is the fallback.
 
 ## Changes this model makes to the plan
 
 Applied to PLAN.md in the same commit:
 
-- **S9.2:** the phone key requires user authentication every 5 minutes (biometric or device PIN).
 - **S11.1:** minimum Android 11 (API 30). The open decision "Minimum Android version" is closed.
 - **S11.2:** the app exports nothing that starts a session; `voiceup://pair` only opens the pairing screen.
 - **S11.3:** `FLAG_SECURE` on the viewing screen.
-- **S12.2:** phone voice is refused while Claude's `permission_mode` is `bypassPermissions`.
-- **S9.5:** "Allow this phone automatically" explains that it turns a stolen phone into remote command execution.
-- **Docs (S11.7):** the install guide says to pair only a phone with a screen lock, and to keep Claude's default permission mode.
+
+The stolen-phone changes (S9.2, S9.5, S11.7, S12.2) were parked on 2026-11-09 and moved to `docs/ideas.md`.
 
 ## Review checklist before E10
 
-- [ ] Antonio has read this page and agrees with A1's remaining risk.
+- [x] Antonio has read this page. The stolen-phone section is parked (2026-11-09).
 - [ ] The decision note for S9.1 is written (`/decision-note S9.1`).
 - [ ] The minimum Android version is checked against friends' phones.
 

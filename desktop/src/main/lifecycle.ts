@@ -14,6 +14,7 @@ import { exposeForE2e } from './e2eHook'
 import { on, registerTerminalIpc } from './ipc/terminal'
 import { registerTerminalUiIpc } from './ipc/terminalUi'
 import { initLogging, log, setLogLevel } from './log'
+import { applySettingsChanges, BACKGROUND_FLAG } from './settingsEffects'
 import { installAppMenu } from './menu'
 import { Overlay } from './overlay'
 import { installPermissions } from './permissions'
@@ -41,13 +42,7 @@ function failStartup(error: unknown): void {
   app.exit(1)
 }
 
-/** Windows passes this when it starts VoiceUp at sign-in, so the window stays in the tray. */
-export const BACKGROUND_FLAG = '--background'
-
-/** An unpackaged build would add electron.exe to the startup list, so only a packaged one does. */
-function applyStartWithWindows(on: boolean): void {
-  if (app.isPackaged) app.setLoginItemSettings({ openAtLogin: on, args: [BACKGROUND_FLAG] })
-}
+export { BACKGROUND_FLAG } from './settingsEffects'
 
 function focusWindow(window: BrowserWindow): void {
   if (window.isMinimized()) window.restore()
@@ -344,28 +339,16 @@ export function startApp({
         if (store.current.wizard.done) settingsScreen.open()
         else focusFront()
       }
-      // A saved change takes effect at once, or from the next recording.
-      store.subscribe((next, previous) => {
-        if (next.logLevel !== previous.logLevel) setLogLevel(next.logLevel)
-        if (next.ui.sounds !== previous.ui.sounds) overlay.setSounds(next.ui.sounds)
-        if (next.ui.notifications !== previous.ui.notifications) {
-          setNotifications(next.ui.notifications)
-        }
-        if (next.ui.startWithWindows !== previous.ui.startWithWindows) {
-          applyStartWithWindows(next.ui.startWithWindows)
-          log.info(`Start with Windows: ${next.ui.startWithWindows ? 'on' : 'off'}`)
-        }
-        if (next.speech.modelId !== previous.speech.modelId) {
-          models.select(next.speech.modelId)
-        } else if (
-          next.speech.endSilenceSec !== previous.speech.endSilenceSec ||
-          next.speech.maxRecordingSec !== previous.speech.maxRecordingSec
-        ) {
-          applySpeechSettings()
-        }
+      applySettingsChanges(store, {
+        setSounds: (on) => {
+          overlay.setSounds(on)
+        },
+        setNotifications,
+        selectModel: (id) => {
+          models.select(id)
+        },
+        applySpeechSettings
       })
-      // Brings an entry from before S7.1 up to date, with the flag that keeps the window hidden.
-      if (store.current.ui.startWithWindows) applyStartWithWindows(true)
       const openTerminal = async (): Promise<void> => {
         await loadTerminal()
         // The e2e tests have no model and no network, so nothing downloads for them.
